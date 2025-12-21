@@ -1,203 +1,295 @@
 import streamlit as st
 from openai import OpenAI
 from streamlit_drawable_canvas import st_canvas
-from PIL import Image
 import gspread
 from google.oauth2.service_account import Credentials
-import io, base64, json, pandas as pd, numpy as np
+import json, re
+import pandas as pd
 from datetime import datetime
 
-# --- CONFIG & STYLING ---
 st.set_page_config(page_title="Physics Examiner Pro", layout="wide")
 
-# --- AUTHENTICATION HELPER ---
-@st.cache_resource
+# =========================
+# CONFIG + CONSTANTS
+# =========================
+
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+]
+
+QUESTIONS = {
+    "Q1: Forces": {
+        "question": "5kg box, 20N force, 4N friction. Acceleration?",
+        "marks": 3,
+        "mark_scheme": "1. F=16N. 2. F=ma. 3. a=3.2m/s².",
+    },
+    "Q2: Refraction": {
+        "question": "Draw ray diagram: air to glass block.",
+        "marks": 2,
+        "mark_scheme": "1. Bends to normal. 2. Labels.",
+    },
+}
+
+# =========================
+# GOOGLE SHEETS AUTH
+# =========================
+
+def _extract_sheet_id(url_or_id: str) -> str:
+    s = (url_or_id or "").strip()
+    m = re.search(r"/d/([a-zA-Z0-9-_]+)", s)
+    return m.group(1) if m else s
+
+def _coerce_service_account_info(raw):
+    """
+    Accepts either:
+      - dict (recommended Streamlit secrets TOML style)
+      - JSON string
+
+    Repairs common private_key newline issues:
+      - literal newlines inside the JSON string value
+      - \\n sequences that need to become real newlines
+    """
+    if isinstance(raw, dict):
+        info = dict(raw)
+
+    elif isinstance(raw, str):
+        s = raw.strip()
+
+        # First attempt: strict JSON
+        try:
+            info = json.loads(s)
+        except json.JSONDecodeError:
+            # Second attempt: permissive parsing
+            try:
+                info = json.loads(s, strict=False)
+            except json.JSONDecodeError:
+                # Third attempt: only escape literal newlines inside "private_key"
+                m = re.search(r'("private_key"\s*:\s*")(.*?)(\")', s, flags=re.S)
+                if not m:
+                    raise
+
+                pk_raw = m.group(2)
+                pk_fixed_for_json = pk_raw.replace("\r", "").replace("\n", "\\n")
+                s_fixed = s[:m.start(2)] + pk_fixed_for_json + s[m.end(2):]
+                info = json.loads(s_fixed)
+    else:
+        raise TypeError(f"service_account_info must be dict or str, got {type(raw)}")
+
+    # Normalize private_key to real newlines for google-auth
+    if "private_key" in info and isinstance(info["private_key"], str):
+        info["private_key"] = info["private_key"].replace("\\n", "\n").replace("\r", "")
+
+    return info
+
+@st.cache_resource(show_spinner=False)
 def get_gspread_client():
     """
-    Handles parsing of Service Account JSON from st.secrets.
-    Fixed to handle both string and dict inputs to avoid 'length 1' errors.
+    Robust gspread client creation from Streamlit Secrets.
+
+    Supports either:
+      A) st.secrets["connections"]["gsheets"]["service_account_info"] as dict
+      B) same key as JSON string
+      C) storing individual SA fields under [connections.gsheets] (fallback)
     """
     try:
-        # 1. Fetch the secret info
-        raw_info = st.secrets["connections"]["gsheets"]["service_account_info"]
-        
-        # 2. Convert to dictionary if it's currently a string
-        if isinstance(raw_info, str):
-            info = json.loads(raw_info, strict=False)
+        gs = st.secrets["connections"]["gsheets"]
+
+        if "service_account_info" in gs:
+            info = _coerce_service_account_info(gs["service_account_info"])
         else:
-            info = dict(raw_info)
-        
-        # 3. CRITICAL: Fix the private key formatting for the RSA library
-        if "private_key" in info:
-            info["private_key"] = info["private_key"].replace("\\n", "\n")
-        
-        scope = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ]
-        
-        # 4. Authenticate
-        creds = Credentials.from_service_account_info(info, scopes=scope)
+            # Fallback: build dict from individual keys
+            info = {k: gs[k] for k in gs.keys() if k != "spreadsheet"}
+            if "private_key" in info and isinstance(info["private_key"], str):
+                info["private_key"] = info["private_key"].replace("\\n", "\n").replace("\r", "")
+
+        creds = Credentials.from_service_account_info(info, scopes=SCOPES)
         return gspread.authorize(creds)
+
     except Exception as e:
-        st.error(f"❌ Authentication Failed: {e}")
+        st.error(f"❌ Google Sheets auth failed: {e}")
+        st.info(
+            "Checklist:\n"
+            "1) Your spreadsheet must be shared with the service account client_email (Editor).\n"
+            "2) The private_key must retain line breaks (either \\n or real newlines).\n"
+            "3) If using a JSON string in secrets, ensure it is valid JSON."
+        )
         return None
 
-# Initialize Clients
+# Initialize clients
 gc = get_gspread_client()
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# --- PHYSICS QUESTION BANK ---
-QUESTIONS = {
-    "Q1: Forces": {
-        "question": "A 5kg box is pushed with a 20N force. Friction is 4N. Calculate acceleration.", 
-        "marks": 3, 
-        "mark_scheme": "1. Resultant Force = 16N. 2. Use F=ma. 3. a = 3.2 m/s²."
-    },
-    "Q2: Refraction": {
-        "question": "Draw a ray diagram showing light traveling from air into a glass block.", 
-        "marks": 2, 
-        "mark_scheme": "1. Ray bends towards the normal in glass. 2. Correct labels for Incident and Refracted rays."
-    }
-}
+# =========================
+# DATA WRITE
+# =========================
 
-# --- IMPROVED SAVE LOGIC ---
 def save_to_cloud(name, set_name, q_name, score, max_m, summary):
-    """Appends results and provides specific error feedback for 403/404 errors."""
     if not gc:
-        st.error("Google Sheets client is not authenticated.")
         return False
+
     try:
-        url = st.secrets["connections"]["gsheets"]["spreadsheet"]
-        # Extract ID from URL
-        s_id = url.split("/d/")[1].split("/")[0] if "/d/" in url else url
-        
-        # Open the sheet
-        spreadsheet = gc.open_by_key(s_id)
-        sheet = spreadsheet.get_worksheet(0)
-        
-        # Prepare the row data
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        row = [timestamp, str(name), str(set_name), str(q_name), int(score), int(max_m), str(summary)]
-        
-        # Append the row
-        sheet.append_row(row, value_input_option="USER_ENTERED")
+        sheet_ref = st.secrets["connections"]["gsheets"]["spreadsheet"]
+        s_id = _extract_sheet_id(sheet_ref)
+
+        ws = gc.open_by_key(s_id).get_worksheet(0)
+        ws.append_row(
+            [
+                datetime.now().strftime("%Y-%m-%d %H:%M"),
+                name,
+                set_name,
+                q_name,
+                int(score),
+                int(max_m),
+                str(summary),
+            ],
+            value_input_option="USER_ENTERED",
+        )
         return True
-        
-    except gspread.exceptions.APIError as e:
-        # This handles the "Save error" by identifying if permissions are missing
-        msg = e.response.json().get('error', {}).get('message', str(e))
-        st.error(f"❌ Google API Error: {msg}")
-        if "permission" in msg.lower():
-            email = st.secrets["connections"]["gsheets"]["service_account_info"]["client_email"]
-            st.info(f"💡 ACTION REQUIRED: Share your Google Sheet with: `{email}` as an 'Editor'.")
-        return False
+
     except Exception as e:
-        st.error(f"⚠️ Unexpected Save Error: {e}")
+        st.error(f"Save error: {e}")
+        st.info(
+            "If this looks like a permission error, share the spreadsheet with the service account client_email "
+            "and grant Editor access."
+        )
         return False
 
-# --- SESSION STATE ---
-if "feedback" not in st.session_state: st.session_state["feedback"] = None
+# =========================
+# SESSION STATE
+# =========================
 
-# --- UI LAYOUT ---
+if "canvas_key" not in st.session_state:
+    st.session_state["canvas_key"] = 0
+if "feedback" not in st.session_state:
+    st.session_state["feedback"] = None
+
+# =========================
+# UI
+# =========================
+
 t1, t2 = st.tabs(["✍️ Student Portal", "📊 Teacher Dashboard"])
 
 with t1:
-    st.title("⚛️ Physics Examiner Pro")
-    
-    with st.expander("👤 Student Identity", expanded=True):
-        c1, c2, c3 = st.columns(3)
-        f_name = c1.text_input("First Name")
-        l_name = c2.text_input("Last Name")
-        cl_set = c3.selectbox("Physics Set", ["11Y/Ph1", "11X/Ph2", "Teacher Test"])
-        full_name = f"{f_name} {l_name}"
+    st.title("⚛️ Physics Examiner")
 
-    col_l, col_r = st.columns([2, 1])
-    
+    with st.expander("👤 Identity", expanded=True):
+        c1, c2, c3 = st.columns(3)
+        first = c1.text_input("First")
+        last = c2.text_input("Last")
+        cl_set = c3.selectbox("Set", ["11Y/Ph1", "11X/Ph2", "Teacher Test"])
+
+        name = f"{first.strip()} {last.strip()}".strip()
+        if not name:
+            st.warning("Please enter your first and last name before submitting.")
+
+    col_l, col_r = st.columns(2)
+
     with col_l:
-        q_key = st.selectbox("Select Question", list(QUESTIONS.keys()))
+        q_key = st.selectbox("Question", list(QUESTIONS.keys()))
         q_data = QUESTIONS[q_key]
-        st.info(f"**Question:** {q_data['question']}")
-        
-        mode = st.radio("Response Method", ["Type Calculations", "Draw Diagram"], horizontal=True)
-        
-        if mode == "Type Calculations":
-            ans = st.text_area("Show your working:", height=200)
-            if st.button("Submit Calculations", use_container_width=True):
-                if not full_name.strip():
-                    st.warning("Please enter your name first.")
-                else:
-                    with st.spinner("AI marking in progress..."):
-                        prompt = f"GCSE Physics Marker. Q: {q_data['question']}\nAns: {ans}\nScheme: {q_data['mark_scheme']}\nTotal: {q_data['marks']}\nReturn JSON: {{'score': int, 'summary': str}}"
+        st.info(q_data["question"])
+
+        mode = st.radio("Mode", ["Type", "Draw"], horizontal=True)
+
+        if mode == "Type":
+            ans = st.text_area("Working:")
+
+            if st.button("Submit", use_container_width=True, disabled=(not name)):
+                with st.spinner("Marking..."):
+                    try:
                         res = client.chat.completions.create(
-                            model="gpt-4o",
-                            messages=[{"role": "user", "content": prompt}],
-                            response_format={"type": "json_object"}
+                            model="gpt-5-nano",
+                            messages=[
+                                {
+                                    "role": "user",
+                                    "content": (
+                                        "You are a GCSE Physics examiner.\n"
+                                        f"Mark the student's answer out of {q_data['marks']} using the mark scheme.\n\n"
+                                        f"Question: {q_data['question']}\n"
+                                        f"Mark scheme: {q_data['mark_scheme']}\n\n"
+                                        f"Student answer: {ans}\n\n"
+                                        "Return JSON only with keys: score (int), summary (string)."
+                                    ),
+                                }
+                            ],
+                            response_format={"type": "json_object"},
                         )
-                        feedback = json.loads(res.choices[0].message.content)
-                        st.session_state["feedback"] = feedback
-                        
-                        # Trigger cloud save
-                        if save_to_cloud(full_name, cl_set, q_key, feedback.get('score', 0), q_data['marks'], feedback.get('summary', '')):
-                            st.success("Result recorded successfully!")
+
+                        raw = res.choices[0].message.content or "{}"
+                        data = json.loads(raw)
+
+                        # Guardrails
+                        score = int(data.get("score", 0))
+                        score = max(0, min(score, int(q_data["marks"])))
+                        summary = str(data.get("summary", "")).strip()
+
+                        st.session_state["feedback"] = {"score": score, "summary": summary}
+
+                        ok = save_to_cloud(name, cl_set, q_key, score, q_data["marks"], summary)
+                        if ok:
+                            st.success("Saved to cloud.")
+                        else:
+                            st.warning("Not saved to cloud.")
+
+                    except Exception as e:
+                        st.error(f"Marking error: {e}")
 
         else:
-            st.write("Draw your diagram below:")
+            tool = st.toggle("Eraser")
             canvas = st_canvas(
-                stroke_width=3, stroke_color="#000", background_color="#fff",
-                height=350, width=500, drawing_mode="freedraw", key="canvas_phy"
+                stroke_width=20 if tool else 2,
+                stroke_color="#f8f9fa" if tool else "#000000",
+                background_color="#f8f9fa",
+                height=300,
+                width=400,
+                key=f"c_{st.session_state['canvas_key']}",
             )
-            
-            if st.button("Submit Drawing", use_container_width=True):
-                if canvas.image_data is not None:
-                    with st.spinner("Analyzing diagram with AI..."):
-                        # Convert canvas to Base64 image
-                        img = Image.fromarray(canvas.image_data.astype('uint8'), 'RGBA').convert('RGB')
-                        buffered = io.BytesIO()
-                        img.save(buffered, format="PNG")
-                        img_str = base64.b64encode(buffered.getvalue()).decode()
 
-                        res = client.chat.completions.create(
-                            model="gpt-4o",
-                            messages=[{
-                                "role": "user",
-                                "content": [
-                                    {"type": "text", "text": f"Mark this diagram based on: {q_data['mark_scheme']}. Marks: {q_data['marks']}. JSON: {{'score': int, 'summary': str}}"},
-                                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
-                                ]
-                            }],
-                            response_format={"type": "json_object"}
-                        )
-                        feedback = json.loads(res.choices[0].message.content)
-                        st.session_state["feedback"] = feedback
-                        save_to_cloud(full_name, cl_set, q_key, feedback.get('score', 0), q_data['marks'], feedback.get('summary', ''))
+            if st.button("Submit Drawing", use_container_width=True, disabled=(not name)):
+                st.info("Drawing submission received. Add vision logic here when ready.")
+                # You can still write a placeholder row if you want:
+                ok = save_to_cloud(name, cl_set, q_key, 0, q_data["marks"], "Drawing submitted (vision marking not enabled).")
+                if ok:
+                    st.success("Saved to cloud.")
+                else:
+                    st.warning("Not saved to cloud.")
 
     with col_r:
-        st.subheader("Results & Feedback")
+        st.subheader("Feedback")
         if st.session_state["feedback"]:
             f = st.session_state["feedback"]
-            st.metric("Score", f"{f.get('score', 0)} / {q_data['marks']}")
-            st.markdown(f"**Examiner's Note:**\n\n{f.get('summary', 'No feedback provided.')}")
+            st.metric("Score", f.get("score", 0), delta=None)
+            st.write(f.get("summary", ""))
         else:
-            st.write("Submit your work to receive instant AI marking.")
+            st.caption("Submit an answer to see feedback here.")
 
 with t2:
-    st.header("📊 Teacher Results Dashboard")
-    if st.text_input("Access Password", type="password") == "Newton2025":
-        if gc:
+    st.subheader("Teacher Dashboard")
+
+    pw = st.text_input("Password", type="password")
+    if pw == "Newton2025":
+        if not gc:
+            st.error("Google Sheets is not authenticated, so the dashboard cannot load data.")
+        else:
             try:
-                url = st.secrets["connections"]["gsheets"]["spreadsheet"]
-                s_id = url.split("/d/")[1].split("/")[0] if "/d/" in url else url
-                rows = gc.open_by_key(s_id).get_worksheet(0).get_all_records()
-                
-                if rows:
-                    df = pd.DataFrame(rows)
-                    st.dataframe(df, use_container_width=True)
-                    
-                    # CSV Download Option
-                    csv = df.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Download Results CSV", data=csv, file_name="physics_results.csv", mime='text/csv')
+                sheet_ref = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                s_id = _extract_sheet_id(sheet_ref)
+
+                ws = gc.open_by_key(s_id).get_worksheet(0)
+                rows = ws.get_all_records()
+
+                df = pd.DataFrame(rows)
+                if df.empty:
+                    st.info("No records yet.")
                 else:
-                    st.info("The spreadsheet is currently empty.")
+                    st.dataframe(df, use_container_width=True)
+
             except Exception as e:
-                st.error(f"Error fetching dashboard data: {e}")
+                st.error(f"Dashboard load error: {e}")
+                st.info(
+                    "If this is a permission error, share the spreadsheet with the service account client_email "
+                    "and grant Editor access."
+                )
+    elif pw:
+        st.error("Incorrect password.")
