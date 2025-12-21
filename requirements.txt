@@ -1,9 +1,7 @@
 streamlit
 openai
-streamlit-drawable-canvas
-Pillow
-gspread
-oauth2client
-sqlalchemy>=2.0
-psycopg[binary]>=3.1
 pandas
+sqlalchemy
+streamlit-drawable-canvas
+psycopg-binary
+Pillow
