@@ -19,8 +19,8 @@ st.set_page_config(
 )
 
 # --- CONSTANTS ---
-# using gpt-4o-mini for speed/cost (replace with your specific model if needed)
-MODEL_NAME = "gpt-4o-mini" 
+# using gpt-5-mini for speed/cost (replace with your specific model if needed)
+MODEL_NAME = "gpt-5-mini" 
 CANVAS_BG_HEX = "#f8f9fa"
 CANVAS_BG_RGB = (248, 249, 250)
 MAX_IMAGE_WIDTH = 1024
