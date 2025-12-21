@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 # --- CONSTANTS ---
-MODEL_NAME = "gpt-5-nano"
+MODEL_NAME = "gpt-5-mini"
 CANVAS_BG_HEX = "#f8f9fa"
 CANVAS_BG_RGB = (248, 249, 250)
 MAX_IMAGE_WIDTH = 1024
