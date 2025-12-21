@@ -37,28 +37,79 @@ except Exception:
     st.error("⚠️ OpenAI API Key missing or invalid in Streamlit Secrets!")
     AI_READY = False
 
-# --- DATABASE (SUPABASE POSTGRES) ---
-# Secrets required:
-#   DATABASE_URL = "postgresql://..."
+
+# =========================
+#  SUPABASE POSTGRES LAYER
+# =========================
+# Secrets you should add:
+#   DATABASE_URL = "postgresql+psycopg://..."
 # Optional:
 #   TEACHER_PASSWORD = "..."
+
+def _normalize_db_url(db_url: str) -> str:
+    """
+    Forces SQLAlchemy to use psycopg v3.
+    Accepts URLs copied from Supabase like:
+      postgresql://...
+      postgres://...
+    And rewrites them to:
+      postgresql+psycopg://...
+    """
+    u = (db_url or "").strip()
+    if not u:
+        return ""
+
+    # Allow user to already provide postgresql+psycopg://
+    if u.startswith("postgresql+psycopg://"):
+        return u
+
+    # Supabase sometimes shows postgres://
+    if u.startswith("postgres://"):
+        u = "postgresql://" + u[len("postgres://"):]
+
+    # If it's plain postgresql://, force psycopg driver
+    if u.startswith("postgresql://"):
+        u = "postgresql+psycopg://" + u[len("postgresql://"):]
+    return u
+
 @st.cache_resource
 def get_db_engine():
-    db_url = st.secrets.get("DATABASE_URL", "").strip()
+    """
+    Returns an engine or None.
+    Never raises driver import errors to the app.
+    """
+    db_url_raw = st.secrets.get("DATABASE_URL", "")
+    db_url = _normalize_db_url(db_url_raw)
     if not db_url:
         return None
-    # pool_pre_ping helps survive idle disconnects
-    return create_engine(db_url, pool_pre_ping=True)
+
+    # Check psycopg is installed (psycopg v3)
+    try:
+        import psycopg  # noqa: F401
+    except Exception:
+        return None
+
+    try:
+        # pool_pre_ping helps with intermittent disconnects
+        return create_engine(db_url, pool_pre_ping=True)
+    except Exception:
+        return None
 
 def db_ready() -> bool:
     return get_db_engine() is not None
 
 def ensure_attempts_table():
-    """Creates attempts table if it does not exist (safe to call repeatedly)."""
+    """
+    Creates attempts table if it does not exist.
+    Safe to call repeatedly.
+    """
     eng = get_db_engine()
     if eng is None:
         return
+
     ddl = """
+    create extension if not exists pgcrypto;
+
     create table if not exists public.attempts (
       id uuid primary key default gen_random_uuid(),
       created_at timestamptz not null default now(),
@@ -79,22 +130,26 @@ def ensure_attempts_table():
     create index if not exists attempts_created_idx on public.attempts (created_at desc);
     create index if not exists attempts_question_idx on public.attempts (question_key);
     """
+
     try:
         with eng.begin() as conn:
             conn.execute(text(ddl))
     except Exception:
-        # Do not crash student UI if DB has issues
+        # Do not crash student UI
         pass
 
 def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
-    """Appends one attempt row. Silent failure to avoid exposing internals to students."""
+    """
+    Inserts one attempt row.
+    Silent failure to avoid exposing internals to students.
+    """
     eng = get_db_engine()
     if eng is None:
         return
 
     sid = (student_id or "").strip()
     if not sid:
-        return  # require student_id for logging
+        return
 
     try:
         with eng.begin() as conn:
@@ -137,7 +192,6 @@ def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
                 conn,
                 params={"limit": int(limit)},
             )
-        # normalize
         if not df.empty:
             df["marks_awarded"] = pd.to_numeric(df["marks_awarded"], errors="coerce").fillna(0).astype(int)
             df["max_marks"] = pd.to_numeric(df["max_marks"], errors="coerce").fillna(0).astype(int)
@@ -145,11 +199,13 @@ def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
     except Exception:
         return pd.DataFrame()
 
+
 # --- SESSION STATE ---
 if "canvas_key" not in st.session_state:
     st.session_state["canvas_key"] = 0
 if "feedback" not in st.session_state:
     st.session_state["feedback"] = None
+
 
 # --- QUESTION BANK ---
 QUESTIONS = {
@@ -164,6 +220,7 @@ QUESTIONS = {
         "mark_scheme": "1. Ray bends towards the normal inside the glass. 2. Angles of incidence and refraction labeled correctly.",
     },
 }
+
 
 # --- HELPER FUNCTIONS ---
 def encode_image(image_pil: Image.Image) -> str:
@@ -299,9 +356,6 @@ def render_report(report: dict):
         for n in report["next_steps"]:
             st.write(f"- {n}")
 
-# Optional: auto-create table if DB is configured
-if db_ready():
-    ensure_attempts_table()
 
 # --- MAIN APP UI ---
 
@@ -313,12 +367,10 @@ with top_col1:
     st.caption(f"Powered by {MODEL_NAME}")
 
 with top_col2:
-    # Selector moved to top
     q_key = st.selectbox("Select Topic:", list(QUESTIONS.keys()))
     q_data = QUESTIONS[q_key]
 
 with top_col3:
-    # Status indicator
     if AI_READY:
         st.success("System Online", icon="🟢")
     else:
@@ -336,14 +388,12 @@ with col1:
 
     st.write("")
 
-    # Student identifier for logging (keeps UI simple, but enables dashboard)
     student_id = st.text_input(
         "Student ID",
         placeholder="e.g. 10A_23",
-        help="Used to record your attempts for the teacher dashboard. Leave blank if not needed."
+        help="Used to record attempts for the teacher dashboard. Leave blank if not needed."
     )
 
-    # Input Method Tabs
     tab_type, tab_draw = st.tabs(["⌨️ Type Answer", "✍️ Draw Answer"])
 
     with tab_type:
@@ -354,11 +404,11 @@ with col1:
             else:
                 with st.spinner("Marking..."):
                     st.session_state["feedback"] = get_gpt_feedback(answer, q_data, is_image=False)
-                    # Log attempt (if DB configured and student_id provided)
-                    insert_attempt(student_id, q_key, st.session_state["feedback"], mode="text")
+                    if db_ready():
+                        ensure_attempts_table()
+                        insert_attempt(student_id, q_key, st.session_state["feedback"], mode="text")
 
     with tab_draw:
-        # Toolbar for canvas
         tool_c1, tool_c2, tool_c3 = st.columns([2, 2, 3])
         with tool_c1:
             tool = st.radio("Tool", ["Pen", "Eraser"], horizontal=True, label_visibility="collapsed")
@@ -388,8 +438,9 @@ with col1:
                 with st.spinner("Analyzing diagram..."):
                     img_for_ai = preprocess_canvas_image(canvas_result.image_data)
                     st.session_state["feedback"] = get_gpt_feedback(img_for_ai, q_data, is_image=True)
-                    # Log attempt (if DB configured and student_id provided)
-                    insert_attempt(student_id, q_key, st.session_state["feedback"], mode="drawing")
+                    if db_ready():
+                        ensure_attempts_table()
+                        insert_attempt(student_id, q_key, st.session_state["feedback"], mode="drawing")
 
 with col2:
     st.subheader("👨‍🏫 Report")
@@ -403,15 +454,18 @@ with col2:
         else:
             st.info("Submit an answer to receive feedback.")
 
-    # --- TEACHER DASHBOARD (simple MVP) ---
     st.write("")
     st.subheader("🔒 Teacher Dashboard")
 
-    if not db_ready():
-        st.info("Database not configured. Add DATABASE_URL to Streamlit secrets to enable class analytics.")
+    if not st.secrets.get("DATABASE_URL", "").strip():
+        st.info("Database not configured. Add DATABASE_URL to Streamlit secrets to enable analytics.")
+    elif not db_ready():
+        st.error("Database driver not ready. Ensure requirements.txt includes psycopg[binary] and redeploy.")
+        st.caption("Also ensure DATABASE_URL uses postgresql+psycopg:// (or paste Supabase URL and this app will normalize it).")
     else:
         teacher_pw = st.text_input("Teacher password", type="password", help="Set TEACHER_PASSWORD in Streamlit secrets.")
         if teacher_pw and teacher_pw == st.secrets.get("TEACHER_PASSWORD", ""):
+            ensure_attempts_table()
             with st.spinner("Loading class data..."):
                 df = load_attempts_df(limit=5000)
 
@@ -432,7 +486,7 @@ with col2:
                 )
                 st.dataframe(by_student, use_container_width=True)
 
-                st.write("### By topic (average %)")
+                st.write("### By topic (overall %)")
                 by_topic = (
                     df.groupby("question_key")[["marks_awarded", "max_marks"]]
                     .sum()
