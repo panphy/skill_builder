@@ -1,5 +1,5 @@
 streamlit
-google-generativeai>=0.8.3
+openai>=1.50.0
 streamlit-drawable-canvas
 Pillow
 numpy
