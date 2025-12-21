@@ -7,7 +7,7 @@ import io, base64, json, pandas as pd, numpy as np
 from datetime import datetime
 
 # --- CONFIG ---
-st.set_page_config(page_title="AI Physics Examiner", page_icon="⚛️", layout="wide")
+st.set_page_config(page_title="AI Physics Examiner (GPT-5-nano)", page_icon="⚛️", layout="wide")
 
 # --- CONNECTIONS ---
 @st.cache_resource
@@ -30,7 +30,7 @@ if "feedback" not in st.session_state: st.session_state["feedback"] = None
 # --- DATA ---
 QUESTIONS = {
     "Q1: Forces": {"question": "A 5kg box is pushed with a 20N force. Friction is 4N. Calculate acceleration.", "marks": 3, "mark_scheme": "1. Resultant=16N. 2. F=ma. 3. a=3.2m/s²."},
-    "Q2: Refraction": {"question": "Draw a ray diagram: light air to glass.", "marks": 2, "mark_scheme": "1. Bends toward normal. 2. Correct labels."}
+    "Q2: Refraction": {"question": "Draw a ray diagram: light passing from air to glass block at an angle.", "marks": 2, "mark_scheme": "1. Bends toward normal. 2. Correct labels for incidence/refraction."}
 }
 CLASS_SETS = ["11Y/Ph1", "11X/Ph2", "10A/Ph1", "Teacher Test"]
 
@@ -44,9 +44,9 @@ def save_to_cloud(name, set_name, q_name, score, max_m, summary):
             "Student Name": name,
             "Class Set": set_name,
             "Question": q_name,
-            "Score": score,
-            "Max Marks": max_m,
-            "Feedback Summary": summary
+            "Score": int(score),
+            "Max Marks": int(max_m),
+            "Feedback Summary": str(summary)
         }])
         updated_df = pd.concat([df, new_data], ignore_index=True)
         conn.update(data=updated_df)
@@ -56,7 +56,7 @@ def save_to_cloud(name, set_name, q_name, score, max_m, summary):
         return False
 
 def get_gpt_feedback(answer, q_data, is_image=False):
-    # Enforce structured JSON output to avoid KeyErrors
+    # GPT-5-nano uses Structured Outputs to prevent KeyErrors
     schema = {
         "type": "json_schema",
         "json_schema": {
@@ -65,34 +65,44 @@ def get_gpt_feedback(answer, q_data, is_image=False):
             "schema": {
                 "type": "object",
                 "properties": {
-                    "score": {"type": "integer"},
+                    "score_awarded": {"type": "integer"},
                     "summary": {"type": "string"}
                 },
-                "required": ["score", "summary"],
+                "required": ["score_awarded", "summary"],
                 "additionalProperties": False
             }
         }
     }
 
-    messages = [{"role": "system", "content": f"Mark strictly. Scheme: {q_data['mark_scheme']}"}]
+    system_instr = f"You are a strict GCSE Physics Examiner. Mark strictly according to the scheme. Question: {q_data['question']}. Scheme: {q_data['mark_scheme']}"
+    
+    messages = [{"role": "system", "content": system_instr}]
+    
     if is_image:
         buffered = io.BytesIO()
         answer.save(buffered, format="PNG")
         img_b64 = base64.b64encode(buffered.getvalue()).decode()
-        messages.append({"role": "user", "content": [{"type": "text", "text": "Mark this drawing."}, {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}"}}]})
+        messages.append({
+            "role": "user", 
+            "content": [
+                {"type": "text", "text": "Analyze this student drawing/handwriting."},
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}"}}
+            ]
+        })
     else:
         messages.append({"role": "user", "content": f"Student Answer: {answer}"})
 
+    # High token limit to allow for GPT-5 reasoning overhead
     response = client.chat.completions.create(
         model="gpt-5-nano",
         messages=messages,
-        max_completion_tokens=3000,
+        max_completion_tokens=4000,
         reasoning_effort="minimal",
         response_format=schema
     )
     return json.loads(response.choices[0].message.content)
 
-# --- UI ---
+# --- UI LAYOUT ---
 tab1, tab2 = st.tabs(["✍️ Student Portal", "📊 Teacher Dashboard"])
 
 with tab1:
@@ -100,101 +110,111 @@ with tab1:
     
     # 1. Identity Section
     with st.container(border=True):
-        st.subheader("1. Enter Your Details")
+        st.subheader("1. Identify Yourself")
         c1, c2, c3 = st.columns(3)
-        fname = c1.text_input("First Name")
-        lname = c2.text_input("Last Name")
-        student_set = c3.selectbox("Class Set", CLASS_SETS)
+        fname = c1.text_input("First Name", placeholder="e.g. Isaac")
+        lname = c2.text_input("Last Name", placeholder="e.g. Newton")
+        student_set = c3.selectbox("Your Class Set", CLASS_SETS)
 
-    # 2. Work Section
+    # 2. Main Workspace
     col_left, col_right = st.columns([1, 1])
+    
     with col_left:
-        st.subheader("2. Complete the Task")
+        st.subheader("2. Your Task")
         q_key = st.selectbox("Select Question", list(QUESTIONS.keys()))
         q_data = QUESTIONS[q_key]
         st.info(f"**Question:** {q_data['question']}")
         
-        mode = st.radio("Answer Method:", ["⌨️ Type Answer", "✍️ Drawing/Handwriting"], horizontal=True)
+        mode = st.radio("How will you answer?", ["⌨️ Type", "✍️ Draw"], horizontal=True)
         
-        if mode == "⌨️ Type Answer":
-            ans_text = st.text_area("Your working out:", height=200)
+        if mode == "⌨️ Type":
+            ans_text = st.text_area("Type your working and final answer:", height=250)
             if st.button("Submit Typed Answer"):
-                if not (fname and lname): st.warning("Please enter your name first!")
+                if not (fname and lname): 
+                    st.warning("Please enter your name at the top first!")
                 else:
-                    with st.spinner("Marking..."):
+                    with st.spinner("GPT-5-nano is marking..."):
                         res = get_gpt_feedback(ans_text, q_data)
                         st.session_state["feedback"] = res
-                        save_to_cloud(f"{fname} {lname}", student_set, q_key, res['score'], q_data['marks'], res['summary'])
+                        save_to_cloud(f"{fname} {lname}", student_set, q_key, res['score_awarded'], q_data['marks'], res['summary'])
         
         else: # DRAWING MODE
+            st.write("Use the tools below to draw your working or diagram:")
             # TOOLBAR for Pen/Eraser/Clear
             tcol1, tcol2, tcol3 = st.columns([1, 1, 1])
-            with tcol1: tool = st.toggle("🧼 Eraser", False)
+            with tcol1: tool = st.toggle("🧼 Eraser Mode", False)
             with tcol2: 
-                if st.button("🗑️ Clear Canvas"):
+                if st.button("🗑️ Clear Everything"):
                     st.session_state["canvas_key"] += 1
                     st.rerun()
             
-            # Canvas logic
+            # Tool logic: Eraser swaps color and increases width
             stroke_color = "#f8f9fa" if tool else "#000000"
-            stroke_width = 20 if tool else 2
+            stroke_width = 30 if tool else 2
             
             canvas = st_canvas(
-                stroke_width=stroke_width, stroke_color=stroke_color,
-                background_color="#f8f9fa", height=300, width=500,
-                key=f"c_{st.session_state['canvas_key']}"
+                stroke_width=stroke_width,
+                stroke_color=stroke_color,
+                background_color="#f8f9fa",
+                height=350,
+                width=500,
+                drawing_mode="freedraw",
+                key=f"canvas_id_{st.session_state['canvas_key']}"
             )
             
             if st.button("Submit Drawing"):
-                if not (fname and lname): st.warning("Please enter your name first!")
+                if not (fname and lname): 
+                    st.warning("Please enter your name at the top first!")
                 else:
-                    with st.spinner("Analyzing drawing..."):
+                    with st.spinner("AI is analyzing your handwriting..."):
                         raw = Image.fromarray(canvas.image_data.astype('uint8'))
+                        # Composite onto white background for AI vision clarity
                         white_bg = Image.new("RGB", raw.size, (255, 255, 255))
                         white_bg.paste(raw, mask=raw.split()[3])
                         res = get_gpt_feedback(white_bg, q_data, is_image=True)
                         st.session_state["feedback"] = res
-                        save_to_cloud(f"{fname} {lname}", student_set, q_key, res['score'], q_data['marks'], res['summary'])
+                        save_to_cloud(f"{fname} {lname}", student_set, q_key, res['score_awarded'], q_data['marks'], res['summary'])
 
     with col_right:
-        st.subheader("3. Examiner Feedback")
+        st.subheader("3. Examiner's Report")
         if st.session_state["feedback"]:
             res = st.session_state["feedback"]
-            st.metric("Score", f"{res['score']} / {q_data['marks']}")
-            st.success(f"**Report:** {res['summary']}")
-            if st.button("Try Again / New Question"):
+            st.metric("Final Score", f"{res['score_awarded']} / {q_data['marks']}")
+            st.success(f"**Feedback:** {res['summary']}")
+            if st.button("Try a Different Question"):
                 st.session_state["feedback"] = None
                 st.rerun()
         else:
-            st.info("Submit your work to see your score and feedback.")
+            st.info("Your feedback will appear here once you submit your work.")
 
 with tab2:
     st.title("👨‍🏫 Teacher Dashboard")
-    pwd = st.text_input("Access Password", type="password")
+    pwd = st.text_input("Enter Dashboard Password", type="password")
     if pwd == "Newton2025":
         try:
-            # ttl=0 forces the app to fetch fresh data from Google Sheets
+            # ttl=0 forces a fresh pull from the cloud sheet
             df = conn.read(ttl=0)
             if not df.empty:
                 st.write(f"Total Submissions: {len(df)}")
                 st.dataframe(df, use_container_width=True)
-                # Export Button
-                st.download_button("Download CSV", df.to_csv(index=False), "results.csv", "text/csv")
+                # Analytics
+                st.subheader("Class Set Performance")
+                st.bar_chart(df.groupby("Class Set")["Score"].mean())
             else:
-                st.info("The sheet is empty. Waiting for student submissions.")
+                st.info("No submissions found in the Google Sheet yet.")
         except Exception as e:
-            st.error(f"Could not read Google Sheet: {e}")
-            st.info("Check: Have you shared the sheet with the Service Account email?")
+            st.error(f"Failed to access Google Sheets: {e}")
+            st.info("Ensure the Service Account email is an 'Editor' on your sheet.")
 
 # --- SIDEBAR DIAGNOSTICS ---
 with st.sidebar:
-    st.header("⚙️ System Status")
-    if AI_READY: st.success("✅ AI Brain Connected")
-    else: st.error("❌ AI Brain Disconnected")
+    st.header("⚙️ Diagnostics")
+    if AI_READY: st.success("AI Model: GPT-5-nano")
+    else: st.error("AI Model: Offline")
     
-    if st.button("Test Google Sheets Connection"):
+    if st.button("Check Cloud Connection"):
         try:
             test_df = conn.read(ttl=0)
-            st.success(f"✅ Connected! Found {len(test_df)} rows.")
+            st.success(f"✅ Sheet Connected! ({len(test_df)} rows)")
         except Exception as e:
             st.error(f"❌ Connection Failed: {e}")
