@@ -11,6 +11,7 @@ import numpy as np
 # New: database + dashboard
 import pandas as pd
 from sqlalchemy import create_engine, text
+import secrets as pysecrets
 
 # --- PAGE CONFIG ---
 st.set_page_config(
@@ -37,61 +38,86 @@ except Exception:
     st.error("⚠️ OpenAI API Key missing or invalid in Streamlit Secrets!")
     AI_READY = False
 
+# --- SESSION STATE ---
+if "canvas_key" not in st.session_state:
+    st.session_state["canvas_key"] = 0
+if "feedback" not in st.session_state:
+    st.session_state["feedback"] = None
+
+# New: stable anonymous id for logging when student_id is blank
+if "anon_id" not in st.session_state:
+    st.session_state["anon_id"] = pysecrets.token_hex(4)
+if "db_last_error" not in st.session_state:
+    st.session_state["db_last_error"] = ""
+if "db_table_ready" not in st.session_state:
+    st.session_state["db_table_ready"] = False
+
+# --- QUESTION BANK ---
+QUESTIONS = {
+    "Q1: Forces (Resultant)": {
+        "question": "A 5kg box is pushed with a 20N force. Friction is 4N. Calculate the acceleration.",
+        "marks": 3,
+        "mark_scheme": "1. Resultant force = 20 - 4 = 16N (1 mark). 2. F = ma (1 mark). 3. a = 16 / 5 = 3.2 m/s² (1 mark).",
+    },
+    "Q2: Refraction (Drawing)": {
+        "question": "Draw a ray diagram showing light passing from air into a glass block at an angle.",
+        "marks": 2,
+        "mark_scheme": "1. Ray bends towards the normal inside the glass. 2. Angles of incidence and refraction labeled correctly.",
+    },
+}
 
 # =========================
 #  SUPABASE POSTGRES LAYER
 # =========================
-# Secrets you should add:
-#   DATABASE_URL = "postgresql+psycopg://..."
+# Secrets you should set:
+#   DATABASE_URL = "postgresql://..." or "postgres://..." or "postgresql+psycopg://..."
 # Optional:
 #   TEACHER_PASSWORD = "..."
 
 def _normalize_db_url(db_url: str) -> str:
     """
     Forces SQLAlchemy to use psycopg v3.
-    Accepts URLs copied from Supabase like:
+    Accepts URLs copied from Supabase:
       postgresql://...
       postgres://...
-    And rewrites them to:
+      postgresql+psycopg://...
+    Returns:
       postgresql+psycopg://...
     """
     u = (db_url or "").strip()
     if not u:
         return ""
 
-    # Allow user to already provide postgresql+psycopg://
     if u.startswith("postgresql+psycopg://"):
         return u
 
-    # Supabase sometimes shows postgres://
     if u.startswith("postgres://"):
         u = "postgresql://" + u[len("postgres://"):]
 
-    # If it's plain postgresql://, force psycopg driver
     if u.startswith("postgresql://"):
         u = "postgresql+psycopg://" + u[len("postgresql://"):]
+
     return u
 
 @st.cache_resource
 def get_db_engine():
     """
-    Returns an engine or None.
-    Never raises driver import errors to the app.
+    Returns a SQLAlchemy engine or None.
+    Never crashes the app if driver is missing or URL is invalid.
     """
-    db_url_raw = st.secrets.get("DATABASE_URL", "")
-    db_url = _normalize_db_url(db_url_raw)
-    if not db_url:
+    raw = st.secrets.get("DATABASE_URL", "")
+    url = _normalize_db_url(raw)
+    if not url:
         return None
 
-    # Check psycopg is installed (psycopg v3)
+    # Ensure psycopg v3 exists
     try:
         import psycopg  # noqa: F401
     except Exception:
         return None
 
     try:
-        # pool_pre_ping helps with intermittent disconnects
-        return create_engine(db_url, pool_pre_ping=True)
+        return create_engine(url, pool_pre_ping=True)
     except Exception:
         return None
 
@@ -101,17 +127,18 @@ def db_ready() -> bool:
 def ensure_attempts_table():
     """
     Creates attempts table if it does not exist.
-    Safe to call repeatedly.
+    Uses bigserial id (no pgcrypto extension needed).
     """
+    if st.session_state.get("db_table_ready", False):
+        return
+
     eng = get_db_engine()
     if eng is None:
         return
 
     ddl = """
-    create extension if not exists pgcrypto;
-
     create table if not exists public.attempts (
-      id uuid primary key default gen_random_uuid(),
+      id bigserial primary key,
       created_at timestamptz not null default now(),
 
       student_id text not null,
@@ -134,22 +161,28 @@ def ensure_attempts_table():
     try:
         with eng.begin() as conn:
             conn.execute(text(ddl))
-    except Exception:
-        # Do not crash student UI
-        pass
+        st.session_state["db_last_error"] = ""
+        st.session_state["db_table_ready"] = True
+    except Exception as e:
+        st.session_state["db_last_error"] = f"ensure_attempts_table: {e}"
+        st.session_state["db_table_ready"] = False
 
 def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
     """
     Inserts one attempt row.
-    Silent failure to avoid exposing internals to students.
+    Logs even if student_id is blank (uses anon_<id>).
     """
     eng = get_db_engine()
     if eng is None:
         return
 
+    ensure_attempts_table()
+    if not st.session_state.get("db_table_ready", False):
+        return
+
     sid = (student_id or "").strip()
     if not sid:
-        return
+        sid = f"anon_{st.session_state['anon_id']}"
 
     try:
         with eng.begin() as conn:
@@ -172,12 +205,17 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
                     next_steps=json.dumps(report.get("next_steps", [])[:6]),
                 )
             )
-    except Exception:
-        pass
+        st.session_state["db_last_error"] = ""
+    except Exception as e:
+        st.session_state["db_last_error"] = f"insert_attempt: {e}"
 
 def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
     eng = get_db_engine()
     if eng is None:
+        return pd.DataFrame()
+
+    ensure_attempts_table()
+    if not st.session_state.get("db_table_ready", False):
         return pd.DataFrame()
 
     try:
@@ -192,35 +230,15 @@ def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
                 conn,
                 params={"limit": int(limit)},
             )
+        st.session_state["db_last_error"] = ""
+
         if not df.empty:
             df["marks_awarded"] = pd.to_numeric(df["marks_awarded"], errors="coerce").fillna(0).astype(int)
             df["max_marks"] = pd.to_numeric(df["max_marks"], errors="coerce").fillna(0).astype(int)
         return df
-    except Exception:
+    except Exception as e:
+        st.session_state["db_last_error"] = f"load_attempts_df: {e}"
         return pd.DataFrame()
-
-
-# --- SESSION STATE ---
-if "canvas_key" not in st.session_state:
-    st.session_state["canvas_key"] = 0
-if "feedback" not in st.session_state:
-    st.session_state["feedback"] = None
-
-
-# --- QUESTION BANK ---
-QUESTIONS = {
-    "Q1: Forces (Resultant)": {
-        "question": "A 5kg box is pushed with a 20N force. Friction is 4N. Calculate the acceleration.",
-        "marks": 3,
-        "mark_scheme": "1. Resultant force = 20 - 4 = 16N (1 mark). 2. F = ma (1 mark). 3. a = 16 / 5 = 3.2 m/s² (1 mark).",
-    },
-    "Q2: Refraction (Drawing)": {
-        "question": "Draw a ray diagram showing light passing from air into a glass block at an angle.",
-        "marks": 2,
-        "mark_scheme": "1. Ray bends towards the normal inside the glass. 2. Angles of incidence and refraction labeled correctly.",
-    },
-}
-
 
 # --- HELPER FUNCTIONS ---
 def encode_image(image_pil: Image.Image) -> str:
@@ -356,7 +374,6 @@ def render_report(report: dict):
         for n in report["next_steps"]:
             st.write(f"- {n}")
 
-
 # --- MAIN APP UI ---
 
 # 1. Top Navigation Bar (Replaces Sidebar)
@@ -388,10 +405,11 @@ with col1:
 
     st.write("")
 
+    # Keep your UI intact: Student ID is optional
     student_id = st.text_input(
         "Student ID",
         placeholder="e.g. 10A_23",
-        help="Used to record attempts for the teacher dashboard. Leave blank if not needed."
+        help="Used to record attempts for the teacher dashboard. If left blank, attempts are logged as an anonymous session."
     )
 
     tab_type, tab_draw = st.tabs(["⌨️ Type Answer", "✍️ Draw Answer"])
@@ -405,7 +423,6 @@ with col1:
                 with st.spinner("Marking..."):
                     st.session_state["feedback"] = get_gpt_feedback(answer, q_data, is_image=False)
                     if db_ready():
-                        ensure_attempts_table()
                         insert_attempt(student_id, q_key, st.session_state["feedback"], mode="text")
 
     with tab_draw:
@@ -439,7 +456,6 @@ with col1:
                     img_for_ai = preprocess_canvas_image(canvas_result.image_data)
                     st.session_state["feedback"] = get_gpt_feedback(img_for_ai, q_data, is_image=True)
                     if db_ready():
-                        ensure_attempts_table()
                         insert_attempt(student_id, q_key, st.session_state["feedback"], mode="drawing")
 
 with col2:
@@ -454,6 +470,7 @@ with col2:
         else:
             st.info("Submit an answer to receive feedback.")
 
+    # --- TEACHER DASHBOARD (MVP) ---
     st.write("")
     st.subheader("🔒 Teacher Dashboard")
 
@@ -461,13 +478,16 @@ with col2:
         st.info("Database not configured. Add DATABASE_URL to Streamlit secrets to enable analytics.")
     elif not db_ready():
         st.error("Database driver not ready. Ensure requirements.txt includes psycopg[binary] and redeploy.")
-        st.caption("Also ensure DATABASE_URL uses postgresql+psycopg:// (or paste Supabase URL and this app will normalize it).")
+        st.caption("Tip: DATABASE_URL can be copied from Supabase as postgresql://... and this app will convert it to psycopg automatically.")
     else:
         teacher_pw = st.text_input("Teacher password", type="password", help="Set TEACHER_PASSWORD in Streamlit secrets.")
         if teacher_pw and teacher_pw == st.secrets.get("TEACHER_PASSWORD", ""):
-            ensure_attempts_table()
             with st.spinner("Loading class data..."):
                 df = load_attempts_df(limit=5000)
+
+            # Show DB errors to teacher only
+            if st.session_state.get("db_last_error"):
+                st.warning(st.session_state["db_last_error"])
 
             if df.empty:
                 st.info("No attempts logged yet.")
