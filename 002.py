@@ -13,15 +13,18 @@ st.set_page_config(page_title="Physics Examiner Pro", layout="wide")
 # --- AUTHENTICATION HELPER ---
 @st.cache_resource
 def get_gspread_client():
-    """
-    Handles the robust parsing of Service Account JSON from st.secrets.
-    Ensures the private_key is correctly formatted to avoid 'Invalid control character'.
-    """
     try:
-        # Access the dictionary directly from Streamlit secrets
-        info = dict(st.secrets["connections"]["gsheets"]["service_account_info"])
+        # Get the secret data
+        raw_info = st.secrets["connections"]["gsheets"]["service_account_info"]
         
-        # FIX: Replace literal backslash-n with actual newlines in the private key
+        # If Streamlit loads it as a string, parse it to JSON
+        # If it's already a dict, use it as is
+        if isinstance(raw_info, str):
+            info = json.loads(raw_info)
+        else:
+            info = dict(raw_info)
+        
+        # FIX: Handle the private key newline issue
         if "private_key" in info:
             info["private_key"] = info["private_key"].replace("\\n", "\n")
         
@@ -56,12 +59,9 @@ QUESTIONS = {
 
 # --- CORE FUNCTIONS ---
 def save_to_cloud(name, set_name, q_name, score, max_m, summary):
-    """Appends student results to the linked Google Sheet."""
-    if not gc:
-        return False
+    if not gc: return False
     try:
         url = st.secrets["connections"]["gsheets"]["spreadsheet"]
-        # Extract ID from URL
         s_id = url.split("/d/")[1].split("/")[0] if "/d/" in url else url
         sheet = gc.open_by_key(s_id).get_worksheet(0)
         
@@ -94,7 +94,6 @@ with t1:
     with col_l:
         q_key = st.selectbox("Select Question", list(QUESTIONS.keys()))
         q_data = QUESTIONS[q_key]
-        
         st.info(f"**Question:** {q_data['question']}")
         
         mode = st.radio("Response Method", ["Type Calculations", "Draw Diagram"], horizontal=True)
@@ -103,74 +102,58 @@ with t1:
             ans = st.text_area("Show your working here:", height=200)
             if st.button("Submit Work", use_container_width=True):
                 with st.spinner("Marking..."):
-                    prompt = f"""Mark this GCSE Physics answer. 
-                    Question: {q_data['question']}
-                    Student Answer: {ans}
-                    Mark Scheme: {q_data['mark_scheme']}
-                    Total Marks Available: {q_data['marks']}
-                    
-                    Return ONLY a JSON object: {{"score": int, "summary": "string feedback"}}"""
-                    
+                    prompt = f"Mark this GCSE Physics answer. Question: {q_data['question']}\nStudent Answer: {ans}\nScheme: {q_data['mark_scheme']}\nMarks: {q_data['marks']}\nReturn JSON: {{'score': int, 'summary': 'string'}}"
                     res = client.chat.completions.create(
-                        model="gpt-4-turbo-preview", # GPT-5-Nano placeholder
+                        model="gpt-4o", 
                         messages=[{"role": "user", "content": prompt}],
                         response_format={"type": "json_object"}
                     )
-                    
-                    feedback = json.loads(res.choices[0].message.content)
-                    st.session_state["feedback"] = feedback
-                    
-                    # Save to Google Sheets
-                    success = save_to_cloud(full_name, cl_set, q_key, feedback.get('score', 0), q_data['marks'], feedback.get('summary', ''))
-                    if success: st.success("Results saved to Teacher Dashboard.")
+                    data = json.loads(res.choices[0].message.content)
+                    st.session_state["feedback"] = data
+                    save_to_cloud(full_name, cl_set, q_key, data.get('score', 0), q_data['marks'], data.get('summary', ''))
 
         else:
-            st.write("Draw your diagram below:")
             tool = st.toggle("Eraser Mode")
             canvas = st_canvas(
-                stroke_width=15 if tool else 3,
-                stroke_color="#000000",
-                background_color="#ffffff",
-                height=300,
-                width=500,
-                drawing_mode="freedraw",
-                key=f"c_{st.session_state['canvas_key']}"
+                stroke_width=15 if tool else 3, stroke_color="#000", background_color="#fff",
+                height=350, width=500, drawing_mode="freedraw", key=f"c_{st.session_state['canvas_key']}"
             )
+            
             if st.button("Submit Drawing", use_container_width=True):
-                st.warning("Vision analysis logic pending. Drawing received!")
+                if canvas.image_data is not None:
+                    with st.spinner("AI is analyzing your diagram..."):
+                        # Process image
+                        img = Image.fromarray(canvas.image_data.astype('uint8'), 'RGBA').convert('RGB')
+                        buffered = io.BytesIO()
+                        img.save(buffered, format="PNG")
+                        img_str = base64.b64encode(buffered.getvalue()).decode()
+
+                        res = client.chat.completions.create(
+                            model="gpt-4o",
+                            messages=[{
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": f"Mark this Physics drawing based on: {q_data['mark_scheme']}. Total Marks: {q_data['marks']}. Return JSON: {{'score': int, 'summary': 'string'}}"},
+                                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
+                                ]
+                            }],
+                            response_format={"type": "json_object"}
+                        )
+                        data = json.loads(res.choices[0].message.content)
+                        st.session_state["feedback"] = data
+                        save_to_cloud(full_name, cl_set, q_key, data.get('score', 0), q_data['marks'], data.get('summary', ''))
 
     with col_r:
-        st.subheader("Results & Feedback")
+        st.subheader("Results")
         if st.session_state["feedback"]:
             f = st.session_state["feedback"]
             st.metric("Score", f"{f.get('score', 0)} / {q_data['marks']}")
-            st.markdown(f"**Examiner Note:**\n\n {f.get('summary', '')}")
-        else:
-            st.write("Submit your work to see feedback.")
+            st.write(f.get('summary', ''))
 
 with t2:
-    st.header("📊 Teacher Results Dashboard")
-    pwd = st.text_input("Enter Teacher Password", type="password")
-    
-    if pwd == "Newton2025":
+    if st.text_input("Teacher Password", type="password") == "Newton2025":
         if gc:
-            try:
-                url = st.secrets["connections"]["gsheets"]["spreadsheet"]
-                s_id = url.split("/d/")[1].split("/")[0] if "/d/" in url else url
-                rows = gc.open_by_key(s_id).get_worksheet(0).get_all_records()
-                
-                if rows:
-                    df = pd.DataFrame(rows)
-                    st.dataframe(df, use_container_width=True)
-                    
-                    # Simple Analytics
-                    st.divider()
-                    st.subheader("Quick Stats")
-                    avg_score = df['score'].mean() if 'score' in df.columns else 0
-                    st.write(f"Class Average: **{avg_score:.1f} marks**")
-                else:
-                    st.info("No records found in the spreadsheet.")
-            except Exception as e:
-                st.error(f"Error fetching data: {e}")
-        else:
-            st.error("Authentication not configured.")
+            url = st.secrets["connections"]["gsheets"]["spreadsheet"]
+            s_id = url.split("/d/")[1].split("/")[0] if "/d/" in url else url
+            rows = gc.open_by_key(s_id).get_worksheet(0).get_all_records()
+            st.dataframe(pd.DataFrame(rows), use_container_width=True)
