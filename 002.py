@@ -10,33 +10,24 @@ from datetime import datetime
 # --- CONFIG ---
 st.set_page_config(page_title="Physics Examiner Pro", layout="wide")
 
-# --- FIXED AUTHENTICATION HELPER ---
+# --- AUTHENTICATION HELPER ---
 @st.cache_resource
 def get_gspread_client():
-    """
-    Solves the 'Invalid control character' and 'Dictionary update sequence' errors
-    by explicitly handling both String and Dict formats from st.secrets.
-    """
+    """Fixes 'Invalid control character' and 'dictionary length' errors."""
     try:
-        # 1. Fetch the secret
         raw_info = st.secrets["connections"]["gsheets"]["service_account_info"]
         
-        # 2. Parse if string, otherwise cast to dict
+        # Parse based on whether secrets are stored as a string or TOML table
         if isinstance(raw_info, str):
-            # This handles strings that might have hidden control characters
             info = json.loads(raw_info, strict=False)
         else:
             info = dict(raw_info)
         
-        # 3. CRITICAL: Fix private_key newline formatting for Google RSA
+        # Sanitize the private key for Google RSA
         if "private_key" in info:
             info["private_key"] = info["private_key"].replace("\\n", "\n")
         
-        scope = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ]
-        
+        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         creds = Credentials.from_service_account_info(info, scopes=scope)
         return gspread.authorize(creds)
     except Exception as e:
@@ -61,22 +52,35 @@ QUESTIONS = {
     }
 }
 
-# --- SAVE LOGIC ---
+# --- IMPROVED SAVE LOGIC ---
 def save_to_cloud(name, set_name, q_name, score, max_m, summary):
-    if not gc: return False
+    if not gc: 
+        st.error("GSpread client not initialized.")
+        return False
     try:
         url = st.secrets["connections"]["gsheets"]["spreadsheet"]
-        s_id = url.split("/d/")[1].split("/")[0] if "/d/" in url else url
+        # Improved ID extraction
+        if "/d/" in url:
+            s_id = url.split("/d/")[1].split("/")[0]
+        else:
+            s_id = url
+            
         sheet = gc.open_by_key(s_id).get_worksheet(0)
         
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-        sheet.append_row([timestamp, name, set_name, q_name, int(score), int(max_m), str(summary)])
+        # Ensure values are simple types for JSON serialisation
+        row = [timestamp, str(name), str(set_name), str(q_name), int(score), int(max_m), str(summary)]
+        
+        sheet.append_row(row)
         return True
+    except gspread.exceptions.APIError as e:
+        st.error(f"⚠️ Google API Error: {e}. Check if you shared the sheet with the Service Account email!")
+        return False
     except Exception as e:
         st.error(f"⚠️ Save error: {e}")
         return False
 
-# --- UI ---
+# --- UI LOGIC ---
 if "feedback" not in st.session_state: st.session_state["feedback"] = None
 
 t1, t2 = st.tabs(["✍️ Student Portal", "📊 Teacher Dashboard"])
@@ -86,8 +90,10 @@ with t1:
     
     with st.expander("👤 Student Identity", expanded=True):
         c1, c2, c3 = st.columns(3)
-        full_name = f"{c1.text_input('First')} {c2.text_input('Last')}"
+        f_name = c1.text_input('First Name')
+        l_name = c2.text_input('Last Name')
         cl_set = c3.selectbox("Set", ["11Y/Ph1", "11X/Ph2", "Teacher Test"])
+        full_name = f"{f_name} {l_name}"
 
     col_l, col_r = st.columns([2, 1])
     
@@ -104,7 +110,7 @@ with t1:
                 with st.spinner("AI Marking..."):
                     res = client.chat.completions.create(
                         model="gpt-4o", 
-                        messages=[{"role": "user", "content": f"Mark: {ans}. Scheme: {q_data['mark_scheme']}. JSON only: {{'score': int, 'summary': str}}"}],
+                        messages=[{"role": "user", "content": f"Mark: {ans}. Scheme: {q_data['mark_scheme']}. Total Marks: {q_data['marks']}. JSON format only: {{'score': int, 'summary': str}}"}],
                         response_format={"type": "json_object"}
                     )
                     data = json.loads(res.choices[0].message.content)
@@ -112,7 +118,7 @@ with t1:
                     save_to_cloud(full_name, cl_set, q_key, data.get('score', 0), q_data['marks'], data.get('summary', ''))
 
         else:
-            canvas = st_canvas(stroke_width=3, stroke_color="#000", background_color="#fff", height=300, width=500, drawing_mode="freedraw")
+            canvas = st_canvas(stroke_width=3, stroke_color="#000", background_color="#fff", height=300, width=500, drawing_mode="freedraw", key="canvas_main")
             if st.button("Submit Drawing", use_container_width=True):
                 if canvas.image_data is not None:
                     with st.spinner("Analyzing Diagram..."):
@@ -126,7 +132,7 @@ with t1:
                             messages=[{
                                 "role": "user",
                                 "content": [
-                                    {"type": "text", "text": f"Mark drawing: {q_data['mark_scheme']}. JSON: {{'score': int, 'summary': str}}"},
+                                    {"type": "text", "text": f"Mark this GCSE diagram. Scheme: {q_data['mark_scheme']}. Total Marks: {q_data['marks']}. Return JSON: {{'score': int, 'summary': str}}"},
                                     {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
                                 ]
                             }],
@@ -144,9 +150,12 @@ with t1:
             st.write(f.get('summary', ''))
 
 with t2:
-    if st.text_input("Password", type="password") == "Newton2025":
+    if st.text_input("Teacher Password", type="password") == "Newton2025":
         if gc:
-            url = st.secrets["connections"]["gsheets"]["spreadsheet"]
-            s_id = url.split("/d/")[1].split("/")[0] if "/d/" in url else url
-            rows = gc.open_by_key(s_id).get_worksheet(0).get_all_records()
-            st.dataframe(pd.DataFrame(rows), use_container_width=True)
+            try:
+                url = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                s_id = url.split("/d/")[1].split("/")[0] if "/d/" in url else url
+                rows = gc.open_by_key(s_id).get_worksheet(0).get_all_records()
+                st.dataframe(pd.DataFrame(rows), use_container_width=True)
+            except Exception as e:
+                st.error(f"Could not load dashboard: {e}")
