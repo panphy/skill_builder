@@ -1,8 +1,6 @@
 streamlit
-openai>=1.58.1
+openai
 streamlit-drawable-canvas
 Pillow
-numpy
-pandas
 gspread
-google-auth
+oauth2client
