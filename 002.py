@@ -197,7 +197,6 @@ Max Marks: {max_marks}
             messages=messages,
             max_completion_tokens=800,
             reasoning_effort="minimal",
-            temperature=0
         )
 
         raw = response.choices[0].message.content or ""
