@@ -175,11 +175,13 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
     fb_json = json.dumps(report.get("feedback_points", [])[:6])
     ns_json = json.dumps(report.get("next_steps", [])[:6])
 
+    # FIX: Changed :param::jsonb to CAST(:param AS jsonb) to avoid parser errors
     query = """
         insert into public.physics_attempts_v1
         (student_id, question_key, mode, marks_awarded, max_marks, summary, feedback_points, next_steps)
         values
-        (:student_id, :question_key, :mode, :marks_awarded, :max_marks, :summary, :feedback_points::jsonb, :next_steps::jsonb)
+        (:student_id, :question_key, :mode, :marks_awarded, :max_marks, :summary, 
+         CAST(:feedback_points AS jsonb), CAST(:next_steps AS jsonb))
     """
 
     try:
@@ -197,6 +199,7 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
         st.session_state["db_last_error"] = None
     except Exception as e:
         st.session_state["db_last_error"] = f"Insert Error: {e}"
+
 
 def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
     """Loads attempts for the dashboard."""
