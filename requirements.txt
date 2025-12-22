@@ -5,3 +5,4 @@ streamlit-drawable-canvas
 psycopg[binary]
 SQLAlchemy>=2.0
 Pillow
+supabase>=2.0,<3
