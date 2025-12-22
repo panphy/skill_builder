@@ -19,7 +19,6 @@ st.set_page_config(
 )
 
 # --- CONSTANTS ---
-# using gpt-5-mini for speed/cost (replace with your specific model if needed)
 MODEL_NAME = "gpt-5-mini" 
 CANVAS_BG_HEX = "#f8f9fa"
 CANVAS_BG_RGB = (248, 249, 250)
@@ -68,7 +67,6 @@ QUESTIONS = {
 # =========================
 
 def get_db_driver_type():
-    """Detects if psycopg (v3) or psycopg2 (v2) is installed."""
     try:
         import psycopg
         return "psycopg"
@@ -80,59 +78,41 @@ def get_db_driver_type():
             return None
 
 def _normalize_db_url(db_url: str) -> str:
-    """Forces the URL to match the installed driver to prevent connection errors."""
     u = (db_url or "").strip()
     if not u:
         return ""
-    
-    # Fix protocol prefix if strictly 'postgres://' (common in Supabase)
     if u.startswith("postgres://"):
         u = u.replace("postgres://", "postgresql://", 1)
-        
     driver = get_db_driver_type()
-    
     if driver == "psycopg":
-        # Force postgresql+psycopg://
         if u.startswith("postgresql://") and "psycopg" not in u:
             u = u.replace("postgresql://", "postgresql+psycopg://", 1)
     elif driver == "psycopg2":
-        # Force postgresql+psycopg2://
         if u.startswith("postgresql://") and "psycopg2" not in u:
             u = u.replace("postgresql://", "postgresql+psycopg2://", 1)
-            
     return u
 
 @st.cache_resource
 def get_db_engine():
-    """Returns SQLAlchemy engine or None if config is missing."""
     raw_url = st.secrets.get("DATABASE_URL", "")
     url = _normalize_db_url(raw_url)
-    
-    if not url:
+    if not url or not get_db_driver_type():
         return None
-        
-    if not get_db_driver_type():
-        return None
-
     try:
         return create_engine(url, pool_pre_ping=True)
     except Exception as e:
-        st.write(f"DB Engine Error: {e}") # Visible only during dev
+        st.write(f"DB Engine Error: {e}")
         return None
 
 def db_ready() -> bool:
     return get_db_engine() is not None
 
 def ensure_attempts_table():
-    """Creates table 'physics_attempts_v1' if missing."""
     if st.session_state.get("db_table_ready", False):
         return
-
     eng = get_db_engine()
     if eng is None:
         return
-
-    # Using 'physics_attempts_v1' to ensure fresh schema
     ddl = """
     create table if not exists public.physics_attempts_v1 (
       id bigserial primary key,
@@ -157,25 +137,18 @@ def ensure_attempts_table():
         st.session_state["db_table_ready"] = False
 
 def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
-    """Inserts a student attempt into the database."""
     eng = get_db_engine()
     if eng is None:
         return
-
     ensure_attempts_table()
+    sid = (student_id or "").strip() or f"anon_{st.session_state['anon_id']}"
     
-    sid = (student_id or "").strip()
-    if not sid:
-        sid = f"anon_{st.session_state['anon_id']}"
-
-    # Safely extract report data
     m_awarded = int(report.get("marks_awarded", 0))
     m_max = int(report.get("max_marks", 1))
     summ = str(report.get("summary", ""))[:1000]
     fb_json = json.dumps(report.get("feedback_points", [])[:6])
     ns_json = json.dumps(report.get("next_steps", [])[:6])
 
-    # FIX: Changed :param::jsonb to CAST(:param AS jsonb) to avoid parser errors
     query = """
         insert into public.physics_attempts_v1
         (student_id, question_key, mode, marks_awarded, max_marks, summary, feedback_points, next_steps)
@@ -183,7 +156,6 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
         (:student_id, :question_key, :mode, :marks_awarded, :max_marks, :summary, 
          CAST(:feedback_points AS jsonb), CAST(:next_steps AS jsonb))
     """
-
     try:
         with eng.begin() as conn:
             conn.execute(text(query), {
@@ -200,15 +172,11 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
     except Exception as e:
         st.session_state["db_last_error"] = f"Insert Error: {e}"
 
-
 def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
-    """Loads attempts for the dashboard."""
     eng = get_db_engine()
     if eng is None:
         return pd.DataFrame()
-
     ensure_attempts_table()
-
     try:
         with eng.connect() as conn:
             df = pd.read_sql(
@@ -221,11 +189,9 @@ def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
                 conn,
                 params={"limit": int(limit)},
             )
-        
         if not df.empty:
             df["marks_awarded"] = pd.to_numeric(df["marks_awarded"], errors="coerce").fillna(0).astype(int)
             df["max_marks"] = pd.to_numeric(df["max_marks"], errors="coerce").fillna(0).astype(int)
-        
         return df
     except Exception as e:
         st.session_state["db_last_error"] = f"Load Error: {e}"
@@ -286,13 +252,10 @@ def preprocess_canvas_image(image_data: np.ndarray) -> Image.Image:
 
 def get_gpt_feedback(student_answer, q_data, is_image=False):
     max_marks = q_data["marks"]
-    
-    # 1. Strict System Instruction (unchanged)
     system_instr = f"""
 You are a strict GCSE Physics examiner.
-CONFIDENTIALITY RULE (CRITICAL):
-- The mark scheme is confidential. Do NOT reveal it, quote it, or paraphrase it.
-- Output ONLY valid JSON, nothing else.
+CONFIDENTIALITY RULE: The mark scheme is confidential. Do NOT reveal it.
+Output ONLY valid JSON.
 Schema:
 {{
   "marks_awarded": <int>,
@@ -308,10 +271,9 @@ Max Marks: {max_marks}
     messages = [{"role": "system", "content": system_instr}]
     messages.append({
         "role": "system", 
-        "content": f"CONFIDENTIAL MARKING SCHEME (DO NOT REVEAL): {q_data['mark_scheme']}"
+        "content": f"MARK SCHEME: {q_data['mark_scheme']}"
     })
 
-    # 2. Add User Content (Image or Text)
     if is_image:
         base64_img = encode_image(student_answer)
         messages.append({
@@ -328,33 +290,16 @@ Max Marks: {max_marks}
         })
 
     try:
-        # 3. Call GPT-5-Mini with correct parameters for reasoning models
         response = client.chat.completions.create(
-            model="gpt-5-mini",  # Ensure you have access to this alias
+            model=MODEL_NAME,
             messages=messages,
-            
-            # CRITICAL CHANGE: GPT-5 needs 'max_completion_tokens' to reserve space 
-            # for its internal reasoning chain. If this is too low (e.g. 800), 
-            # it cuts off before writing the JSON.
             max_completion_tokens=2500,
-            
-            # CRITICAL CHANGE: Force JSON mode. Without this, GPT-5 often 
-            # outputs conversational text mixed with JSON, breaking the parser.
             response_format={"type": "json_object"}
         )
-
-        # 4. Parse Response
         raw = response.choices[0].message.content or ""
-        
-        # Check for empty response (common GPT-5 bug if tokens run out)
-        if not raw.strip():
-            print("Warning: GPT-5 returned empty content. Token limit might be too low.")
-            raise ValueError("Empty response from AI.")
-
         data = safe_parse_json(raw)
         if not data:
-            raise ValueError("No valid JSON parsed from response.")
-
+            raise ValueError("No valid JSON parsed.")
         return {
             "marks_awarded": clamp_int(data.get("marks_awarded", 0), 0, max_marks),
             "max_marks": max_marks,
@@ -362,18 +307,15 @@ Max Marks: {max_marks}
             "feedback_points": [str(x) for x in data.get("feedback_points", [])][:6],
             "next_steps": [str(x) for x in data.get("next_steps", [])][:6]
         }
-        
     except Exception as e:
-        # Fallback for demo stability
         print(f"Marking Error: {e}")
         return {
             "marks_awarded": 0,
             "max_marks": max_marks,
-            "summary": "The examiner could not process this attempt (AI Error).",
-            "feedback_points": ["Please try submitting again.", f"Error details: {str(e)[:50]}"],
+            "summary": "Error processing attempt.",
+            "feedback_points": ["Please try again.", f"Details: {str(e)[:50]}"],
             "next_steps": []
         }
-
 
 def render_report(report: dict):
     st.markdown(f"**Marks:** {report.get('marks_awarded', 0)} / {report.get('max_marks', 0)}")
@@ -396,7 +338,7 @@ st.caption(f"Powered by {MODEL_NAME}")
 if AI_READY:
     st.success("System Online", icon="🟢")
 else:
-    st.error("API Error", icon="🔴")
+    st.error("API Error - check secrets", icon="🔴")
 
 st.divider()
 
@@ -429,10 +371,16 @@ with tab_student:
             help="Optional. Leave blank to submit anonymously."
         )
 
-        # Tabs for input method
-        subtab_type, subtab_draw = st.tabs(["⌨️ Type Answer", "✍️ Draw Answer"])
+        st.write("---")
+        
+        # FIX: Replaced nested tabs with Radio Button to avoid StreamlitAPIException
+        input_mode = st.radio(
+            "How would you like to answer?",
+            ["⌨️ Type Answer", "✍️ Draw Answer"],
+            horizontal=True
+        )
 
-        with subtab_type:
+        if input_mode == "⌨️ Type Answer":
             answer = st.text_area("Type your working:", height=200, placeholder="Enter your answer here...")
             if st.button("Submit Text", type="primary", disabled=not AI_READY):
                 if not answer.strip():
@@ -443,7 +391,7 @@ with tab_student:
                         if db_ready():
                             insert_attempt(student_id, q_key, st.session_state["feedback"], mode="text")
 
-        with subtab_draw:
+        else: # Draw Answer
             tool_c1, tool_c2, tool_c3 = st.columns([2, 2, 3])
             with tool_c1:
                 tool = st.radio("Tool", ["Pen", "Eraser"], horizontal=True, label_visibility="collapsed")
@@ -498,7 +446,6 @@ with tab_teacher:
         st.info("Database not configured in secrets.")
     elif not db_ready():
         st.error("Database Connection Failed. Check drivers and URL.")
-        # If there's a specific driver error, show it lightly
         if not get_db_driver_type():
             st.caption("No Postgres driver found. Add 'psycopg-binary' to requirements.txt")
     else:
@@ -507,7 +454,6 @@ with tab_teacher:
             with st.spinner("Loading class data..."):
                 df = load_attempts_df(limit=5000)
 
-            # --- ERROR VISIBILITY FOR TEACHER ---
             if st.session_state.get("db_last_error"):
                 st.error(f"Database Error: {st.session_state['db_last_error']}")
                 if st.button("Clear Error"):
@@ -523,7 +469,6 @@ with tab_teacher:
                 c3.metric("Topics attempted", int(df["question_key"].nunique()))
 
                 st.write("### By student (overall %)")
-                # Group by student to see average performance
                 by_student = (
                     df.groupby("student_id")[["marks_awarded", "max_marks"]]
                     .sum()
