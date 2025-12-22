@@ -20,7 +20,7 @@ st.set_page_config(
 
 # --- CONSTANTS ---
 # using gpt-5-mini for speed/cost (replace with your specific model if needed)
-MODEL_NAME = "gpt-5-mini" 
+MODEL_NAME = "gpt-5-mini"
 CANVAS_BG_HEX = "#f8f9fa"
 CANVAS_BG_RGB = (248, 249, 250)
 MAX_IMAGE_WIDTH = 1024
@@ -84,13 +84,13 @@ def _normalize_db_url(db_url: str) -> str:
     u = (db_url or "").strip()
     if not u:
         return ""
-    
+
     # Fix protocol prefix if strictly 'postgres://' (common in Supabase)
     if u.startswith("postgres://"):
         u = u.replace("postgres://", "postgresql://", 1)
-        
+
     driver = get_db_driver_type()
-    
+
     if driver == "psycopg":
         # Force postgresql+psycopg://
         if u.startswith("postgresql://") and "psycopg" not in u:
@@ -99,7 +99,7 @@ def _normalize_db_url(db_url: str) -> str:
         # Force postgresql+psycopg2://
         if u.startswith("postgresql://") and "psycopg2" not in u:
             u = u.replace("postgresql://", "postgresql+psycopg2://", 1)
-            
+
     return u
 
 @st.cache_resource
@@ -107,17 +107,17 @@ def get_db_engine():
     """Returns SQLAlchemy engine or None if config is missing."""
     raw_url = st.secrets.get("DATABASE_URL", "")
     url = _normalize_db_url(raw_url)
-    
+
     if not url:
         return None
-        
+
     if not get_db_driver_type():
         return None
 
     try:
         return create_engine(url, pool_pre_ping=True)
     except Exception as e:
-        st.write(f"DB Engine Error: {e}") # Visible only during dev
+        st.write(f"DB Engine Error: {e}")  # Visible only during dev
         return None
 
 def db_ready() -> bool:
@@ -163,7 +163,7 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
         return
 
     ensure_attempts_table()
-    
+
     sid = (student_id or "").strip()
     if not sid:
         sid = f"anon_{st.session_state['anon_id']}"
@@ -180,7 +180,7 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
         insert into public.physics_attempts_v1
         (student_id, question_key, mode, marks_awarded, max_marks, summary, feedback_points, next_steps)
         values
-        (:student_id, :question_key, :mode, :marks_awarded, :max_marks, :summary, 
+        (:student_id, :question_key, :mode, :marks_awarded, :max_marks, :summary,
          CAST(:feedback_points AS jsonb), CAST(:next_steps AS jsonb))
     """
 
@@ -199,7 +199,6 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
         st.session_state["db_last_error"] = None
     except Exception as e:
         st.session_state["db_last_error"] = f"Insert Error: {e}"
-
 
 def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
     """Loads attempts for the dashboard."""
@@ -221,11 +220,11 @@ def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
                 conn,
                 params={"limit": int(limit)},
             )
-        
+
         if not df.empty:
             df["marks_awarded"] = pd.to_numeric(df["marks_awarded"], errors="coerce").fillna(0).astype(int)
             df["max_marks"] = pd.to_numeric(df["max_marks"], errors="coerce").fillna(0).astype(int)
-        
+
         return df
     except Exception as e:
         st.session_state["db_last_error"] = f"Load Error: {e}"
@@ -286,7 +285,7 @@ def preprocess_canvas_image(image_data: np.ndarray) -> Image.Image:
 
 def get_gpt_feedback(student_answer, q_data, is_image=False):
     max_marks = q_data["marks"]
-    
+
     # 1. Strict System Instruction (unchanged)
     system_instr = f"""
 You are a strict GCSE Physics examiner.
@@ -307,7 +306,7 @@ Max Marks: {max_marks}
 
     messages = [{"role": "system", "content": system_instr}]
     messages.append({
-        "role": "system", 
+        "role": "system",
         "content": f"CONFIDENTIAL MARKING SCHEME (DO NOT REVEAL): {q_data['mark_scheme']}"
     })
 
@@ -332,21 +331,13 @@ Max Marks: {max_marks}
         response = client.chat.completions.create(
             model="gpt-5-mini",  # Ensure you have access to this alias
             messages=messages,
-            
-            # CRITICAL CHANGE: GPT-5 needs 'max_completion_tokens' to reserve space 
-            # for its internal reasoning chain. If this is too low (e.g. 800), 
-            # it cuts off before writing the JSON.
             max_completion_tokens=2500,
-            
-            # CRITICAL CHANGE: Force JSON mode. Without this, GPT-5 often 
-            # outputs conversational text mixed with JSON, breaking the parser.
             response_format={"type": "json_object"}
         )
 
         # 4. Parse Response
         raw = response.choices[0].message.content or ""
-        
-        # Check for empty response (common GPT-5 bug if tokens run out)
+
         if not raw.strip():
             print("Warning: GPT-5 returned empty content. Token limit might be too low.")
             raise ValueError("Empty response from AI.")
@@ -362,7 +353,7 @@ Max Marks: {max_marks}
             "feedback_points": [str(x) for x in data.get("feedback_points", [])][:6],
             "next_steps": [str(x) for x in data.get("next_steps", [])][:6]
         }
-        
+
     except Exception as e:
         # Fallback for demo stability
         print(f"Marking Error: {e}")
@@ -373,7 +364,6 @@ Max Marks: {max_marks}
             "feedback_points": ["Please try submitting again.", f"Error details: {str(e)[:50]}"],
             "next_steps": []
         }
-
 
 def render_report(report: dict):
     st.markdown(f"**Marks:** {report.get('marks_awarded', 0)} / {report.get('max_marks', 0)}")
@@ -388,110 +378,113 @@ def render_report(report: dict):
         for n in report["next_steps"]:
             st.write(f"- {n}")
 
-# --- MAIN APP UI ---
+# =========================
+#  MAIN APP UI (UI CHANGE ONLY)
+# =========================
 
-# 1. Top Navigation
-top_col1, top_col2, top_col3 = st.columns([3, 2, 1])
+tab_student, tab_teacher = st.tabs(["🧑‍🎓 Student", "🔒 Teacher Dashboard"])
 
-with top_col1:
-    st.title("⚛️ AI Examiner")
-    st.caption(f"Powered by {MODEL_NAME}")
+with tab_student:
+    # 1. Top Navigation
+    top_col1, top_col2, top_col3 = st.columns([3, 2, 1])
 
-with top_col2:
-    q_key = st.selectbox("Select Topic:", list(QUESTIONS.keys()))
-    q_data = QUESTIONS[q_key]
+    with top_col1:
+        st.title("⚛️ AI Examiner")
+        st.caption(f"Powered by {MODEL_NAME}")
 
-with top_col3:
-    if AI_READY:
-        st.success("System Online", icon="🟢")
-    else:
-        st.error("API Error", icon="🔴")
+    with top_col2:
+        q_key = st.selectbox("Select Topic:", list(QUESTIONS.keys()))
+        q_data = QUESTIONS[q_key]
 
-st.divider()
+    with top_col3:
+        if AI_READY:
+            st.success("System Online", icon="🟢")
+        else:
+            st.error("API Error", icon="🔴")
 
-# 2. Main Content
-col1, col2 = st.columns([5, 4])
+    st.divider()
 
-with col1:
-    st.subheader("📝 The Question")
-    st.markdown(f"**{q_data['question']}**")
-    st.caption(f"Max Marks: {q_data['marks']}")
+    # 2. Main Content
+    col1, col2 = st.columns([5, 4])
 
-    st.write("")
-    
-    student_id = st.text_input(
-        "Student ID",
-        placeholder="e.g. 10A_23",
-        help="Optional. Leave blank to submit anonymously."
-    )
+    with col1:
+        st.subheader("📝 The Question")
+        st.markdown(f"**{q_data['question']}**")
+        st.caption(f"Max Marks: {q_data['marks']}")
 
-    tab_type, tab_draw = st.tabs(["⌨️ Type Answer", "✍️ Draw Answer"])
+        st.write("")
 
-    with tab_type:
-        answer = st.text_area("Type your working:", height=200, placeholder="Enter your answer here...")
-        if st.button("Submit Text", type="primary", disabled=not AI_READY):
-            if not answer.strip():
-                st.toast("Please type an answer first.", icon="⚠️")
-            else:
-                with st.spinner("Marking..."):
-                    st.session_state["feedback"] = get_gpt_feedback(answer, q_data, is_image=False)
-                    if db_ready():
-                        insert_attempt(student_id, q_key, st.session_state["feedback"], mode="text")
-
-    with tab_draw:
-        tool_c1, tool_c2, tool_c3 = st.columns([2, 2, 3])
-        with tool_c1:
-            tool = st.radio("Tool", ["Pen", "Eraser"], horizontal=True, label_visibility="collapsed")
-        with tool_c3:
-            if st.button("🗑️ Clear Canvas"):
-                st.session_state["canvas_key"] += 1
-                st.session_state["feedback"] = None
-                st.rerun()
-
-        stroke_width = 2 if tool == "Pen" else 30
-        stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
-
-        canvas_result = st_canvas(
-            stroke_width=stroke_width,
-            stroke_color=stroke_color,
-            background_color=CANVAS_BG_HEX,
-            height=400,
-            width=600,
-            drawing_mode="freedraw",
-            key=f"canvas_{st.session_state['canvas_key']}",
+        student_id = st.text_input(
+            "Student ID",
+            placeholder="e.g. 10A_23",
+            help="Optional. Leave blank to submit anonymously."
         )
 
-        if st.button("Submit Drawing", type="primary", disabled=not AI_READY):
-            if canvas_result.image_data is None or not canvas_has_ink(canvas_result.image_data):
-                st.toast("Canvas is empty!", icon="⚠️")
+        tab_type, tab_draw = st.tabs(["⌨️ Type Answer", "✍️ Draw Answer"])
+
+        with tab_type:
+            answer = st.text_area("Type your working:", height=200, placeholder="Enter your answer here...")
+            if st.button("Submit Text", type="primary", disabled=not AI_READY):
+                if not answer.strip():
+                    st.toast("Please type an answer first.", icon="⚠️")
+                else:
+                    with st.spinner("Marking..."):
+                        st.session_state["feedback"] = get_gpt_feedback(answer, q_data, is_image=False)
+                        if db_ready():
+                            insert_attempt(student_id, q_key, st.session_state["feedback"], mode="text")
+
+        with tab_draw:
+            tool_c1, tool_c2, tool_c3 = st.columns([2, 2, 3])
+            with tool_c1:
+                tool = st.radio("Tool", ["Pen", "Eraser"], horizontal=True, label_visibility="collapsed")
+            with tool_c3:
+                if st.button("🗑️ Clear Canvas"):
+                    st.session_state["canvas_key"] += 1
+                    st.session_state["feedback"] = None
+                    st.rerun()
+
+            stroke_width = 2 if tool == "Pen" else 30
+            stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
+
+            canvas_result = st_canvas(
+                stroke_width=stroke_width,
+                stroke_color=stroke_color,
+                background_color=CANVAS_BG_HEX,
+                height=400,
+                width=600,
+                drawing_mode="freedraw",
+                key=f"canvas_{st.session_state['canvas_key']}",
+            )
+
+            if st.button("Submit Drawing", type="primary", disabled=not AI_READY):
+                if canvas_result.image_data is None or not canvas_has_ink(canvas_result.image_data):
+                    st.toast("Canvas is empty!", icon="⚠️")
+                else:
+                    with st.spinner("Analyzing diagram..."):
+                        img_for_ai = preprocess_canvas_image(canvas_result.image_data)
+                        st.session_state["feedback"] = get_gpt_feedback(img_for_ai, q_data, is_image=True)
+                        if db_ready():
+                            insert_attempt(student_id, q_key, st.session_state["feedback"], mode="drawing")
+
+    with col2:
+        st.subheader("👨‍🏫 Report")
+        with st.container(border=True):
+            if st.session_state["feedback"]:
+                render_report(st.session_state["feedback"])
+                st.divider()
+                if st.button("Start New Attempt", use_container_width=True):
+                    st.session_state["feedback"] = None
+                    st.rerun()
             else:
-                with st.spinner("Analyzing diagram..."):
-                    img_for_ai = preprocess_canvas_image(canvas_result.image_data)
-                    st.session_state["feedback"] = get_gpt_feedback(img_for_ai, q_data, is_image=True)
-                    if db_ready():
-                        insert_attempt(student_id, q_key, st.session_state["feedback"], mode="drawing")
+                st.info("Submit an answer to receive feedback.")
 
-with col2:
-    st.subheader("👨‍🏫 Report")
-    with st.container(border=True):
-        if st.session_state["feedback"]:
-            render_report(st.session_state["feedback"])
-            st.divider()
-            if st.button("Start New Attempt", use_container_width=True):
-                st.session_state["feedback"] = None
-                st.rerun()
-        else:
-            st.info("Submit an answer to receive feedback.")
-
-    # --- TEACHER DASHBOARD ---
-    st.write("")
+with tab_teacher:
     st.subheader("🔒 Teacher Dashboard")
 
     if not st.secrets.get("DATABASE_URL", "").strip():
         st.info("Database not configured in secrets.")
     elif not db_ready():
         st.error("Database Connection Failed. Check drivers and URL.")
-        # If there's a specific driver error, show it lightly
         if not get_db_driver_type():
             st.caption("No Postgres driver found. Add 'psycopg-binary' to requirements.txt")
     else:
@@ -516,7 +509,6 @@ with col2:
                 c3.metric("Topics attempted", int(df["question_key"].nunique()))
 
                 st.write("### By student (overall %)")
-                # Group by student to see average performance
                 by_student = (
                     df.groupby("student_id")[["marks_awarded", "max_marks"]]
                     .sum()
