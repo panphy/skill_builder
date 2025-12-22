@@ -15,7 +15,7 @@ import secrets as pysecrets
 # --- PAGE CONFIG ---
 # =========================
 st.set_page_config(
-    page_title="AI Physics Examiner",
+    page_title="PanPhy Skill Builder",
     page_icon="⚛️",
     layout="wide"
 )
@@ -773,7 +773,7 @@ with tab_student:
 
         st.write("")
 
-        tab_type, tab_draw = st.tabs(["⌨️ Type Answer", "✍️ Draw Answer"])
+        tab_type, tab_draw = st.tabs(["⌨️ Type Answer", "✍️ Write Answer"])
 
         with tab_type:
             answer = st.text_area("Type your working:", height=200, placeholder="Enter your answer here...")
@@ -840,7 +840,7 @@ with tab_student:
                 key=f"canvas_{st.session_state['canvas_key']}",
             )
 
-            if st.button("Submit Drawing", type="primary", disabled=not AI_READY):
+            if st.button("Submit Writing", type="primary", disabled=not AI_READY):
                 if canvas_result.image_data is None or not canvas_has_ink(canvas_result.image_data):
                     st.toast("Canvas is empty!", icon="⚠️")
                 else:
