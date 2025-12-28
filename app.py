@@ -610,17 +610,31 @@ def upload_to_storage(path: str, file_bytes: bytes, content_type: str) -> bool:
         st.session_state["db_last_error"] = "Storage Upload Error: empty path."
         return False
 
-    # supabase-py (v2+) expects file_options keys like contentType/upsert (bool).
-    # We include both legacy and current keys for compatibility across versions.
+    # Different supabase-py versions treat "file_options" differently.
+    # Some versions forward these options directly into HTTP headers.
+    # HTTP headers require **string/bytes** values, so NEVER pass booleans here.
+    # We include both legacy and current keys for compatibility.
     file_options = {
-        "contentType": content_type,
-        "content-type": content_type,
-        "upsert": True,
+        # content type
+        "contentType": str(content_type),
+        "content-type": str(content_type),
+
+        # cache control
         "cacheControl": "3600",
+        "cache-control": "3600",
+
+        # upsert (tolerate both keys used by different clients)
+        "upsert": "true",
+        "x-upsert": "true",
     }
 
     try:
-        res = sb.storage.from_(STORAGE_BUCKET).upload(p, file_bytes, file_options)
+        # Try the most common calling convention.
+        try:
+            res = sb.storage.from_(STORAGE_BUCKET).upload(p, file_bytes, file_options)
+        except TypeError:
+            # Some versions require keyword args.
+            res = sb.storage.from_(STORAGE_BUCKET).upload(path=p, file=file_bytes, file_options=file_options)
         err = None
         if hasattr(res, "error"):
             err = getattr(res, "error")
