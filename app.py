@@ -706,6 +706,8 @@ def cached_download_from_storage(path: str, _fp: str = "") -> bytes:
     return download_from_storage(path)
 
 
+def bytes_to_pil(img_bytes: bytes) -> Image.Image:
+    img = Image.open(io.BytesIO(img_bytes))
     img.load()
     if img.mode not in ("RGB", "RGBA"):
         img = img.convert("RGB")
