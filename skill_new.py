@@ -1006,7 +1006,7 @@ def _run_ai_with_progress(task_fn, mode: str, ctx: dict, typical_range: str, est
                 progress.progress(int(frac * 100))
 
                 if elapsed > 15 and not still_working_shown:
-                    status.update(label="Still working… (complex answer detected)", state="running", expanded=True)
+                    status.update(label="Still working… ", state="running", expanded=True)
                     still_working_shown = True
 
                 time.sleep(0.12)
