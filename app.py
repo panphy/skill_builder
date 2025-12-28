@@ -1511,10 +1511,16 @@ with header_left:
     st.title("⚛️ PanPhy Skill Builder")
     st.caption(f"Model: {MODEL_NAME}")
 with header_right:
-    if AI_READY:
-        st.success("System Online", icon="🟢")
-    else:
-        st.error("API Error", icon="🔴")
+    # Keep the header clean. Only show status when something is wrong.
+    issues = []
+    if not AI_READY:
+        issues.append("AI model not connected.")
+    if not db_ready():
+        issues.append("Database not connected.")
+    if issues:
+        st.caption("⚠️ System status")
+        for msg in issues:
+            st.caption(msg)
 
 # ============================================================
 # STUDENT PAGE
@@ -1523,49 +1529,30 @@ if nav == "🧑‍🎓 Student":
     st.divider()
 
     source_options = ["AI Practice", "Teacher Uploads", "All"]
-    source = st.selectbox("Question Source:", source_options, key="student_source")
 
-    col1, col2 = st.columns([5, 4])
+    # ------------------------------------------------------------------
+    # Compact selection UI: keep the main page focused on the question,
+    # the answer area, and the AI feedback report.
+    # ------------------------------------------------------------------
+    expand_by_default = st.session_state.get("selected_qid") is None
 
-    q_key = None
-    q_row: Dict[str, Any] = {}
-    question_img = None
-    max_marks = None
-
-    with col1:
-        st.subheader("📝 The Question")
-
-        student_id = st.text_input(
-            "Student ID",
-            placeholder="e.g. 10A_23",
-            help="Optional. Leave blank to submit anonymously.",
-            key="student_id"
-        )
-
-        effective_sid = _effective_student_id(student_id)
-
-        if st.session_state.get("is_teacher", False):
-            st.caption("Teacher mode: rate limits bypassed.")
-        else:
-            if db_ready():
-                allowed, remaining, _ = check_rate_limit(effective_sid)
-                st.caption(f"{remaining}/{RATE_LIMIT_MAX} attempts remaining this hour (updates every ~15s).")
-            else:
-                st.caption("Rate limit indicator unavailable (database not ready).")
+    with st.expander("Question selection", expanded=expand_by_default):
+        sel1, sel2 = st.columns([2, 2])
+        with sel1:
+            source = st.selectbox("Source", source_options, key="student_source")
+        with sel2:
+            st.text_input(
+                "Student ID (optional)",
+                placeholder="e.g. 10A_23",
+                help="Leave blank to submit anonymously.",
+                key="student_id",
+            )
 
         if not db_ready():
             st.error("Database not ready. Configure DATABASE_URL first.")
         else:
-            ensure_question_bank_table()
-
-            if st.session_state["cached_bank_df"] is None:
-                dfb = load_question_bank_df(limit=5000, include_inactive=False)
-                st.session_state["cached_bank_df"] = dfb
-                st.session_state["cached_assignments"] = ["All"] + sorted(dfb["assignment_name"].dropna().unique().tolist()) if not dfb.empty else ["All"]
-            else:
-                dfb = st.session_state["cached_bank_df"]
-
-            if dfb is None or dfb.empty:
+            # dfb is loaded/cached earlier in the app when DB is ready.
+            if dfb is None or getattr(dfb, "empty", True):
                 st.info("No questions in the database yet. Ask a teacher to generate or upload questions in the Question Bank page.")
             else:
                 if source == "AI Practice":
@@ -1578,78 +1565,95 @@ if nav == "🧑‍🎓 Student":
                 if df_src.empty:
                     st.info("No questions available for this source yet.")
                 else:
-                    # Build assignment options from the currently selected source only.
+                    # Assignment list depends on selected source only (prevents state mismatch).
                     assignments = ["All"] + sorted(df_src["assignment_name"].dropna().unique().tolist())
                     if st.session_state.get("student_assignment_filter") not in assignments:
                         st.session_state["student_assignment_filter"] = "All"
-                    assignment_filter = st.selectbox("Assignment:", assignments, key="student_assignment_filter")
+                    assignment_filter = st.selectbox("Assignment", assignments, key="student_assignment_filter")
 
-                    # Build the question list fresh to avoid selection/key mismatches when switching filters.
                     if assignment_filter != "All":
                         df2 = df_src[df_src["assignment_name"] == assignment_filter].copy()
                     else:
                         df2 = df_src.copy()
 
-                    df2 = df2.sort_values(["assignment_name", "question_label", "id"], kind="mergesort")
-                    df2["label"] = df2.apply(
-                        lambda r: f"{r['assignment_name']} | {r['question_label']} ({int(r['max_marks'])} marks) [id {int(r['id'])}]",
-                        axis=1
-                    )
-                    choices = df2["label"].tolist()
-                    labels_map = {lab: int(qid) for lab, qid in zip(choices, df2["id"].tolist())}
-
-                    if not choices:
-                        st.info("No questions in this assignment filter.")
+                    if df2.empty:
+                        st.info("No questions available for this assignment.")
                     else:
-                        choice_key = f"student_choice__{source}__{assignment_filter}"
+                        df2 = df2.sort_values(["assignment_name", "question_label", "id"], kind="mergesort")
+                        df2["label"] = df2.apply(
+                            lambda r: f"{r['assignment_name']} | {r['question_label']} ({int(r['max_marks'])} marks) [id {int(r['id'])}]",
+                            axis=1
+                        )
+                        choices = df2["label"].tolist()
+                        labels_map = dict(zip(df2["label"], df2["id"]))
+
+                        # Key varies with filters so Streamlit never keeps an invalid selection.
+                        choice_key = f"student_question_choice::{source}::{assignment_filter}"
                         if st.session_state.get(choice_key) not in choices:
                             st.session_state[choice_key] = choices[0]
-                        choice = st.selectbox("Select Question:", choices, key=choice_key)
-                        chosen_id = int(labels_map.get(choice, 0))
-                        if chosen_id <= 0:
-                            st.error("Selection mismatch. Please reselect the question.")
-                            st.stop()
 
+                        choice = st.selectbox("Question", choices, key=choice_key)
+                        chosen_id = int(labels_map.get(choice, 0)) if choice else 0
 
-                        if st.session_state["selected_qid"] != chosen_id:
-                            st.session_state["selected_qid"] = chosen_id
+                        if chosen_id:
+                            if st.session_state.get("selected_qid") != chosen_id:
+                                st.session_state["selected_qid"] = chosen_id
 
-                            q_row = load_question_by_id(chosen_id)
-                            st.session_state["cached_q_row"] = q_row
+                                q_row = load_question_by_id(chosen_id)
+                                st.session_state["cached_q_row"] = q_row
 
-                            st.session_state["cached_q_path"] = q_row.get("question_image_path")
-                            st.session_state["cached_ms_path"] = q_row.get("markscheme_image_path")
+                                st.session_state["cached_q_path"] = (q_row.get("question_image_path") or "").strip()
+                                st.session_state["cached_ms_path"] = (q_row.get("markscheme_image_path") or "").strip()
 
-                            q_path = (st.session_state["cached_q_path"] or "").strip()
-                            if q_path:
-                                fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
-                                q_bytes = cached_download_from_storage(q_path, fp)
-                                st.session_state["cached_question_img"] = bytes_to_pil(q_bytes) if q_bytes else None
-                            else:
-                                st.session_state["cached_question_img"] = None
+                                # Download question image now for display
+                                q_path = (st.session_state.get("cached_q_path") or "").strip()
+                                if q_path:
+                                    fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
+                                    q_bytes = cached_download_from_storage(q_path, fp)
+                                    st.session_state["cached_question_img"] = safe_bytes_to_pil(q_bytes)
+                                else:
+                                    st.session_state["cached_question_img"] = None
 
-                            st.session_state["feedback"] = None
-                            st.session_state["canvas_key"] += 1
-                            st.session_state["last_canvas_image_data"] = None
+                                # Reset per-question UI state
+                                st.session_state["feedback"] = None
+                                st.session_state["canvas_key"] += 1
+                                st.session_state["last_canvas_image_data"] = None
 
-                        q_row = st.session_state.get("cached_q_row") or {}
-                        question_img = st.session_state.get("cached_question_img")
+    # Current selection summary (kept small)
+    if st.session_state.get("cached_q_row"):
+        _qr = st.session_state["cached_q_row"]
+        st.caption(f"Selected: {_qr.get('assignment_name', '')} | {_qr.get('question_label', '')}")
 
-                        if q_row:
-                            max_marks = int(q_row.get("max_marks", 1))
-                            q_key = f"QB:{int(q_row['id'])}:{q_row.get('source','')}:{q_row.get('assignment_name','')}:{q_row.get('question_label','')}"
-                            q_text = (q_row.get("question_text") or "").strip()
+    # Pull cached selection for rendering and marking
+    student_id = st.session_state.get("student_id", "") or ""
+    q_row: Dict[str, Any] = st.session_state.get("cached_q_row") or {}
+    question_img = st.session_state.get("cached_question_img")
+    max_marks = int(q_row.get("max_marks", 1)) if q_row else None
+    q_text = (q_row.get("question_text") or "").strip() if q_row else ""
+    q_key = None
+    if q_row and q_row.get("id") is not None:
+        try:
+            q_key = f"QB:{int(q_row['id'])}:{q_row.get('assignment_name','')}:{q_row.get('question_label','')}"
+        except Exception:
+            q_key = None
 
-                            st.markdown("**Question**")
-                            with st.container(border=True):
-                                if question_img is not None:
-                                    st.image(question_img, caption="Question image", use_container_width=True)
-                                if q_text:
-                                    st.markdown(q_text)
-                                if (question_img is None) and (not q_text):
-                                    st.warning("This question has no question text or image.")
-                            st.caption(f"Max Marks: {max_marks}")
+    col1, col2 = st.columns([5, 4])
 
+    with col1:
+        st.subheader("📝 The Question")
+
+        if not q_row:
+            st.info("Select a question above to begin.")
+        else:
+            st.markdown("**Question**")
+            with st.container(border=True):
+                if question_img is not None:
+                    st.image(question_img, caption="Question image", use_container_width=True)
+                if q_text:
+                    st.markdown(q_text)
+                if (question_img is None) and (not q_text):
+                    st.warning("This question has no question text or image.")
+            st.caption(f"Max Marks: {max_marks}")
         st.write("")
         tab_type, tab_write = st.tabs(["⌨️ Type Answer", "✍️ Write Answer"])
 
