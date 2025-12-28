@@ -590,17 +590,37 @@ def slugify(s: str) -> str:
     return s or "untitled"
 
 
+def _clean_storage_path(path: str) -> str:
+    # Supabase Storage expects paths without a leading slash.
+    p = (path or "").strip().lstrip("/")
+    # Normalize accidental backslashes from copy/paste.
+    p = p.replace("\\", "/")
+    p = re.sub(r"/{2,}", "/", p)
+    return p
+
+
 def upload_to_storage(path: str, file_bytes: bytes, content_type: str) -> bool:
     sb = get_supabase_client()
     if sb is None:
         st.session_state["db_last_error"] = "Supabase Storage not configured."
         return False
+
+    p = _clean_storage_path(path)
+    if not p:
+        st.session_state["db_last_error"] = "Storage Upload Error: empty path."
+        return False
+
+    # supabase-py (v2+) expects file_options keys like contentType/upsert (bool).
+    # We include both legacy and current keys for compatibility across versions.
+    file_options = {
+        "contentType": content_type,
+        "content-type": content_type,
+        "upsert": True,
+        "cacheControl": "3600",
+    }
+
     try:
-        res = sb.storage.from_(STORAGE_BUCKET).upload(
-            path,
-            file_bytes,
-            {"content-type": content_type, "upsert": "true"}
-        )
+        res = sb.storage.from_(STORAGE_BUCKET).upload(p, file_bytes, file_options)
         err = None
         if hasattr(res, "error"):
             err = getattr(res, "error")
@@ -611,6 +631,10 @@ def upload_to_storage(path: str, file_bytes: bytes, content_type: str) -> bool:
         return True
     except Exception as e:
         st.session_state["db_last_error"] = f"Storage Upload Error: {type(e).__name__}: {e}"
+        LOGGER.error(
+            "Storage upload failed",
+            extra={"ctx": {"component": "storage", "op": "upload", "path": p, "error": type(e).__name__}},
+        )
         return False
 
 
@@ -618,29 +642,70 @@ def download_from_storage(path: str) -> bytes:
     sb = get_supabase_client()
     if sb is None:
         return b""
+
+    p = _clean_storage_path(path)
+    if not p:
+        return b""
+
     try:
-        res = sb.storage.from_(STORAGE_BUCKET).download(path)
+        res = sb.storage.from_(STORAGE_BUCKET).download(p)
+
+        # Different supabase-py versions return different shapes.
         if isinstance(res, (bytes, bytearray)):
             return bytes(res)
+
         if hasattr(res, "data") and res.data is not None:
             if isinstance(res.data, (bytes, bytearray)):
                 return bytes(res.data)
+
+        if hasattr(res, "content") and res.content is not None:
+            if isinstance(res.content, (bytes, bytearray)):
+                return bytes(res.content)
+
+        if hasattr(res, "read"):
+            try:
+                out = res.read()
+                if isinstance(out, (bytes, bytearray)):
+                    return bytes(out)
+            except Exception:
+                pass
+
+        # Some httpx responses expose .text; we won't use it for images.
         return b""
     except Exception as e:
         st.session_state["db_last_error"] = f"Storage Download Error: {type(e).__name__}: {e}"
+        LOGGER.error(
+            "Storage download failed",
+            extra={"ctx": {"component": "storage", "op": "download", "path": p, "error": type(e).__name__}},
+        )
         return b""
 
 
 @st.cache_data(ttl=300)
 def cached_download_from_storage(path: str, _fp: str) -> bytes:
+    # _fp is a fingerprint so cache invalidates when SUPABASE_URL changes.
     return download_from_storage(path)
 
 
 def bytes_to_pil(img_bytes: bytes) -> Image.Image:
     img = Image.open(io.BytesIO(img_bytes))
+    img.load()
     if img.mode not in ("RGB", "RGBA"):
         img = img.convert("RGB")
     return img
+
+
+def safe_bytes_to_pil(img_bytes: bytes) -> Optional[Image.Image]:
+    if not img_bytes:
+        return None
+    try:
+        return bytes_to_pil(img_bytes)
+    except Exception as e:
+        LOGGER.error(
+            "Failed to decode image bytes",
+            extra={"ctx": {"component": "image", "error": type(e).__name__}},
+        )
+        return None
 
 # ============================================================
 # FILE SIZE VALIDATION + COMPRESSION
@@ -884,7 +949,7 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
     """
     try:
         with eng.begin() as conn:
-            conn.execute(text(query), {
+            res = conn.execute(text(query), {
                 "student_id": sid,
                 "question_key": question_key,
                 "mode": mode,
@@ -1017,11 +1082,20 @@ def insert_question_bank_row(
        :question_text, :question_image_path,
        :markscheme_text, :markscheme_image_path,
        true, now())
-    on conflict (source, assignment_name, question_label) do nothing
+    on conflict (source, assignment_name, question_label) do update set
+       created_by = excluded.created_by,
+       max_marks = excluded.max_marks,
+       tags = excluded.tags,
+       question_text = excluded.question_text,
+       question_image_path = excluded.question_image_path,
+       markscheme_text = excluded.markscheme_text,
+       markscheme_image_path = excluded.markscheme_image_path,
+       is_active = true,
+       updated_at = now()
     """
     try:
         with eng.begin() as conn:
-            conn.execute(text(query), {
+            res = conn.execute(text(query), {
                 "source": source,
                 "created_by": (created_by or "").strip() or None,
                 "assignment_name": assignment_name.strip(),
@@ -1033,6 +1107,9 @@ def insert_question_bank_row(
                 "markscheme_text": (markscheme_text or "").strip()[:20000] or None,
                 "markscheme_image_path": (markscheme_image_path or "").strip() or None,
             })
+            if getattr(res, "rowcount", 1) == 0:
+                raise RuntimeError("No row inserted/updated.")
+
         # invalidate caches
         try:
             load_question_bank_df_cached.clear()
@@ -1482,30 +1559,38 @@ if nav == "🧑‍🎓 Student":
                 if df_src.empty:
                     st.info("No questions available for this source yet.")
                 else:
-                    assignment_filter = st.selectbox("Assignment:", st.session_state["cached_assignments"], key="student_assignment_filter")
+                    # Build assignment options from the currently selected source only.
+                    assignments = ["All"] + sorted(df_src["assignment_name"].dropna().unique().tolist())
+                    if st.session_state.get("student_assignment_filter") not in assignments:
+                        st.session_state["student_assignment_filter"] = "All"
+                    assignment_filter = st.selectbox("Assignment:", assignments, key="student_assignment_filter")
 
-                    map_key = f"labels_{source}_{assignment_filter}"
-                    if st.session_state.get("cached_labels_map_key") != map_key:
-                        if assignment_filter != "All":
-                            df2 = df_src[df_src["assignment_name"] == assignment_filter].copy()
-                        else:
-                            df2 = df_src.copy()
+                    # Build the question list fresh to avoid selection/key mismatches when switching filters.
+                    if assignment_filter != "All":
+                        df2 = df_src[df_src["assignment_name"] == assignment_filter].copy()
+                    else:
+                        df2 = df_src.copy()
 
-                        df2["label"] = df2.apply(
-                            lambda r: f"{r['assignment_name']} | {r['question_label']} ({int(r['max_marks'])} marks) [id {int(r['id'])}]",
-                            axis=1
-                        )
-                        labels_map = {row["label"]: int(row["id"]) for _, row in df2.iterrows()}
-                        st.session_state["cached_labels_map"] = labels_map
-                        st.session_state["cached_labels"] = list(labels_map.keys())
-                        st.session_state["cached_labels_map_key"] = map_key
+                    df2 = df2.sort_values(["assignment_name", "question_label", "id"], kind="mergesort")
+                    df2["label"] = df2.apply(
+                        lambda r: f"{r['assignment_name']} | {r['question_label']} ({int(r['max_marks'])} marks) [id {int(r['id'])}]",
+                        axis=1
+                    )
+                    choices = df2["label"].tolist()
+                    labels_map = {lab: int(qid) for lab, qid in zip(choices, df2["id"].tolist())}
 
-                    choices = st.session_state.get("cached_labels", [])
                     if not choices:
                         st.info("No questions in this assignment filter.")
                     else:
-                        choice = st.selectbox("Select Question:", choices, key="student_choice")
-                        chosen_id = int(st.session_state["cached_labels_map"][choice])
+                        choice_key = f"student_choice__{source}__{assignment_filter}"
+                        if st.session_state.get(choice_key) not in choices:
+                            st.session_state[choice_key] = choices[0]
+                        choice = st.selectbox("Select Question:", choices, key=choice_key)
+                        chosen_id = int(labels_map.get(choice, 0))
+                        if chosen_id <= 0:
+                            st.error("Selection mismatch. Please reselect the question.")
+                            st.stop()
+
 
                         if st.session_state["selected_qid"] != chosen_id:
                             st.session_state["selected_qid"] = chosen_id
@@ -2078,8 +2163,8 @@ else:
                 ms_path = (row.get("markscheme_image_path") or "").strip()
 
                 fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
-                q_img = bytes_to_pil(cached_download_from_storage(q_path, fp)) if q_path else None
-                ms_img = bytes_to_pil(cached_download_from_storage(ms_path, fp)) if ms_path else None
+                q_img = safe_bytes_to_pil(cached_download_from_storage(q_path, fp)) if q_path else None
+                ms_img = safe_bytes_to_pil(cached_download_from_storage(ms_path, fp)) if ms_path else None
 
                 pv1, pv2 = st.columns(2)
                 with pv1:
