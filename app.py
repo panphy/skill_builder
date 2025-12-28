@@ -1472,35 +1472,77 @@ if nav == "🧑‍🎓 Student":
             if dfb is None or dfb.empty:
                 st.info("No questions in the database yet. Ask a teacher to generate or upload questions in the Question Bank page.")
             else:
-                if source == "AI Practice":
-                    df_src = dfb[dfb["source"] == "ai_generated"].copy()
-                elif source == "Teacher Uploads":
-                    df_src = dfb[dfb["source"] == "teacher"].copy()
-                else:
-                    df_src = dfb.copy()
+				# --- source filtering ---
+if source == "AI Practice":
+    df_src = dfb[dfb["source"] == "ai_generated"].copy()
+elif source == "Teacher Uploads":
+    df_src = dfb[dfb["source"] == "teacher"].copy()
+else:
+    df_src = dfb.copy()
 
-                if df_src.empty:
-                    st.info("No questions available for this source yet.")
-                else:
-                    assignment_filter = st.selectbox("Assignment:", st.session_state["cached_assignments"], key="student_assignment_filter")
+if df_src.empty:
+    st.info("No questions available for this source yet.")
+else:
+    # --- Assignment dropdown MUST be based on df_src (not the full bank) ---
+    assignments_src = ["All"] + sorted(df_src["assignment_name"].dropna().unique().tolist())
 
-                    map_key = f"labels_{source}_{assignment_filter}"
-                    if st.session_state.get("cached_labels_map_key") != map_key:
-                        if assignment_filter != "All":
-                            df2 = df_src[df_src["assignment_name"] == assignment_filter].copy()
-                        else:
-                            df2 = df_src.copy()
+    # Use a source-specific key so Streamlit does not keep an invalid previous selection
+    assignment_filter = st.selectbox(
+        "Assignment:",
+        assignments_src,
+        key=f"student_assignment_filter_{source}",
+    )
 
-                        df2["label"] = df2.apply(
-                            lambda r: f"{r['assignment_name']} | {r['question_label']} ({int(r['max_marks'])} marks) [id {int(r['id'])}]",
-                            axis=1
-                        )
-                        labels_map = {row["label"]: int(row["id"]) for _, row in df2.iterrows()}
-                        st.session_state["cached_labels_map"] = labels_map
-                        st.session_state["cached_labels"] = list(labels_map.keys())
-                        st.session_state["cached_labels_map_key"] = map_key
+    # Now filter safely
+    if assignment_filter != "All":
+        df2 = df_src[df_src["assignment_name"] == assignment_filter].copy()
+    else:
+        df2 = df_src.copy()
 
-                    choices = st.session_state.get("cached_labels", [])
+    if df2.empty:
+        st.info("No questions in this assignment for the selected source.")
+        st.stop()
+
+    # --- Build labels WITHOUT apply() (vectorized, cannot return a DataFrame) ---
+    df2 = df2.copy()
+    df2["id"] = pd.to_numeric(df2["id"], errors="coerce").fillna(0).astype(int)
+    df2["max_marks"] = pd.to_numeric(df2["max_marks"], errors="coerce").fillna(0).astype(int)
+
+    df2["label"] = (
+        df2["assignment_name"].astype(str)
+        + " | "
+        + df2["question_label"].astype(str)
+        + " ("
+        + df2["max_marks"].astype(str)
+        + " marks) [id "
+        + df2["id"].astype(str)
+        + "]"
+    )
+
+    labels_map = dict(zip(df2["label"].tolist(), df2["id"].tolist()))
+    labels = list(labels_map.keys())
+
+    choice = st.selectbox(
+        "Select Question:",
+        labels,
+        key=f"student_choice_{source}_{assignment_filter}",
+    )
+    chosen_id = int(labels_map[choice])
+
+    # Load question row (unchanged from your existing logic)
+    if st.session_state["selected_qid"] != chosen_id:
+        st.session_state["selected_qid"] = chosen_id
+        q_row = load_question_by_id(chosen_id)
+        st.session_state["cached_q_row"] = q_row
+
+        st.session_state["cached_q_path"] = q_row.get("question_image_path")
+        st.session_state["cached_ms_path"] = q_row.get("markscheme_image_path")
+
+        st.session_state["feedback"] = None
+        st.session_state["canvas_key"] += 1
+        st.session_state["last_canvas_image_data"] = None
+
+    q_row = st.session_state.get("cached_q_row") or {}
                     if not choices:
                         st.info("No questions in this assignment filter.")
                     else:
