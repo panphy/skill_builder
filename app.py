@@ -593,7 +593,10 @@ def slugify(s: str) -> str:
 
 def _clean_storage_path(path: str) -> str:
     # Supabase Storage expects paths without a leading slash.
-    p = (path or "").strip().lstrip("/")
+    # Be defensive: DB reads can yield NaN/None or other non-string types.
+    if not isinstance(path, str):
+        return ""
+    p = path.strip().lstrip("/")
     # Normalize accidental backslashes from copy/paste.
     p = p.replace("\\", "/")
     p = re.sub(r"/{2,}", "/", p)
@@ -697,13 +700,12 @@ def download_from_storage(path: str) -> bytes:
 
 
 @st.cache_data(ttl=300)
-def cached_download_from_storage(path: str, _fp: str) -> bytes:
-    # _fp is a fingerprint so cache invalidates when SUPABASE_URL changes.
+def cached_download_from_storage(path: str, _fp: str = "") -> bytes:
+    # _fp is an optional fingerprint so cache invalidates when SUPABASE_URL changes.
+    # Some call sites pass only `path`, so `_fp` must be optional.
     return download_from_storage(path)
 
 
-def bytes_to_pil(img_bytes: bytes) -> Image.Image:
-    img = Image.open(io.BytesIO(img_bytes))
     img.load()
     if img.mode not in ("RGB", "RGBA"):
         img = img.convert("RGB")
@@ -2021,12 +2023,14 @@ else:
                         ms_text = (row.get("markscheme_text") or "").strip()
 
                         q_img = None
-                        if row.get("question_image_path"):
-                            q_img = safe_bytes_to_pil(cached_download_from_storage(row["question_image_path"]))
+                        q_path = row.get("question_image_path")
+                        if isinstance(q_path, str) and q_path.strip():
+                            q_img = safe_bytes_to_pil(cached_download_from_storage(q_path))
 
                         ms_img = None
-                        if row.get("markscheme_image_path"):
-                            ms_img = safe_bytes_to_pil(cached_download_from_storage(row["markscheme_image_path"]))
+                        ms_path = row.get("markscheme_image_path")
+                        if isinstance(ms_path, str) and ms_path.strip():
+                            ms_img = safe_bytes_to_pil(cached_download_from_storage(ms_path))
 
                         meta1, meta2, meta3, meta4 = st.columns([3, 2, 2, 1])
                         with meta1:
