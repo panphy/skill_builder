@@ -1472,77 +1472,101 @@ if nav == "🧑‍🎓 Student":
             if dfb is None or dfb.empty:
                 st.info("No questions in the database yet. Ask a teacher to generate or upload questions in the Question Bank page.")
             else:
-				# --- source filtering ---
                 if source == "AI Practice":
-                    df_src = dfb[dfb["source"] == "ai_generated"].copy()
+                    df_src = dfb[dfb["source"].astype(str).str.strip() == "ai_generated"].copy()
                 elif source == "Teacher Uploads":
-                    df_src = dfb[dfb["source"] == "teacher"].copy()
+                    df_src = dfb[dfb["source"].astype(str).str.strip() == "teacher"].copy()
                 else:
                     df_src = dfb.copy()
 
                 if df_src.empty:
                     st.info("No questions available for this source yet.")
                 else:
-                    # --- Assignment dropdown MUST be based on df_src (not the full bank) ---
-                    assignments_src = ["All"] + sorted(df_src["assignment_name"].dropna().unique().tolist())
+                    assignment_filter = st.selectbox("Assignment:", st.session_state["cached_assignments"], key="student_assignment_filter")
 
-                    # Use a source-specific key so Streamlit does not keep an invalid previous selection
-                    assignment_filter = st.selectbox(
-                        "Assignment:",
-                        assignments_src,
-                        key=f"student_assignment_filter_{source}",
-                    )
+                    map_key = f"labels_{source}_{assignment_filter}"
+                    if st.session_state.get("cached_labels_map_key") != map_key:
+                        if assignment_filter != "All":
+                            df2 = df_src[df_src["assignment_name"] == assignment_filter].copy()
+                        else:
+                            df2 = df_src.copy()
 
-                    # Now filter safely
-                    if assignment_filter != "All":
-                        df2 = df_src[df_src["assignment_name"] == assignment_filter].copy()
+                        df2["label"] = df2.apply(
+                            lambda r: f"{r['assignment_name']} | {r['question_label']} ({int(r['max_marks'])} marks) [id {int(r['id'])}]",
+                            axis=1
+                        )
+                        labels_map = {row["label"]: int(row["id"]) for _, row in df2.iterrows()}
+                        st.session_state["cached_labels_map"] = labels_map
+                        st.session_state["cached_labels"] = list(labels_map.keys())
+                        st.session_state["cached_labels_map_key"] = map_key
+
+                    choices = st.session_state.get("cached_labels", [])
+                    if not choices:
+                        st.info("No questions in this assignment filter.")
                     else:
-                        df2 = df_src.copy()
+                        choice = st.selectbox("Select Question:", choices, key="student_choice")
+                        chosen_id = int(st.session_state["cached_labels_map"][choice])
 
-                    if df2.empty:
-                        st.info("No questions in this assignment for the selected source.")
-                        st.stop()
+                        if st.session_state["selected_qid"] != chosen_id:
+                            st.session_state["selected_qid"] = chosen_id
 
-                    # --- Build labels WITHOUT apply() (vectorized, cannot return a DataFrame) ---
-                    df2 = df2.copy()
-                    df2["id"] = pd.to_numeric(df2["id"], errors="coerce").fillna(0).astype(int)
-                    df2["max_marks"] = pd.to_numeric(df2["max_marks"], errors="coerce").fillna(0).astype(int)
+                            q_row = load_question_by_id(chosen_id)
+                            st.session_state["cached_q_row"] = q_row
 
-                    df2["label"] = (
-                        df2["assignment_name"].astype(str)
-                        + " | "
-                        + df2["question_label"].astype(str)
-                        + " ("
-                        + df2["max_marks"].astype(str)
-                        + " marks) [id "
-                        + df2["id"].astype(str)
-                        + "]"
-                    )
+                            st.session_state["cached_q_path"] = q_row.get("question_image_path")
+                            st.session_state["cached_ms_path"] = q_row.get("markscheme_image_path")
 
-                    labels_map = dict(zip(df2["label"].tolist(), df2["id"].tolist()))
-                    labels = list(labels_map.keys())
+                            q_path = (st.session_state["cached_q_path"] or "").strip()
+                            if q_path:
+                                fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
+                                q_bytes = cached_download_from_storage(q_path, fp)
+                                st.session_state["cached_question_img"] = bytes_to_pil(q_bytes) if q_bytes else None
+                            else:
+                                st.session_state["cached_question_img"] = None
 
-                    choice = st.selectbox(
-                        "Select Question:",
-                        labels,
-                        key=f"student_choice_{source}_{assignment_filter}",
-                    )
-                    chosen_id = int(labels_map[choice])
+                            st.session_state["feedback"] = None
+                            st.session_state["canvas_key"] += 1
+                            st.session_state["last_canvas_image_data"] = None
 
-                    # Load question row (unchanged from your existing logic)
-                    if st.session_state["selected_qid"] != chosen_id:
-                        st.session_state["selected_qid"] = chosen_id
-                        q_row = load_question_by_id(chosen_id)
-                        st.session_state["cached_q_row"] = q_row
+                        q_row = st.session_state.get("cached_q_row") or {}
 
-                        st.session_state["cached_q_path"] = q_row.get("question_image_path")
-                        st.session_state["cached_ms_path"] = q_row.get("markscheme_image_path")
+        # --- DISPLAY THE QUESTION ---
+        if q_row:
+            with st.container(border=True):
+                # 1) Image?
+                q_img_path = q_row.get("question_image_path")
+                if q_img_path:
+                    fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
+                    q_bytes = cached_download_from_storage(q_img_path, fp)
+                    if q_bytes:
+                        st.image(q_bytes, use_container_width=True)
+                
+                # 2) Text?
+                q_text = (q_row.get("question_text") or "").strip()
+                if q_text:
+                    st.markdown(q_text)
+                
+                # 3) Marks
+                mm = q_row.get("max_marks", 0)
+                st.caption(f"Max marks: {mm}")
+                # 4) Prepare variables for backend
+                q_key = f"QB:{int(q_row.get('id', 0))}:{q_row.get('source','')}:{q_row.get('assignment_name','')}:{q_row.get('question_label','')}"
+                
+                # We need question_img as PIL for the AI function
+                question_img = None
+                if q_img_path and fp:
+                     # Reuse the bytes from above if possible, or re-download (cached)
+                     # Since we didn't save bytes above in a var usable here broadly, let's just re-call cached download (it's fast)
+                     # Or better, just do it once.
+                     # Let's simple re-fetch from cache to keep logic clean.
+                     q_bytes_pil = cached_download_from_storage(q_img_path, fp)
+                     if q_bytes_pil:
+                         question_img = bytes_to_pil(q_bytes_pil)
 
-                        st.session_state["feedback"] = None
-                        st.session_state["canvas_key"] += 1
-                        st.session_state["last_canvas_image_data"] = None
-
-                    q_row = st.session_state.get("cached_q_row") or {}
+        else:
+            st.info("Select a question above to begin.")
+            q_key = None
+            question_img = None
 
         st.write("")
         tab_type, tab_write = st.tabs(["⌨️ Type Answer", "✍️ Write Answer"])
