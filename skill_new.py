@@ -1204,7 +1204,7 @@ Max Marks: {int(max_marks)}
         {"role": "user", "content": content}
     ]
 
-    try:
+      try:
         response = client.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
@@ -1226,7 +1226,7 @@ Max Marks: {int(max_marks)}
         if not isinstance(readback_warn, list):
             readback_warn = []
 
-    return {
+        return {
             "readback_type": readback_type,
             "readback_markdown": readback_md,
             "readback_warnings": [str(x) for x in readback_warn][:6],
