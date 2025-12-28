@@ -1471,121 +1471,134 @@ with tab_student:
         # -------------------------
         # Write Answer (Canvas)
         # -------------------------
-        with tab_write:
-            tool_row = st.columns([2, 1])
-            with tool_row[0]:
-                tool = st.radio("Tool", ["Pen", "Eraser"], horizontal=True, label_visibility="collapsed")
-            clear_clicked = tool_row[1].button("🗑️ Clear", use_container_width=True)
+        
+with tab_write:
+    # Backup store in case some browsers lag when submitting
+    if "last_canvas_image_data" not in st.session_state:
+        st.session_state["last_canvas_image_data"] = None
 
-            if clear_clicked:
-                st.session_state["feedback"] = None
-                st.session_state["canvas_key"] += 1
-                st.rerun()
+    tool_row = st.columns([2, 1])
+    with tool_row[0]:
+        tool = st.radio("Tool", ["Pen", "Eraser"], horizontal=True, label_visibility="collapsed")
+    clear_clicked = tool_row[1].button("🗑️ Clear", use_container_width=True)
 
-            stroke_width = 2 if tool == "Pen" else 30
-            stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
+    if clear_clicked:
+        st.session_state["feedback"] = None
+        st.session_state["last_canvas_image_data"] = None
+        st.session_state["canvas_key"] += 1
+        st.rerun()
 
-            canvas_result = st_canvas(
-                stroke_width=stroke_width,
-                stroke_color=stroke_color,
-                background_color=CANVAS_BG_HEX,
-                height=400,
-                width=600,
-                drawing_mode="freedraw",
-                key=f"canvas_{st.session_state['canvas_key']}",
-                display_toolbar=False,
-                update_streamlit=False,
-            )
+    stroke_width = 2 if tool == "Pen" else 30
+    stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
 
-            if st.button("Submit Writing", type="primary", disabled=not AI_READY):
-                sid = _effective_student_id(student_id)
-                ctx = {"student_id": sid, "question": q_key or "", "mode": "writing"}
+    # Put the canvas + submit inside a form so Streamlit does NOT rerun on every stroke
+    with st.form(key=f"write_form_{st.session_state['canvas_key']}"):
+        canvas_result = st_canvas(
+            stroke_width=stroke_width,
+            stroke_color=stroke_color,
+            background_color=CANVAS_BG_HEX,
+            height=400,
+            width=600,
+            drawing_mode="freedraw",
+            key=f"canvas_{st.session_state['canvas_key']}",
+            display_toolbar=False,
+            update_streamlit=True,  # keep True so image_data exists when the form submits
+        )
 
-                if canvas_result.image_data is None or not canvas_has_ink(canvas_result.image_data):
-                    st.toast("Canvas is empty!", icon="⚠️")
-                else:
-                    # Rate limit check BEFORE calling OpenAI
-                    allowed_now, remaining_now, reset_str = check_rate_limit(sid)
-                    if not allowed_now:
-                        msg = f"You’ve reached the limit of {RATE_LIMIT_MAX} submissions per hour. Please try again at {reset_str}."
-                        st.error(msg)
-                        LOGGER.warning("Rate limit reached", extra={"ctx": {**ctx, "remaining": remaining_now}})
-                    else:
-                        # Preprocess image
-                        img_for_ai = preprocess_canvas_image(canvas_result.image_data)
+        submitted_writing = st.form_submit_button("Submit Writing", type="primary", disabled=not AI_READY)
 
-                        # Validate canvas size after preprocessing (and compress if needed)
-                        # Encode to JPEG to control size and reduce cost when sending to the model.
-                        canvas_bytes = _encode_image_bytes(img_for_ai, "JPEG", quality=80)
-                        ok_canvas, msg_canvas = validate_image_file(canvas_bytes, CANVAS_MAX_MB, "canvas")
-                        if not ok_canvas:
-                            # Try compress if slightly over
-                            okc, outb, outct, err = _compress_bytes_to_limit(
-                                canvas_bytes, CANVAS_MAX_MB, purpose="canvas", prefer_fmt="JPEG"
-                            )
-                            if not okc:
-                                st.error(err or msg_canvas)
-                                LOGGER.warning("Canvas validation failed", extra={"ctx": {**ctx, "reason": err or msg_canvas}})
-                                st.stop()
-                            # Re-load back to PIL for the existing encode_image path (PNG base64)
-                            img_for_ai = Image.open(io.BytesIO(outb)).convert("RGB")
+    # Cache the latest non-empty drawing whenever Streamlit has it
+    if canvas_result is not None and canvas_result.image_data is not None:
+        if canvas_has_ink(canvas_result.image_data):
+            st.session_state["last_canvas_image_data"] = canvas_result.image_data
 
-                        # Increment immediately before API call (limits spend)
-                        increment_rate_limit(sid)
+    if submitted_writing:
+        sid = _effective_student_id(student_id)
+        ctx = {"student_id": sid, "question": q_key or "", "mode": "writing"}
 
-                        LOGGER.info("Submission received", extra={"ctx": ctx})
+        # Prefer current image_data; fallback to cached last drawing (more robust across browsers)
+        img_data = canvas_result.image_data if (canvas_result and canvas_result.image_data is not None) else st.session_state.get("last_canvas_image_data")
 
-                        def task():
-                            if not selected_is_custom:
-                                return get_gpt_feedback(img_for_ai, q_data, is_image=True)
-                            if not custom_row or question_img is None:
-                                return {
-                                    "readback_type": "",
-                                    "readback_markdown": "",
-                                    "readback_warnings": [],
-                                    "marks_awarded": 0,
-                                    "max_marks": int(max_marks or 1),
-                                    "summary": "Custom question not ready (missing images).",
-                                    "feedback_points": ["Please inform your teacher.", "Question image could not be loaded."],
-                                    "next_steps": []
-                                }
-                            ms_path = st.session_state.get("cached_ms_path") or custom_row.get("markscheme_image_path")
-                            ms_bytes = download_from_storage(ms_path) if ms_path else b""
-                            if not ms_bytes:
-                                return {
-                                    "readback_type": "",
-                                    "readback_markdown": "",
-                                    "readback_warnings": [],
-                                    "marks_awarded": 0,
-                                    "max_marks": int(max_marks or 1),
-                                    "summary": "Mark scheme image missing.",
-                                    "feedback_points": ["Please inform your teacher."],
-                                    "next_steps": []
-                                }
-                            ms_img = bytes_to_pil(ms_bytes)
-                            return get_gpt_feedback_custom(
-                                student_answer=img_for_ai,
-                                question_img=question_img,
-                                markscheme_img=ms_img,
-                                max_marks=max_marks,
-                                is_student_image=True
-                            )
+        if img_data is None or not canvas_has_ink(img_data):
+            st.toast("Canvas is empty!", icon="⚠️")
+        else:
+            allowed_now, remaining_now, reset_str = check_rate_limit(sid)
+            if not allowed_now:
+                msg = f"You’ve reached the limit of {RATE_LIMIT_MAX} submissions per hour. Please try again at {reset_str}."
+                st.error(msg)
+                LOGGER.warning("Rate limit reached", extra={"ctx": {**ctx, "remaining": remaining_now}})
+            else:
+                img_for_ai = preprocess_canvas_image(img_data)
 
-                        # Better progress UI
-                        st.session_state["feedback"] = _run_ai_with_progress(
-                            task_fn=task,
-                            mode="writing",
-                            ctx=ctx,
-                            typical_range="8-15 seconds",
-                            est_seconds=13.0
-                        )
+                # Canvas validation (after preprocessing)
+                canvas_bytes = _encode_image_bytes(img_for_ai, "JPEG", quality=80)
+                ok_canvas, msg_canvas = validate_image_file(canvas_bytes, CANVAS_MAX_MB, "canvas")
+                if not ok_canvas:
+                    okc, outb, outct, err = _compress_bytes_to_limit(
+                        canvas_bytes, CANVAS_MAX_MB, purpose="canvas", prefer_fmt="JPEG"
+                    )
+                    if not okc:
+                        st.error(err or msg_canvas)
+                        LOGGER.warning("Canvas validation failed", extra={"ctx": {**ctx, "reason": err or msg_canvas}})
+                        st.stop()
+                    img_for_ai = Image.open(io.BytesIO(outb)).convert("RGB")
 
-                        rep = st.session_state["feedback"] or {}
-                        LOGGER.info("Feedback generated", extra={"ctx": {**ctx, "marks": f"{rep.get('marks_awarded', 0)}/{rep.get('max_marks', 0)}"}})
+                increment_rate_limit(sid)
+                LOGGER.info("Submission received", extra={"ctx": ctx})
 
-                        if db_ready() and q_key:
-                            insert_attempt(student_id, q_key, st.session_state["feedback"], mode="writing")
+                def task():
+                    if not selected_is_custom:
+                        return get_gpt_feedback(img_for_ai, q_data, is_image=True)
 
+                    if not custom_row or question_img is None:
+                        return {
+                            "readback_type": "",
+                            "readback_markdown": "",
+                            "readback_warnings": [],
+                            "marks_awarded": 0,
+                            "max_marks": int(max_marks or 1),
+                            "summary": "Custom question not ready (missing images).",
+                            "feedback_points": ["Please inform your teacher.", "Question image could not be loaded."],
+                            "next_steps": []
+                        }
+
+                    ms_path = st.session_state.get("cached_ms_path") or custom_row.get("markscheme_image_path")
+                    ms_bytes = download_from_storage(ms_path) if ms_path else b""
+                    if not ms_bytes:
+                        return {
+                            "readback_type": "",
+                            "readback_markdown": "",
+                            "readback_warnings": [],
+                            "marks_awarded": 0,
+                            "max_marks": int(max_marks or 1),
+                            "summary": "Mark scheme image missing.",
+                            "feedback_points": ["Please inform your teacher."],
+                            "next_steps": []
+                        }
+
+                    ms_img = bytes_to_pil(ms_bytes)
+                    return get_gpt_feedback_custom(
+                        student_answer=img_for_ai,
+                        question_img=question_img,
+                        markscheme_img=ms_img,
+                        max_marks=max_marks,
+                        is_student_image=True
+                    )
+
+                st.session_state["feedback"] = _run_ai_with_progress(
+                    task_fn=task,
+                    mode="writing",
+                    ctx=ctx,
+                    typical_range="8-15 seconds",
+                    est_seconds=13.0
+                )
+
+                rep = st.session_state["feedback"] or {}
+                LOGGER.info("Feedback generated", extra={"ctx": {**ctx, "marks": f"{rep.get('marks_awarded', 0)}/{rep.get('max_marks', 0)}"}})
+
+                if db_ready() and q_key:
+                    insert_attempt(student_id, q_key, st.session_state["feedback"], mode="writing")
+                    
     with col2:
         st.subheader("👨‍🏫 Report")
         with st.container(border=True):
