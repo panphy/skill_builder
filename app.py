@@ -15,6 +15,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 import time
+import hashlib
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
@@ -1925,285 +1926,375 @@ else:
             st.session_state["is_teacher"] = True
             ensure_question_bank_table()
 
-            st.write("## 🤖 Generate practice question with AI (teacher vetting required)")
+            st.write("### Question Bank manager")
+            st.caption("Use the tabs below to (1) browse and preview what is already in the bank, (2) generate AI practice questions, or (3) upload scanned questions. All features are unchanged, only reorganised.")
 
-            gen_c1, gen_c2 = st.columns([2, 1])
-            with gen_c1:
-                topic_mode = st.radio("Topic input", ["Choose from AQA list", "Describe a topic"], horizontal=True, key="topic_mode")
-                if topic_mode == "Choose from AQA list":
-                    topic_choice = st.selectbox("AQA GCSE Physics Higher topic", AQA_GCSE_HIGHER_TOPICS, key="topic_choice")
-                    topic_text = topic_choice
+            tab_browse, tab_ai, tab_upload = st.tabs(["🔎 Browse & preview", "🤖 AI generator", "🖼️ Upload scans"])
+
+            with tab_browse:
+                st.write("## 🔎 Browse & preview")
+                df_all = load_question_bank_df(limit=5000, include_inactive=False)
+
+                if df_all.empty:
+                    st.info("No questions yet.")
                 else:
-                    topic_text = st.text_input("Describe the topic", placeholder="e.g. stopping distance with thinking vs braking distance", key="topic_text")
+                    df_all = df_all.copy()
 
-                qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
-                difficulty = st.selectbox("Difficulty", DIFFICULTIES, key="gen_difficulty")
-                marks_req = st.number_input("Max marks (target)", min_value=1, max_value=12, value=4, step=1, key="gen_marks")
+                    # ---- Filters
+                    sources = sorted([s for s in df_all["source"].dropna().unique().tolist() if str(s).strip()])
+                    assignments = sorted([a for a in df_all["assignment_name"].dropna().unique().tolist() if str(a).strip()])
 
-                extra_instr = st.text_area(
-                    "Optional constraints for the AI",
-                    height=80,
-                    placeholder="e.g. Include one tricky unit conversion. Use g = 9.8 N/kg. Require a final answer with units.",
-                    key="gen_extra"
-                )
-
-                assignment_name_ai = st.text_input("Assignment name for saving", value="AI Practice", key="gen_assignment")
-            with gen_c2:
-                st.caption("Workflow: Generate draft → edit/vet → Approve & Save.")
-                gen_clicked = st.button("Generate draft", type="primary", use_container_width=True, disabled=not AI_READY, key="gen_btn")
-
-                if st.button("Clear draft", use_container_width=True, key="clear_draft"):
-                    st.session_state["ai_draft"] = None
-                    st.rerun()
-
-            if gen_clicked:
-                if not topic_text.strip():
-                    st.warning("Please choose or describe a topic first.")
-                else:
-                    def task_generate():
-                        return generate_practice_question_with_ai(
-                            topic_text=topic_text.strip(),
-                            difficulty=difficulty,
-                            qtype=qtype,
-                            marks=int(marks_req),
-                            extra_instructions=extra_instr or "",
+                    f1, f2, f3 = st.columns([2, 2, 2])
+                    with f1:
+                        src_sel = st.multiselect(
+                            "Source",
+                            options=sources,
+                            default=sources,
+                            key="bank_filter_source",
+                        )
+                    with f2:
+                        asg_sel = st.selectbox(
+                            "Assignment",
+                            ["All"] + assignments,
+                            index=0,
+                            key="bank_filter_assignment",
+                        )
+                    with f3:
+                        search_txt = st.text_input(
+                            "Search (label, tag, keyword)",
+                            value="",
+                            placeholder="e.g. Q3b, circuit, energy",
+                            key="bank_filter_search",
                         )
 
-                    draft_raw = _run_ai_with_progress(
-                        task_fn=task_generate,
-                        ctx={"student_id": "teacher", "question": "AI_GENERATOR", "mode": "generate"},
-                        typical_range="5-12 seconds",
-                        est_seconds=10.0
-                    )
+                    df_f = df_all
+                    if src_sel:
+                        df_f = df_f[df_f["source"].isin(src_sel)]
+                    if asg_sel != "All":
+                        df_f = df_f[df_f["assignment_name"] == asg_sel]
+                    if (search_txt or "").strip():
+                        s = search_txt.strip().lower()
 
-                    qtxt = str(draft_raw.get("question_text", "") or "").strip()
-                    mstxt = str(draft_raw.get("markscheme_text", "") or "").strip()
-                    mm = clamp_int(draft_raw.get("max_marks", int(marks_req)), 1, 50, default=int(marks_req))
-                    tags = draft_raw.get("tags", [])
-                    warnings = draft_raw.get("warnings", [])
-                    if not isinstance(tags, list):
-                        tags = []
-                    if not isinstance(warnings, list):
-                        warnings = []
+                        def _row_match(r):
+                            return (
+                                s in str(r.get("assignment_name", "")).lower()
+                                or s in str(r.get("question_label", "")).lower()
+                                or s in str(r.get("question_text", "")).lower()
+                                or s in str(r.get("tags", "")).lower()
+                            )
 
-                    if not qtxt or not mstxt:
-                        st.error("AI did not return a valid draft. Please try again.")
+                        df_f = df_f[df_f.apply(_row_match, axis=1)]
+
+                    st.caption(f"Showing {len(df_f)} of {len(df_all)} questions.")
+
+                    if df_f.empty:
+                        st.warning("No questions match the current filters.")
                     else:
-                        token = pysecrets.token_hex(3)
-                        default_label = f"AI-{slugify(topic_text)[:24]}-{token}"
+                        df_f = df_f.copy()
 
-                        st.session_state["ai_draft"] = {
-                            "assignment_name": assignment_name_ai.strip() or "AI Practice",
-                            "question_label": default_label,
-                            "max_marks": int(mm),
-                            "tags": [str(t).strip() for t in tags if str(t).strip()][:10],
-                            "question_text": qtxt,
-                            "markscheme_text": mstxt,
-                            "warnings": warnings[:10],
-                        }
-                        st.success("Draft generated. Please vet and edit below, then approve to save.")
+                        def _fmt_label(r):
+                            asg = str(r.get("assignment_name") or "").strip()
+                            ql = str(r.get("question_label") or "").strip()
+                            src = str(r.get("source") or "").strip()
+                            try:
+                                mk = int(r.get("max_marks") or 0)
+                            except Exception:
+                                mk = 0
+                            try:
+                                qid = int(r.get("id"))
+                            except Exception:
+                                qid = -1
+                            return f"{asg} | {ql} ({mk} marks) [{src}] [id {qid}]"
 
-            if st.session_state.get("ai_draft"):
-                d = st.session_state["ai_draft"]
+                        df_f["label"] = df_f.apply(_fmt_label, axis=1)
+                        options = df_f["label"].tolist()
 
-                if d.get("warnings"):
-                    st.warning("AI draft warnings (auto-check):\n\n" + "\n".join([f"- {w}" for w in d["warnings"]]))
+                        # Guard against Streamlit "value not in options" when filters change
+                        if "bank_preview_pick" in st.session_state and st.session_state["bank_preview_pick"] not in options:
+                            st.session_state["bank_preview_pick"] = options[0]
 
-                st.write("### ✅ Vet and edit the draft (Markdown + LaTeX supported)")
-                ed1, ed2 = st.columns([2, 1])
-                with ed1:
-                    d_assignment = st.text_input("Assignment name", value=d.get("assignment_name", "AI Practice"), key="draft_assignment")
-                    d_label = st.text_input("Question label", value=d.get("question_label", ""), key="draft_label")
-                    d_marks = st.number_input("Max marks", min_value=1, max_value=50, value=int(d.get("max_marks", 4)), step=1, key="draft_marks")
-                    d_tags_str = st.text_input("Tags (comma separated)", value=", ".join(d.get("tags", [])), key="draft_tags")
+                        pick = st.selectbox("Select a question to preview", options, key="bank_preview_pick")
+                        pick_id = int(df_f.loc[df_f["label"] == pick, "id"].iloc[0])
 
-                with ed2:
-                    st.caption("Mark scheme is confidential. Students never see it.")
-                    approve_clicked = st.button("Approve & Save to bank", type="primary", use_container_width=True, key="approve_save")
-                    st.caption("Tip: use Markdown and LaTeX ($...$) freely.")
+                        row = load_question_by_id(pick_id) or {}
+                        q_text = (row.get("question_text") or "").strip()
+                        ms_text = (row.get("markscheme_text") or "").strip()
 
-                d_qtext = st.text_area("Question text (student will see this)", value=d.get("question_text", ""), height=180, key="draft_qtext")
-                d_mstext = st.text_area("Mark scheme (teacher-only)", value=d.get("markscheme_text", ""), height=220, key="draft_mstext")
+                        q_img = None
+                        if row.get("question_image_path"):
+                            q_img = safe_bytes_to_pil(cached_download_from_storage(row["question_image_path"]))
 
-                p1, p2 = st.columns(2)
-                with p1:
-                    render_md_box("Preview: Question (student view)", d_qtext, empty_text="No question text.")
-                with p2:
-                    render_md_box("Preview: Mark scheme (teacher only)", d_mstext, empty_text="No mark scheme.")
+                        ms_img = None
+                        if row.get("markscheme_image_path"):
+                            ms_img = safe_bytes_to_pil(cached_download_from_storage(row["markscheme_image_path"]))
 
-                if approve_clicked:
-                    if not d_assignment.strip() or not d_label.strip():
-                        st.error("Assignment name and Question label cannot be blank.")
-                    elif not d_qtext.strip() or not d_mstext.strip():
-                        st.error("Question text and mark scheme cannot be blank.")
-                    else:
-                        combined = d_qtext + "\n" + d_mstext
-                        if re.search(r"\\mu_0|\bμ0\b|\\epsilon_0|\bε0\b|B\s*=\s*\\mu_0\s*n\s*I", combined, flags=re.IGNORECASE):
-                            st.error("This draft contains non-GCSE content (e.g. μ0/ε0 or B=μ0 n I). Please edit it out before saving.")
-                            st.stop()
+                        meta1, meta2, meta3, meta4 = st.columns([3, 2, 2, 1])
+                        with meta1:
+                            st.caption(f"Assignment: {row.get('assignment_name', '')}")
+                        with meta2:
+                            st.caption(f"Label: {row.get('question_label', '')}")
+                        with meta3:
+                            st.caption(f"Source: {row.get('source', '')}")
+                        with meta4:
+                            st.caption(f"ID: {row.get('id', '')}")
 
-                        tags = [t.strip() for t in (d_tags_str or "").split(",") if t.strip()]
-                        ok = insert_question_bank_row(
-                            source="ai_generated",
-                            created_by="teacher",
-                            assignment_name=d_assignment.strip(),
-                            question_label=d_label.strip(),
-                            max_marks=int(d_marks),
-                            tags=tags,
-                            question_text=d_qtext.strip(),
-                            markscheme_text=d_mstext.strip(),
-                            question_image_path=None,
-                            markscheme_image_path=None,
-                        )
-                        if ok:
-                            st.session_state["ai_draft"] = None
-                            st.session_state["cached_bank_df"] = None
-                            st.session_state["cached_labels_map_key"] = None
-                            st.success("Approved and saved. Students can now access this under AI Practice.")
-                        else:
-                            st.error("Failed to save to database. Check errors below.")
+                        pv1, pv2 = st.columns(2)
 
-            st.divider()
+                        with pv1:
+                            st.markdown("**Question (student view)**")
+                            with st.container(border=True):
+                                if q_img is not None:
+                                    st.image(q_img, use_container_width=True)
+                                if q_text:
+                                    st.markdown(q_text)
+                                if (q_img is None) and (not q_text):
+                                    st.caption("No question text/image.")
 
-            st.write("## 🖼️ Upload a teacher question (images)")
-            st.caption("Optional question text supports Markdown and LaTeX ($...$).")
+                        with pv2:
+                            st.markdown("**Mark scheme (teacher only)**")
+                            with st.container(border=True):
+                                if ms_img is not None:
+                                    st.image(ms_img, use_container_width=True)
+                                if ms_text:
+                                    st.markdown(ms_text)
+                                if (ms_img is None) and (not ms_text):
+                                    st.caption("No mark scheme text/image (image-only teacher uploads are supported).")
 
-            with st.form("upload_q_form", clear_on_submit=True):
-                c1, c2 = st.columns([2, 1])
-                with c1:
-                    assignment_name = st.text_input("Assignment name", placeholder="e.g. AQA Paper 1 (Electricity)", key="up_assignment")
-                    question_label = st.text_input("Question label", placeholder="e.g. Q3b", key="up_label")
-                with c2:
-                    max_marks_in = st.number_input("Max marks", min_value=1, max_value=50, value=3, step=1, key="up_marks")
+                st.divider()
+                st.write("### Recent question bank entries")
+                df_bank = load_question_bank_df(limit=50, include_inactive=False)
+                st.dataframe(df_bank, use_container_width=True)
 
-                tags_str = st.text_input("Tags (comma separated)", placeholder="forces, resultant, newton", key="up_tags")
-                q_text_opt = st.text_area("Optional: question text (Markdown + LaTeX supported)", height=100, key="up_qtext")
-
-                q_file = st.file_uploader("Upload question screenshot (PNG/JPG)", type=["png", "jpg", "jpeg"], key="up_qfile")
-                ms_file = st.file_uploader("Upload mark scheme screenshot (PNG/JPG)", type=["png", "jpg", "jpeg"], key="up_msfile")
-
-                submitted = st.form_submit_button("Save to Question Bank", type="primary")
-
-            if q_text_opt and q_text_opt.strip():
-                render_md_box("Preview: Optional question text", q_text_opt)
-
-            if submitted:
-                if not assignment_name.strip() or not question_label.strip():
-                    st.warning("Please fill in Assignment name and Question label.")
-                elif q_file is None or ms_file is None:
-                    st.warning("Please upload both the question screenshot and the mark scheme screenshot.")
-                else:
-                    assignment_slug = slugify(assignment_name)
-                    qlabel_slug = slugify(question_label)
-                    token = pysecrets.token_hex(6)
-
-                    q_bytes_raw = q_file.getvalue()
-                    ms_bytes_raw = ms_file.getvalue()
-
-                    ok_q, msg_q = validate_image_file(q_bytes_raw, QUESTION_MAX_MB, "question image")
-                    ok_ms, msg_ms = validate_image_file(ms_bytes_raw, MARKSCHEME_MAX_MB, "mark scheme image")
-
-                    if not ok_q:
-                        okc, q_bytes, q_ct, err = _compress_bytes_to_limit(q_bytes_raw, QUESTION_MAX_MB, _purpose="question image")
-                        if not okc:
-                            st.error(err or msg_q)
-                            st.stop()
-                    else:
-                        q_bytes = q_bytes_raw
-                        q_ct = "image/png" if (q_file.name or "").lower().endswith(".png") else "image/jpeg"
-
-                    if not ok_ms:
-                        okc, ms_bytes, ms_ct, err = _compress_bytes_to_limit(ms_bytes_raw, MARKSCHEME_MAX_MB, _purpose="mark scheme image")
-                        if not okc:
-                            st.error(err or msg_ms)
-                            st.stop()
-                    else:
-                        ms_bytes = ms_bytes_raw
-                        ms_ct = "image/png" if (ms_file.name or "").lower().endswith(".png") else "image/jpeg"
-
-                    q_ext = ".jpg" if q_ct == "image/jpeg" else ".png"
-                    ms_ext = ".jpg" if ms_ct == "image/jpeg" else ".png"
-
-                    q_path = f"{assignment_slug}/{token}/{qlabel_slug}_question{q_ext}"
-                    ms_path = f"{assignment_slug}/{token}/{qlabel_slug}_markscheme{ms_ext}"
-
-                    ok1 = upload_to_storage(q_path, q_bytes, q_ct)
-                    ok2 = upload_to_storage(ms_path, ms_bytes, ms_ct)
-
-                    tags = [t.strip() for t in (tags_str or "").split(",") if t.strip()]
-
-                    if ok1 and ok2:
-                        ok_db = insert_question_bank_row(
-                            source="teacher",
-                            created_by="teacher",
-                            assignment_name=assignment_name.strip(),
-                            question_label=question_label.strip(),
-                            max_marks=int(max_marks_in),
-                            tags=tags,
-                            question_text=(q_text_opt or "").strip(),
-                            markscheme_text="",
-                            question_image_path=q_path,
-                            markscheme_image_path=ms_path
-                        )
-                        if ok_db:
-                            st.session_state["cached_bank_df"] = None
-                            st.session_state["cached_labels_map_key"] = None
-                            st.success("Saved. This question is now available in the Student page.")
-                        else:
-                            st.error("Uploaded images, but failed to save metadata to DB. Check errors below.")
-                    else:
-                        st.error("Failed to upload one or both images to Supabase Storage. Check errors below.")
-
-            st.divider()
-
-            st.write("## 🔎 Preview existing question bank entries (teacher-only)")
-            df_all = load_question_bank_df(limit=5000, include_inactive=False)
-
-            if df_all.empty:
-                st.info("No questions yet.")
-            else:
-                df_all = df_all.copy()
-                df_all["label"] = df_all.apply(
-                    lambda r: f"{r['assignment_name']} | {r['question_label']} ({int(r['max_marks'])} marks) [{r['source']}] [id {int(r['id'])}]",
-                    axis=1
-                )
-                pick = st.selectbox("Select an entry to preview", df_all["label"].tolist(), key="bank_preview_pick")
-                pick_id = int(df_all.loc[df_all["label"] == pick, "id"].iloc[0])
-                row = load_question_by_id(pick_id)
-
-                q_text = (row.get("question_text") or "").strip()
-                ms_text = (row.get("markscheme_text") or "").strip()
-                q_path = (row.get("question_image_path") or "").strip()
-                ms_path = (row.get("markscheme_image_path") or "").strip()
-
-                fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
-                q_img = safe_bytes_to_pil(cached_download_from_storage(q_path, fp)) if q_path else None
-                ms_img = safe_bytes_to_pil(cached_download_from_storage(ms_path, fp)) if ms_path else None
-
-                pv1, pv2 = st.columns(2)
-                with pv1:
-                    st.markdown("**Question (student view)**")
-                    with st.container(border=True):
-                        if q_img is not None:
-                            st.image(q_img, use_container_width=True)
-                        if q_text:
-                            st.markdown(q_text)
-                        if (q_img is None) and (not q_text):
-                            st.caption("No question text/image.")
-                with pv2:
-                    st.markdown("**Mark scheme (teacher only)**")
-                    with st.container(border=True):
-                        if ms_img is not None:
-                            st.image(ms_img, use_container_width=True)
-                        if ms_text:
-                            st.markdown(ms_text)
-                        if (ms_img is None) and (not ms_text):
-                            st.caption("No mark scheme text/image (image-only teacher uploads are supported).")
-
-            st.divider()
-            st.write("### Recent question bank entries")
-            df_bank = load_question_bank_df(limit=50, include_inactive=False)
-            st.dataframe(df_bank, use_container_width=True)
-
+            with tab_ai:
+                            st.write("## 🤖 Generate practice question with AI (teacher vetting required)")
+    
+                            gen_c1, gen_c2 = st.columns([2, 1])
+                            with gen_c1:
+                                topic_mode = st.radio("Topic input", ["Choose from AQA list", "Describe a topic"], horizontal=True, key="topic_mode")
+                                if topic_mode == "Choose from AQA list":
+                                    topic_choice = st.selectbox("AQA GCSE Physics Higher topic", AQA_GCSE_HIGHER_TOPICS, key="topic_choice")
+                                    topic_text = topic_choice
+                                else:
+                                    topic_text = st.text_input("Describe the topic", placeholder="e.g. stopping distance with thinking vs braking distance", key="topic_text")
+    
+                                qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
+                                difficulty = st.selectbox("Difficulty", DIFFICULTIES, key="gen_difficulty")
+                                marks_req = st.number_input("Max marks (target)", min_value=1, max_value=12, value=4, step=1, key="gen_marks")
+    
+                                extra_instr = st.text_area(
+                                    "Optional constraints for the AI",
+                                    height=80,
+                                    placeholder="e.g. Include one tricky unit conversion. Use g = 9.8 N/kg. Require a final answer with units.",
+                                    key="gen_extra"
+                                )
+    
+                                assignment_name_ai = st.text_input("Assignment name for saving", value="AI Practice", key="gen_assignment")
+                            with gen_c2:
+                                st.caption("Workflow: Generate draft → edit/vet → Approve & Save.")
+                                gen_clicked = st.button("Generate draft", type="primary", use_container_width=True, disabled=not AI_READY, key="gen_btn")
+    
+                                if st.button("Clear draft", use_container_width=True, key="clear_draft"):
+                                    st.session_state["ai_draft"] = None
+                                    st.rerun()
+    
+                            if gen_clicked:
+                                if not topic_text.strip():
+                                    st.warning("Please choose or describe a topic first.")
+                                else:
+                                    def task_generate():
+                                        return generate_practice_question_with_ai(
+                                            topic_text=topic_text.strip(),
+                                            difficulty=difficulty,
+                                            qtype=qtype,
+                                            marks=int(marks_req),
+                                            extra_instructions=extra_instr or "",
+                                        )
+    
+                                    draft_raw = _run_ai_with_progress(
+                                        task_fn=task_generate,
+                                        ctx={"student_id": "teacher", "question": "AI_GENERATOR", "mode": "generate"},
+                                        typical_range="5-12 seconds",
+                                        est_seconds=10.0
+                                    )
+    
+                                    qtxt = str(draft_raw.get("question_text", "") or "").strip()
+                                    mstxt = str(draft_raw.get("markscheme_text", "") or "").strip()
+                                    mm = clamp_int(draft_raw.get("max_marks", int(marks_req)), 1, 50, default=int(marks_req))
+                                    tags = draft_raw.get("tags", [])
+                                    warnings = draft_raw.get("warnings", [])
+                                    if not isinstance(tags, list):
+                                        tags = []
+                                    if not isinstance(warnings, list):
+                                        warnings = []
+    
+                                    if not qtxt or not mstxt:
+                                        st.error("AI did not return a valid draft. Please try again.")
+                                    else:
+                                        token = pysecrets.token_hex(3)
+                                        default_label = f"AI-{slugify(topic_text)[:24]}-{token}"
+    
+                                        st.session_state["ai_draft"] = {
+                                            "assignment_name": assignment_name_ai.strip() or "AI Practice",
+                                            "question_label": default_label,
+                                            "max_marks": int(mm),
+                                            "tags": [str(t).strip() for t in tags if str(t).strip()][:10],
+                                            "question_text": qtxt,
+                                            "markscheme_text": mstxt,
+                                            "warnings": warnings[:10],
+                                        }
+                                        st.success("Draft generated. Please vet and edit below, then approve to save.")
+    
+                            if st.session_state.get("ai_draft"):
+                                d = st.session_state["ai_draft"]
+    
+                                if d.get("warnings"):
+                                    st.warning("AI draft warnings (auto-check):\n\n" + "\n".join([f"- {w}" for w in d["warnings"]]))
+    
+                                st.write("### ✅ Vet and edit the draft (Markdown + LaTeX supported)")
+                                ed1, ed2 = st.columns([2, 1])
+                                with ed1:
+                                    d_assignment = st.text_input("Assignment name", value=d.get("assignment_name", "AI Practice"), key="draft_assignment")
+                                    d_label = st.text_input("Question label", value=d.get("question_label", ""), key="draft_label")
+                                    d_marks = st.number_input("Max marks", min_value=1, max_value=50, value=int(d.get("max_marks", 4)), step=1, key="draft_marks")
+                                    d_tags_str = st.text_input("Tags (comma separated)", value=", ".join(d.get("tags", [])), key="draft_tags")
+    
+                                with ed2:
+                                    st.caption("Mark scheme is confidential. Students never see it.")
+                                    approve_clicked = st.button("Approve & Save to bank", type="primary", use_container_width=True, key="approve_save")
+                                    st.caption("Tip: use Markdown and LaTeX ($...$) freely.")
+    
+                                d_qtext = st.text_area("Question text (student will see this)", value=d.get("question_text", ""), height=180, key="draft_qtext")
+                                d_mstext = st.text_area("Mark scheme (teacher-only)", value=d.get("markscheme_text", ""), height=220, key="draft_mstext")
+    
+                                p1, p2 = st.columns(2)
+                                with p1:
+                                    render_md_box("Preview: Question (student view)", d_qtext, empty_text="No question text.")
+                                with p2:
+                                    render_md_box("Preview: Mark scheme (teacher only)", d_mstext, empty_text="No mark scheme.")
+    
+                                if approve_clicked:
+                                    if not d_assignment.strip() or not d_label.strip():
+                                        st.error("Assignment name and Question label cannot be blank.")
+                                    elif not d_qtext.strip() or not d_mstext.strip():
+                                        st.error("Question text and mark scheme cannot be blank.")
+                                    else:
+                                        combined = d_qtext + "\n" + d_mstext
+                                        if re.search(r"\\mu_0|\bμ0\b|\\epsilon_0|\bε0\b|B\s*=\s*\\mu_0\s*n\s*I", combined, flags=re.IGNORECASE):
+                                            st.error("This draft contains non-GCSE content (e.g. μ0/ε0 or B=μ0 n I). Please edit it out before saving.")
+                                            st.stop()
+    
+                                        tags = [t.strip() for t in (d_tags_str or "").split(",") if t.strip()]
+                                        ok = insert_question_bank_row(
+                                            source="ai_generated",
+                                            created_by="teacher",
+                                            assignment_name=d_assignment.strip(),
+                                            question_label=d_label.strip(),
+                                            max_marks=int(d_marks),
+                                            tags=tags,
+                                            question_text=d_qtext.strip(),
+                                            markscheme_text=d_mstext.strip(),
+                                            question_image_path=None,
+                                            markscheme_image_path=None,
+                                        )
+                                        if ok:
+                                            st.session_state["ai_draft"] = None
+                                            st.session_state["cached_bank_df"] = None
+                                            st.session_state["cached_labels_map_key"] = None
+                                            st.success("Approved and saved. Students can now access this under AI Practice.")
+                                        else:
+                                            st.error("Failed to save to database. Check errors below.")
+    
+                            st.divider()
+    
+            with tab_upload:
+                            st.write("## 🖼️ Upload a teacher question (images)")
+                            st.caption("Optional question text supports Markdown and LaTeX ($...$).")
+    
+                            with st.form("upload_q_form", clear_on_submit=True):
+                                c1, c2 = st.columns([2, 1])
+                                with c1:
+                                    assignment_name = st.text_input("Assignment name", placeholder="e.g. AQA Paper 1 (Electricity)", key="up_assignment")
+                                    question_label = st.text_input("Question label", placeholder="e.g. Q3b", key="up_label")
+                                with c2:
+                                    max_marks_in = st.number_input("Max marks", min_value=1, max_value=50, value=3, step=1, key="up_marks")
+    
+                                tags_str = st.text_input("Tags (comma separated)", placeholder="forces, resultant, newton", key="up_tags")
+                                q_text_opt = st.text_area("Optional: question text (Markdown + LaTeX supported)", height=100, key="up_qtext")
+    
+                                q_file = st.file_uploader("Upload question screenshot (PNG/JPG)", type=["png", "jpg", "jpeg"], key="up_qfile")
+                                ms_file = st.file_uploader("Upload mark scheme screenshot (PNG/JPG)", type=["png", "jpg", "jpeg"], key="up_msfile")
+    
+                                submitted = st.form_submit_button("Save to Question Bank", type="primary")
+    
+                            if q_text_opt and q_text_opt.strip():
+                                render_md_box("Preview: Optional question text", q_text_opt)
+    
+                            if submitted:
+                                if not assignment_name.strip() or not question_label.strip():
+                                    st.warning("Please fill in Assignment name and Question label.")
+                                elif q_file is None or ms_file is None:
+                                    st.warning("Please upload both the question screenshot and the mark scheme screenshot.")
+                                else:
+                                    assignment_slug = slugify(assignment_name)
+                                    qlabel_slug = slugify(question_label)
+                                    token = pysecrets.token_hex(6)
+    
+                                    q_bytes_raw = q_file.getvalue()
+                                    ms_bytes_raw = ms_file.getvalue()
+    
+                                    ok_q, msg_q = validate_image_file(q_bytes_raw, QUESTION_MAX_MB, "question image")
+                                    ok_ms, msg_ms = validate_image_file(ms_bytes_raw, MARKSCHEME_MAX_MB, "mark scheme image")
+    
+                                    if not ok_q:
+                                        okc, q_bytes, q_ct, err = _compress_bytes_to_limit(q_bytes_raw, QUESTION_MAX_MB, _purpose="question image")
+                                        if not okc:
+                                            st.error(err or msg_q)
+                                            st.stop()
+                                    else:
+                                        q_bytes = q_bytes_raw
+                                        q_ct = "image/png" if (q_file.name or "").lower().endswith(".png") else "image/jpeg"
+    
+                                    if not ok_ms:
+                                        okc, ms_bytes, ms_ct, err = _compress_bytes_to_limit(ms_bytes_raw, MARKSCHEME_MAX_MB, _purpose="mark scheme image")
+                                        if not okc:
+                                            st.error(err or msg_ms)
+                                            st.stop()
+                                    else:
+                                        ms_bytes = ms_bytes_raw
+                                        ms_ct = "image/png" if (ms_file.name or "").lower().endswith(".png") else "image/jpeg"
+    
+                                    q_ext = ".jpg" if q_ct == "image/jpeg" else ".png"
+                                    ms_ext = ".jpg" if ms_ct == "image/jpeg" else ".png"
+    
+                                    q_path = f"{assignment_slug}/{token}/{qlabel_slug}_question{q_ext}"
+                                    ms_path = f"{assignment_slug}/{token}/{qlabel_slug}_markscheme{ms_ext}"
+    
+                                    ok1 = upload_to_storage(q_path, q_bytes, q_ct)
+                                    ok2 = upload_to_storage(ms_path, ms_bytes, ms_ct)
+    
+                                    tags = [t.strip() for t in (tags_str or "").split(",") if t.strip()]
+    
+                                    if ok1 and ok2:
+                                        ok_db = insert_question_bank_row(
+                                            source="teacher",
+                                            created_by="teacher",
+                                            assignment_name=assignment_name.strip(),
+                                            question_label=question_label.strip(),
+                                            max_marks=int(max_marks_in),
+                                            tags=tags,
+                                            question_text=(q_text_opt or "").strip(),
+                                            markscheme_text="",
+                                            question_image_path=q_path,
+                                            markscheme_image_path=ms_path
+                                        )
+                                        if ok_db:
+                                            st.session_state["cached_bank_df"] = None
+                                            st.session_state["cached_labels_map_key"] = None
+                                            st.success("Saved. This question is now available in the Student page.")
+                                        else:
+                                            st.error("Uploaded images, but failed to save metadata to DB. Check errors below.")
+                                    else:
+                                        st.error("Failed to upload one or both images to Supabase Storage. Check errors below.")
+    
             if st.session_state.get("db_last_error"):
                 st.error(f"Error: {st.session_state['db_last_error']}")
