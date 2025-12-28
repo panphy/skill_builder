@@ -1473,9 +1473,9 @@ if nav == "🧑‍🎓 Student":
                 st.info("No questions in the database yet. Ask a teacher to generate or upload questions in the Question Bank page.")
             else:
                 if source == "AI Practice":
-                    df_src = dfb[dfb["source"].astype(str).str.strip() == "ai_generated"].copy()
+                    df_src = dfb[dfb["source"] == "ai_generated"].copy()
                 elif source == "Teacher Uploads":
-                    df_src = dfb[dfb["source"].astype(str).str.strip() == "teacher"].copy()
+                    df_src = dfb[dfb["source"] == "teacher"].copy()
                 else:
                     df_src = dfb.copy()
 
@@ -1529,44 +1529,22 @@ if nav == "🧑‍🎓 Student":
                             st.session_state["last_canvas_image_data"] = None
 
                         q_row = st.session_state.get("cached_q_row") or {}
+                        question_img = st.session_state.get("cached_question_img")
 
-        # --- DISPLAY THE QUESTION ---
-        if q_row:
-            with st.container(border=True):
-                # 1) Image?
-                q_img_path = q_row.get("question_image_path")
-                if q_img_path:
-                    fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
-                    q_bytes = cached_download_from_storage(q_img_path, fp)
-                    if q_bytes:
-                        st.image(q_bytes, use_container_width=True)
-                
-                # 2) Text?
-                q_text = (q_row.get("question_text") or "").strip()
-                if q_text:
-                    st.markdown(q_text)
-                
-                # 3) Marks
-                mm = q_row.get("max_marks", 0)
-                st.caption(f"Max marks: {mm}")
-                # 4) Prepare variables for backend
-                q_key = f"QB:{int(q_row.get('id', 0))}:{q_row.get('source','')}:{q_row.get('assignment_name','')}:{q_row.get('question_label','')}"
-                
-                # We need question_img as PIL for the AI function
-                question_img = None
-                if q_img_path and fp:
-                     # Reuse the bytes from above if possible, or re-download (cached)
-                     # Since we didn't save bytes above in a var usable here broadly, let's just re-call cached download (it's fast)
-                     # Or better, just do it once.
-                     # Let's simple re-fetch from cache to keep logic clean.
-                     q_bytes_pil = cached_download_from_storage(q_img_path, fp)
-                     if q_bytes_pil:
-                         question_img = bytes_to_pil(q_bytes_pil)
+                        if q_row:
+                            max_marks = int(q_row.get("max_marks", 1))
+                            q_key = f"QB:{int(q_row['id'])}:{q_row.get('source','')}:{q_row.get('assignment_name','')}:{q_row.get('question_label','')}"
+                            q_text = (q_row.get("question_text") or "").strip()
 
-        else:
-            st.info("Select a question above to begin.")
-            q_key = None
-            question_img = None
+                            st.markdown("**Question**")
+                            with st.container(border=True):
+                                if question_img is not None:
+                                    st.image(question_img, caption="Question image", use_container_width=True)
+                                if q_text:
+                                    st.markdown(q_text)
+                                if (question_img is None) and (not q_text):
+                                    st.warning("This question has no question text or image.")
+                            st.caption(f"Max Marks: {max_marks}")
 
         st.write("")
         tab_type, tab_write = st.tabs(["⌨️ Type Answer", "✍️ Write Answer"])
