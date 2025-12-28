@@ -19,7 +19,6 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
 from typing import Tuple, Optional, Dict, Any, List
-import textwrap
 
 # ============================================================
 # LOGGING
@@ -243,100 +242,50 @@ def supabase_ready() -> bool:
 # =========================
 # --- SESSION STATE ---
 # =========================
-def _ss_init(key: str, default):
-    if key not in st.session_state:
-        st.session_state[key] = default
-
-
-_ss_init("canvas_key", 0)
-_ss_init("feedback", None)
-_ss_init("anon_id", pysecrets.token_hex(4))
-_ss_init("db_last_error", "")
-_ss_init("db_table_ready", False)
-_ss_init("bank_table_ready", False)
-_ss_init("is_teacher", False)
-
-# Versions for cache-busting after writes
-_ss_init("bank_version", 0)
-_ss_init("attempts_version", 0)
+if "canvas_key" not in st.session_state:
+    st.session_state["canvas_key"] = 0
+if "feedback" not in st.session_state:
+    st.session_state["feedback"] = None
+if "anon_id" not in st.session_state:
+    st.session_state["anon_id"] = pysecrets.token_hex(4)
+if "db_last_error" not in st.session_state:
+    st.session_state["db_last_error"] = ""
+if "db_table_ready" not in st.session_state:
+    st.session_state["db_table_ready"] = False
+if "bank_table_ready" not in st.session_state:
+    st.session_state["bank_table_ready"] = False
+if "is_teacher" not in st.session_state:
+    st.session_state["is_teacher"] = False
 
 # Canvas robustness cache
-_ss_init("last_canvas_image_data", None)
+if "last_canvas_image_data" not in st.session_state:
+    st.session_state["last_canvas_image_data"] = None
 
 # Question selection cache
-_ss_init("selected_qid", None)
-_ss_init("cached_q_row", None)
-_ss_init("cached_question_img", None)
-_ss_init("cached_q_path", None)
-_ss_init("cached_ms_path", None)
+if "selected_qid" not in st.session_state:
+    st.session_state["selected_qid"] = None
+if "cached_q_row" not in st.session_state:
+    st.session_state["cached_q_row"] = None
+if "cached_question_img" not in st.session_state:
+    st.session_state["cached_question_img"] = None
+if "cached_q_path" not in st.session_state:
+    st.session_state["cached_q_path"] = None
+if "cached_ms_path" not in st.session_state:
+    st.session_state["cached_ms_path"] = None
 
-# Question list cache (UI-level)
-_ss_init("cached_bank_df", None)
-_ss_init("cached_assignments", ["All"])
-_ss_init("cached_labels_map", {})
-_ss_init("cached_labels", [])
-_ss_init("cached_labels_map_key", None)
+# Labels cache
+if "cached_assignments" not in st.session_state:
+    st.session_state["cached_assignments"] = ["All"]
+if "cached_labels_map" not in st.session_state:
+    st.session_state["cached_labels_map"] = {}
+if "cached_labels" not in st.session_state:
+    st.session_state["cached_labels"] = []
+if "cached_labels_map_key" not in st.session_state:
+    st.session_state["cached_labels_map_key"] = None
 
 # AI generator draft cache (teacher-only)
-_ss_init("ai_draft", None)
-
-# ============================================================
-# MARKDOWN + LaTeX NORMALIZATION (end-to-end)
-# ============================================================
-_LATEX_INLINE_PATTERN = re.compile(r"\\\((.+?)\\\)", re.DOTALL)
-_LATEX_BLOCK_PATTERN = re.compile(r"\\\[(.+?)\\\]", re.DOTALL)
-
-
-def normalize_markdown(md_text: str) -> str:
-    """
-    Normalize user/AI-provided Markdown so Streamlit renders it consistently.
-
-    - Dedent to avoid accidental code blocks caused by leading whitespace
-    - Convert \\(...\\) -> $...$ and \\[...\\] -> $$...$$
-    - Normalize newlines
-    """
-    s = (md_text or "")
-    s = s.replace("\r\n", "\n").replace("\r", "\n")
-    s = textwrap.dedent(s)
-
-    # Convert common LaTeX delimiters to Streamlit-friendly ones
-    s = _LATEX_BLOCK_PATTERN.sub(lambda m: "$$" + m.group(1).strip() + "$$", s)
-    s = _LATEX_INLINE_PATTERN.sub(lambda m: "$" + m.group(1).strip() + "$", s)
-
-    # Trim trailing spaces per line (helps markdown parsing)
-    s = "\n".join([line.rstrip() for line in s.split("\n")]).strip()
-    return s
-
-
-def render_markdown(md_text: str):
-    st.markdown(normalize_markdown(md_text or ""), unsafe_allow_html=False)
-
-
-def render_md_box(title: str, md_text: str, caption: str = "", empty_text: str = ""):
-    st.markdown(f"**{title}**")
-    with st.container(border=True):
-        txt = normalize_markdown(md_text or "")
-        if txt:
-            render_markdown(txt)
-        else:
-            st.caption(empty_text or "No content.")
-    if caption:
-        st.caption(caption)
-
-
-def markdown_latex_warnings(md_text: str) -> List[str]:
-    """
-    Light-touch warnings to help teachers spot common formatting issues.
-    Does not block saving.
-    """
-    s = (md_text or "")
-    warns = []
-    # crude: latex commands outside $...$
-    if re.search(r"\\(frac|times|cdot|sqrt|pi|theta|mu|epsilon|Delta)\b", s) and "$" not in s:
-        warns.append("Looks like LaTeX commands are present. Wrap them in $...$ or $$...$$.")
-    if "\\(" in s or "\\[" in s:
-        warns.append("Avoid \\(...\\) or \\[...\\]. Use $...$ or $$...$$ instead.")
-    return warns[:6]
+if "ai_draft" not in st.session_state:
+    st.session_state["ai_draft"] = None
 
 # ============================================================
 #  ROBUST DATABASE LAYER
@@ -394,18 +343,21 @@ def db_ready() -> bool:
     return get_db_engine() is not None
 
 
-def _split_sql_statements(sql_blob: str) -> list[str]:
+# ============================================================
+# SQL EXECUTION THAT HANDLES $$...$$ PL/pgSQL BLOCKS
+# ============================================================
+def _split_sql_statements(sql_blob: str) -> List[str]:
     """
     Split SQL by semicolons, but do NOT split inside Postgres dollar-quoted blocks ($$...$$)
-    or inside single-quoted strings.
-    This is enough for our DDL, which uses $$ for PL/pgSQL.
+    or inside single-quoted strings. This prevents "unterminated dollar-quoted string"
+    errors when executing PL/pgSQL functions from a DDL blob.
     """
     s = (sql_blob or "").strip()
     if not s:
         return []
 
-    out = []
-    buf = []
+    out: List[str] = []
+    buf: List[str] = []
     in_single = False
     in_dollar = False
 
@@ -413,7 +365,7 @@ def _split_sql_statements(sql_blob: str) -> list[str]:
     n = len(s)
     while i < n:
         # Toggle $$...$$ blocks
-        if not in_single and i + 1 < n and s[i] == "$" and s[i + 1] == "$":
+        if (not in_single) and i + 1 < n and s[i] == "$" and s[i + 1] == "$":
             in_dollar = not in_dollar
             buf.append("$$")
             i += 2
@@ -421,10 +373,9 @@ def _split_sql_statements(sql_blob: str) -> list[str]:
 
         ch = s[i]
 
-        # Toggle single quotes (ignore escaped '')
-        if not in_dollar and ch == "'":
+        # Toggle single quotes, respecting escaped ''
+        if (not in_dollar) and ch == "'":
             if in_single:
-                # If it's an escaped quote inside a string: ''
                 if i + 1 < n and s[i + 1] == "'":
                     buf.append("''")
                     i += 2
@@ -460,6 +411,9 @@ def _exec_sql_many(conn, sql_blob: str):
         conn.execute(text(stmt))
 
 
+# ============================================================
+# TABLE ENSURE
+# ============================================================
 def ensure_attempts_table():
     if st.session_state.get("db_table_ready", False):
         return
@@ -593,78 +547,7 @@ def _format_reset_time(dt_utc: datetime) -> str:
         return dt_utc.strftime("%H:%M UTC on %d %b %Y")
 
 
-@st.cache_data(ttl=8)
-def _check_rate_limit_display_cached(student_id: str, _db_url_hash: str, _is_teacher: bool) -> Tuple[bool, int, str]:
-    """
-    Display-only check:
-    - No row locks
-    - No writes
-    - Cached briefly to avoid hammering DB on every rerun
-    """
-    if _is_teacher:
-        return True, RATE_LIMIT_MAX, ""
-
-    eng = get_db_engine()
-    if eng is None:
-        return True, RATE_LIMIT_MAX, ""
-
-    ensure_rate_limits_table()
-
-    sid = (student_id or "").strip() or f"anon_{st.session_state['anon_id']}"
-    now_utc = datetime.now(timezone.utc)
-
-    try:
-        with eng.connect() as conn:
-            row = conn.execute(
-                text("""
-                    select submission_count, window_start_time
-                    from public.rate_limits
-                    where student_id = :sid
-                    limit 1
-                """),
-                {"sid": sid},
-            ).mappings().first()
-
-        if not row:
-            # If no row, they have full allowance
-            return True, RATE_LIMIT_MAX, ""
-
-        submission_count = int(row["submission_count"] or 0)
-        window_start = row["window_start_time"]
-        if isinstance(window_start, datetime):
-            if window_start.tzinfo is None:
-                window_start = window_start.replace(tzinfo=timezone.utc)
-            else:
-                window_start = window_start.astimezone(timezone.utc)
-        else:
-            window_start = now_utc
-
-        elapsed = (now_utc - window_start).total_seconds()
-        if elapsed >= RATE_LIMIT_WINDOW_SECONDS:
-            # Window would reset, so treat as full allowance for display
-            return True, RATE_LIMIT_MAX, _format_reset_time(now_utc + timedelta(seconds=RATE_LIMIT_WINDOW_SECONDS))
-
-        remaining = max(0, RATE_LIMIT_MAX - submission_count)
-        reset_time_utc = window_start + timedelta(seconds=RATE_LIMIT_WINDOW_SECONDS)
-        allowed = submission_count < RATE_LIMIT_MAX
-        return allowed, remaining, _format_reset_time(reset_time_utc)
-    except Exception:
-        return True, RATE_LIMIT_MAX, ""
-
-
-def check_rate_limit_display(student_id: str) -> Tuple[bool, int, str]:
-    db_url = (st.secrets.get("DATABASE_URL", "") or "").strip()
-    db_hash = str(hash(db_url))
-    return _check_rate_limit_display_cached(student_id, db_hash, bool(st.session_state.get("is_teacher", False)))
-
-
-def check_rate_limit_enforce(student_id: str) -> Tuple[bool, int, str]:
-    """
-    Enforced check (submit-time only):
-    - Uses row locking
-    - Resets window if needed
-    - Does not increment; call increment_rate_limit after allowed
-    """
+def check_rate_limit(student_id: str) -> Tuple[bool, int, str]:
     if st.session_state.get("is_teacher", False):
         return True, RATE_LIMIT_MAX, ""
 
@@ -727,7 +610,8 @@ def check_rate_limit_enforce(student_id: str) -> Tuple[bool, int, str]:
             remaining = max(0, RATE_LIMIT_MAX - submission_count)
             reset_time_utc = window_start + timedelta(seconds=RATE_LIMIT_WINDOW_SECONDS)
             allowed = submission_count < RATE_LIMIT_MAX
-            return allowed, remaining, _format_reset_time(reset_time_utc)
+            reset_str = _format_reset_time(reset_time_utc)
+            return allowed, remaining, reset_str
 
     except Exception:
         return True, RATE_LIMIT_MAX, ""
@@ -799,15 +683,13 @@ def upload_to_storage(path: str, file_bytes: bytes, content_type: str) -> bool:
         return False
 
 
-@st.cache_data(ttl=3600)
-def _download_from_storage_cached(path: str, _bucket: str, _sb_ready: bool) -> bytes:
-    if not path or not _sb_ready:
-        return b""
+@st.cache_data(ttl=300, show_spinner=False)
+def download_from_storage_cached(path: str) -> bytes:
     sb = get_supabase_client()
     if sb is None:
         return b""
     try:
-        res = sb.storage.from_(_bucket).download(path)
+        res = sb.storage.from_(STORAGE_BUCKET).download(path)
         if isinstance(res, (bytes, bytearray)):
             return bytes(res)
         if hasattr(res, "data") and res.data is not None:
@@ -819,7 +701,16 @@ def _download_from_storage_cached(path: str, _bucket: str, _sb_ready: bool) -> b
 
 
 def download_from_storage(path: str) -> bytes:
-    return _download_from_storage_cached(path, STORAGE_BUCKET, supabase_ready())
+    if not path:
+        return b""
+    # keep any transient errors out of cache payload
+    out = download_from_storage_cached(path)
+    if out == b"":
+        # set last error but do not crash
+        # (only if storage is configured; otherwise leave silent)
+        if get_supabase_client() is not None:
+            st.session_state["db_last_error"] = "Storage Download Error: empty response."
+    return out
 
 
 def bytes_to_pil(img_bytes: bytes) -> Image.Image:
@@ -934,17 +825,34 @@ def _compress_bytes_to_limit(
 # CANVAS HELPERS
 # ============================================================
 def canvas_has_ink(image_data: np.ndarray) -> bool:
+    """
+    Robust ink detection.
+    Old threshold (ink.mean > 0.001) can false-trigger on small handwriting.
+    We now check absolute ink pixel count as well.
+    """
     if image_data is None:
         return False
-    arr = image_data.astype(np.uint8)
+    try:
+        arr = image_data.astype(np.uint8)
+    except Exception:
+        return False
+
     if arr.ndim != 3 or arr.shape[2] < 3:
         return False
+
     rgb = arr[:, :, :3]
     alpha = arr[:, :, 3] if arr.shape[2] >= 4 else np.full((arr.shape[0], arr.shape[1]), 255, dtype=np.uint8)
     bg = np.array(CANVAS_BG_RGB, dtype=np.uint8)
+
     diff = np.abs(rgb.astype(np.int16) - bg.astype(np.int16)).sum(axis=2)
-    ink = (diff > 60) & (alpha > 30)
-    return (ink.mean() > 0.001)
+    ink_mask = (diff > 40) & (alpha > 20)  # slightly more sensitive than before
+
+    ink_pixels = int(np.count_nonzero(ink_mask))
+    total_pixels = int(ink_mask.size)
+
+    # Require either a tiny fraction OR a minimum pixel count
+    # 600x400 = 240k pixels; 0.00005 = 12 pixels; but also guard with min 40 pixels
+    return (ink_pixels >= 40) or (ink_pixels / max(1, total_pixels) >= 0.00005)
 
 
 def preprocess_canvas_image(image_data: np.ndarray) -> Image.Image:
@@ -991,6 +899,20 @@ def clamp_int(value, lo, hi, default=0):
     return max(lo, min(hi, v))
 
 # ============================================================
+# MARKDOWN RENDER HELPERS
+# ============================================================
+def render_md_box(title: str, md_text: str, caption: str = "", empty_text: str = ""):
+    st.markdown(f"**{title}**")
+    with st.container(border=True):
+        txt = (md_text or "").strip()
+        if txt:
+            st.markdown(txt, unsafe_allow_html=False)
+        else:
+            st.caption(empty_text or "No content.")
+    if caption:
+        st.caption(caption)
+
+# ============================================================
 # PROGRESS INDICATORS
 # ============================================================
 def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: float) -> dict:
@@ -1031,7 +953,7 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
     ns_json = json.dumps(report.get("next_steps", [])[:6])
 
     rb_type = str(report.get("readback_type", "") or "")[:40]
-    rb_md = normalize_markdown(str(report.get("readback_markdown", "") or ""))[:8000]
+    rb_md = str(report.get("readback_markdown", "") or "")[:8000]
     rb_warn = json.dumps(report.get("readback_warnings", [])[:6])
 
     query = """
@@ -1059,93 +981,91 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
                 "readback_warnings": rb_warn
             })
         st.session_state["db_last_error"] = ""
-        st.session_state["attempts_version"] += 1
     except Exception as e:
         st.session_state["db_last_error"] = f"Insert Error: {type(e).__name__}: {e}"
 
 
-@st.cache_data(ttl=10)
-def _load_attempts_df_cached(limit: int, _db_url_hash: str, _ver: int) -> pd.DataFrame:
+@st.cache_data(ttl=30, show_spinner=False)
+def load_attempts_df_cached(limit: int = 5000) -> pd.DataFrame:
     eng = get_db_engine()
     if eng is None:
         return pd.DataFrame()
     ensure_attempts_table()
-    try:
-        with eng.connect() as conn:
-            df = pd.read_sql(
-                text("""
-                    select created_at, student_id, question_key, mode, marks_awarded, max_marks, readback_type
-                    from public.physics_attempts_v1
-                    order by created_at desc
-                    limit :limit
-                """),
-                conn,
-                params={"limit": int(limit)},
-            )
-        if not df.empty:
-            df["marks_awarded"] = pd.to_numeric(df["marks_awarded"], errors="coerce").fillna(0).astype(int)
-            df["max_marks"] = pd.to_numeric(df["max_marks"], errors="coerce").fillna(0).astype(int)
-        return df
-    except Exception:
-        return pd.DataFrame()
+    with eng.connect() as conn:
+        df = pd.read_sql(
+            text("""
+                select created_at, student_id, question_key, mode, marks_awarded, max_marks, readback_type
+                from public.physics_attempts_v1
+                order by created_at desc
+                limit :limit
+            """),
+            conn,
+            params={"limit": int(limit)},
+        )
+    if not df.empty:
+        df["marks_awarded"] = pd.to_numeric(df["marks_awarded"], errors="coerce").fillna(0).astype(int)
+        df["max_marks"] = pd.to_numeric(df["max_marks"], errors="coerce").fillna(0).astype(int)
+    return df
 
 
 def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
-    db_url = (st.secrets.get("DATABASE_URL", "") or "").strip()
-    return _load_attempts_df_cached(int(limit), str(hash(db_url)), int(st.session_state.get("attempts_version", 0)))
+    try:
+        return load_attempts_df_cached(limit=limit)
+    except Exception as e:
+        st.session_state["db_last_error"] = f"Load Error: {type(e).__name__}: {e}"
+        return pd.DataFrame()
 
 
-@st.cache_data(ttl=30)
-def _load_question_bank_df_cached(limit: int, include_inactive: bool, _db_url_hash: str, _ver: int) -> pd.DataFrame:
+@st.cache_data(ttl=60, show_spinner=False)
+def load_question_bank_df_cached(include_inactive: bool = False, limit: int = 5000) -> pd.DataFrame:
     eng = get_db_engine()
     if eng is None:
         return pd.DataFrame()
     ensure_question_bank_table()
-
     where = "" if include_inactive else "where is_active = true"
-    try:
-        with eng.connect() as conn:
-            df = pd.read_sql(
-                text(f"""
-                    select id, created_at, source, assignment_name, question_label, max_marks, is_active
-                    from public.question_bank_v1
-                    {where}
-                    order by created_at desc
-                    limit :limit
-                """),
-                conn,
-                params={"limit": int(limit)},
-            )
-        return df
-    except Exception:
-        return pd.DataFrame()
+    with eng.connect() as conn:
+        df = pd.read_sql(
+            text(f"""
+                select id, created_at, source, assignment_name, question_label, max_marks, is_active
+                from public.question_bank_v1
+                {where}
+                order by created_at desc
+                limit :limit
+            """),
+            conn,
+            params={"limit": int(limit)},
+        )
+    return df
 
 
 def load_question_bank_df(limit: int = 5000, include_inactive: bool = False) -> pd.DataFrame:
-    db_url = (st.secrets.get("DATABASE_URL", "") or "").strip()
-    return _load_question_bank_df_cached(int(limit), bool(include_inactive), str(hash(db_url)), int(st.session_state.get("bank_version", 0)))
+    try:
+        return load_question_bank_df_cached(include_inactive=include_inactive, limit=limit)
+    except Exception as e:
+        st.session_state["db_last_error"] = f"Load Question Bank Error: {type(e).__name__}: {e}"
+        return pd.DataFrame()
 
 
-@st.cache_data(ttl=30)
-def _load_question_by_id_cached(qid: int, _db_url_hash: str, _ver: int) -> Dict[str, Any]:
+@st.cache_data(ttl=60, show_spinner=False)
+def load_question_by_id_cached(qid: int) -> Dict[str, Any]:
     eng = get_db_engine()
     if eng is None:
         return {}
     ensure_question_bank_table()
-    try:
-        with eng.connect() as conn:
-            row = conn.execute(
-                text("select * from public.question_bank_v1 where id = :id limit 1"),
-                {"id": int(qid)}
-            ).mappings().first()
-        return dict(row) if row else {}
-    except Exception:
-        return {}
+    with eng.connect() as conn:
+        row = conn.execute(
+            text("select * from public.question_bank_v1 where id = :id limit 1"),
+            {"id": int(qid)}
+        ).mappings().first()
+    return dict(row) if row else {}
 
 
 def load_question_by_id(qid: int) -> Dict[str, Any]:
-    db_url = (st.secrets.get("DATABASE_URL", "") or "").strip()
-    return _load_question_by_id_cached(int(qid), str(hash(db_url)), int(st.session_state.get("bank_version", 0)))
+    try:
+        return load_question_by_id_cached(qid)
+    except Exception as e:
+        st.session_state["db_last_error"] = f"Load Question Error: {type(e).__name__}: {e}"
+        return {}
 
 
 def insert_question_bank_row(
@@ -1193,8 +1113,6 @@ def insert_question_bank_row(
                 "markscheme_text": (markscheme_text or "").strip()[:20000] or None,
                 "markscheme_image_path": (markscheme_image_path or "").strip() or None,
             })
-        st.session_state["bank_version"] += 1
-        st.session_state["db_last_error"] = ""
         return True
     except Exception as e:
         st.session_state["db_last_error"] = f"Insert Question Bank Error: {type(e).__name__}: {e}"
@@ -1237,7 +1155,7 @@ Max Marks: {int(max_marks)}
 
 
 def _finalize_report(data: dict, max_marks: int) -> dict:
-    readback_md = normalize_markdown(str(data.get("readback_markdown", "") or ""))
+    readback_md = str(data.get("readback_markdown", "") or "").strip()
     readback_type = str(data.get("readback_type", "") or "").strip()
     readback_warn = data.get("readback_warnings", [])
     if not isinstance(readback_warn, list):
@@ -1249,7 +1167,7 @@ def _finalize_report(data: dict, max_marks: int) -> dict:
         "readback_warnings": [str(x) for x in readback_warn][:6],
         "marks_awarded": clamp_int(data.get("marks_awarded", 0), 0, int(max_marks)),
         "max_marks": int(max_marks),
-        "summary": str(data.get("summary", "") or "").strip(),
+        "summary": str(data.get("summary", "")).strip(),
         "feedback_points": [str(x) for x in data.get("feedback_points", [])][:6],
         "next_steps": [str(x) for x in data.get("next_steps", [])][:6]
     }
@@ -1263,8 +1181,8 @@ def get_gpt_feedback_from_bank(
     markscheme_img: Optional[Image.Image],
 ) -> dict:
     max_marks = int(q_row.get("max_marks", 1))
-    question_text = normalize_markdown((q_row.get("question_text") or "").strip())
-    markscheme_text = normalize_markdown((q_row.get("markscheme_text") or "").strip())
+    question_text = (q_row.get("question_text") or "").strip()
+    markscheme_text = (q_row.get("markscheme_text") or "").strip()
 
     system_instr = _mk_system_schema(max_marks=max_marks, question_text=question_text if question_text else "")
     messages = [{"role": "system", "content": system_instr}]
@@ -1285,7 +1203,7 @@ def get_gpt_feedback_from_bank(
     if not is_student_image:
         if question_text and question_img is None:
             content.append({"type": "text", "text": f"Question text:\n{question_text}"})
-        content.append({"type": "text", "text": f"Student Answer (text):\n{student_answer}\n(readback_markdown can be empty for typed answers)"} )
+        content.append({"type": "text", "text": f"Student Answer (text):\n{student_answer}\n(readback_markdown can be empty for typed answers)"})
     else:
         sa_b64 = encode_image(student_answer)
         content.append({"type": "text", "text": "Student answer (image):"})
@@ -1512,8 +1430,8 @@ You MUST:
             data["warnings"] = reasons2[:10]
 
     out = {
-        "question_text": normalize_markdown(str(data.get("question_text", "") or "").strip()),
-        "markscheme_text": normalize_markdown(str(data.get("markscheme_text", "") or "").strip()),
+        "question_text": str(data.get("question_text", "") or "").strip(),
+        "markscheme_text": str(data.get("markscheme_text", "") or "").strip(),
         "max_marks": int(marks),
         "tags": data.get("tags", []),
         "warnings": data.get("warnings", []),
@@ -1530,11 +1448,11 @@ You MUST:
 # REPORT RENDERER
 # ============================================================
 def render_report(report: dict):
-    readback_md = normalize_markdown(report.get("readback_markdown") or "")
+    readback_md = (report.get("readback_markdown") or "").strip()
     if readback_md:
         st.markdown("**AI readback (what it thinks you wrote/drew):**")
         with st.container(border=True):
-            render_markdown(readback_md)
+            st.markdown(readback_md, unsafe_allow_html=False)
 
         rb_warn = report.get("readback_warnings", [])
         if rb_warn:
@@ -1604,9 +1522,7 @@ if nav == "🧑‍🎓 Student":
         )
 
         effective_sid = _effective_student_id(student_id)
-
-        # Display-only rate limit (cached, no locking)
-        allowed_disp, remaining, reset_time_str = check_rate_limit_display(effective_sid)
+        allowed, remaining, reset_time_str = check_rate_limit(effective_sid)
 
         if st.session_state.get("is_teacher", False):
             st.caption("Teacher mode: rate limits bypassed.")
@@ -1621,17 +1537,13 @@ if nav == "🧑‍🎓 Student":
         else:
             ensure_question_bank_table()
 
-            # Use cached DB read (fast) and then keep a session copy for selection mapping
-            if st.session_state["cached_bank_df"] is None:
-                dfb = load_question_bank_df(limit=5000, include_inactive=False)
-                st.session_state["cached_bank_df"] = dfb
-                st.session_state["cached_assignments"] = ["All"] + sorted(dfb["assignment_name"].dropna().unique().tolist()) if not dfb.empty else ["All"]
-            else:
-                dfb = st.session_state["cached_bank_df"]
+            dfb = load_question_bank_df(limit=5000, include_inactive=False)
 
             if dfb is None or dfb.empty:
                 st.info("No questions in the database yet. Ask a teacher to generate or upload questions in the Question Bank page.")
             else:
+                st.session_state["cached_assignments"] = ["All"] + sorted(dfb["assignment_name"].dropna().unique().tolist())
+
                 if source == "AI Practice":
                     df_src = dfb[dfb["source"] == "ai_generated"].copy()
                 elif source == "Teacher Uploads":
@@ -1644,34 +1556,20 @@ if nav == "🧑‍🎓 Student":
                 else:
                     assignment_filter = st.selectbox("Assignment:", st.session_state["cached_assignments"], key="student_assignment_filter")
 
-                    map_key = f"labels_{source}_{assignment_filter}"
+                    map_key = f"labels_{source}_{assignment_filter}_{len(df_src)}"
                     if st.session_state.get("cached_labels_map_key") != map_key:
                         if assignment_filter != "All":
                             df2 = df_src[df_src["assignment_name"] == assignment_filter].copy()
                         else:
                             df2 = df_src.copy()
 
-                        if df2.empty:
-                            st.session_state["cached_labels_map"] = {}
-                            st.session_state["cached_labels"] = []
-                        else:
-                            df2 = df2.copy()
-                            df2["id"] = df2["id"].astype(int)
-                            df2["max_marks"] = df2["max_marks"].astype(int)
-                            df2["label"] = (
-                                df2["assignment_name"].astype(str)
-                                + " | "
-                                + df2["question_label"].astype(str)
-                                + " ("
-                                + df2["max_marks"].astype(str)
-                                + " marks) [id "
-                                + df2["id"].astype(str)
-                                + "]"
-                            )
-                            labels_map = dict(zip(df2["label"].tolist(), df2["id"].tolist()))
-                            st.session_state["cached_labels_map"] = labels_map
-                            st.session_state["cached_labels"] = list(labels_map.keys())
-
+                        df2["label"] = df2.apply(
+                            lambda r: f"{r['assignment_name']} | {r['question_label']} ({int(r['max_marks'])} marks) [id {int(r['id'])}]",
+                            axis=1
+                        )
+                        labels_map = {row["label"]: int(row["id"]) for _, row in df2.iterrows()}
+                        st.session_state["cached_labels_map"] = labels_map
+                        st.session_state["cached_labels"] = list(labels_map.keys())
                         st.session_state["cached_labels_map_key"] = map_key
 
                     choices = st.session_state.get("cached_labels", [])
@@ -1701,14 +1599,15 @@ if nav == "🧑‍🎓 Student":
                         if q_row:
                             max_marks = int(q_row.get("max_marks", 1))
                             q_key = f"QB:{int(q_row['id'])}:{q_row.get('source','')}:{q_row.get('assignment_name','')}:{q_row.get('question_label','')}"
-                            q_text = normalize_markdown((q_row.get("question_text") or "").strip())
+                            q_text = (q_row.get("question_text") or "").strip()
 
                             st.markdown("**Question**")
                             with st.container(border=True):
                                 if question_img is not None:
                                     st.image(question_img, caption="Question image", use_container_width=True)
                                 if q_text:
-                                    render_markdown(q_text)
+                                    # Rendered Markdown + LaTeX only (no raw plaintext)
+                                    st.markdown(q_text, unsafe_allow_html=False)
                                 if (question_img is None) and (not q_text):
                                     st.warning("This question has no question text or image.")
 
@@ -1718,12 +1617,9 @@ if nav == "🧑‍🎓 Student":
         tab_type, tab_write = st.tabs(["⌨️ Type Answer", "✍️ Write Answer"])
 
         with tab_type:
-            # Put typed answer in a form to stop rerunning on every keystroke
-            with st.form("typed_answer_form"):
-                answer = st.text_area("Type your working:", height=200, placeholder="Enter your answer here...", key="student_answer_text")
-                submit_text = st.form_submit_button("Submit Text", type="primary", disabled=not AI_READY or not db_ready())
+            answer = st.text_area("Type your working:", height=200, placeholder="Enter your answer here...", key="student_answer_text")
 
-            if submit_text:
+            if st.button("Submit Text", type="primary", disabled=not AI_READY or not db_ready(), key="submit_text_btn"):
                 sid = _effective_student_id(student_id)
 
                 if not answer.strip():
@@ -1731,7 +1627,7 @@ if nav == "🧑‍🎓 Student":
                 elif not q_row:
                     st.error("Please select a question first.")
                 else:
-                    allowed_now, _, reset_str = check_rate_limit_enforce(sid)
+                    allowed_now, _, reset_str = check_rate_limit(sid)
                     if not allowed_now:
                         st.error(f"You’ve reached the limit of {RATE_LIMIT_MAX} submissions per hour. Please try again at {reset_str}.")
                     else:
@@ -1774,7 +1670,9 @@ if nav == "🧑‍🎓 Student":
             stroke_width = 2 if tool == "Pen" else 30
             stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
 
-            # Form submit means the app reruns only when "Submit Writing" is pressed
+            # IMPORTANT FIX:
+            # - update_streamlit=False reduces heavy reruns/blurry UI while drawing
+            # - ink detection made more sensitive; plus we persist last_canvas_image_data on submit
             with st.form(key=f"write_form_{st.session_state['canvas_key']}"):
                 canvas_result = st_canvas(
                     stroke_width=stroke_width,
@@ -1785,12 +1683,12 @@ if nav == "🧑‍🎓 Student":
                     drawing_mode="freedraw",
                     key=f"canvas_{st.session_state['canvas_key']}",
                     display_toolbar=False,
-                    update_streamlit=False,  # CRITICAL: prevents rerun on every stroke (fixes blur)
+                    update_streamlit=False,  # critical: do not rerun on every stroke
                 )
                 submitted_writing = st.form_submit_button("Submit Writing", type="primary", disabled=not AI_READY or not db_ready())
 
-            # Only store last image data when we have it (no rerun per stroke now)
-            if canvas_result is not None and canvas_result.image_data is not None:
+            # If the frontend sends image_data in this run, cache it (helps robustness)
+            if canvas_result is not None and getattr(canvas_result, "image_data", None) is not None:
                 if canvas_has_ink(canvas_result.image_data):
                     st.session_state["last_canvas_image_data"] = canvas_result.image_data
 
@@ -1800,12 +1698,25 @@ if nav == "🧑‍🎓 Student":
                 if not q_row:
                     st.error("Please select a question first.")
                 else:
-                    img_data = canvas_result.image_data if (canvas_result and canvas_result.image_data is not None) else st.session_state.get("last_canvas_image_data")
+                    img_data = None
+                    if canvas_result is not None and getattr(canvas_result, "image_data", None) is not None:
+                        img_data = canvas_result.image_data
 
-                    if img_data is None or not canvas_has_ink(img_data):
-                        st.toast("Canvas is empty!", icon="⚠️")
+                    # Fallback to last known image if Streamlit returns None on submit
+                    if img_data is None:
+                        img_data = st.session_state.get("last_canvas_image_data")
+
+                    # Second fallback: try to read from session_state for this canvas key (some versions store it)
+                    if img_data is None:
+                        maybe = st.session_state.get(f"canvas_{st.session_state['canvas_key']}")
+                        # some builds store a dict, sometimes under 'image_data'
+                        if isinstance(maybe, dict) and "image_data" in maybe:
+                            img_data = maybe.get("image_data")
+
+                    if img_data is None or (not canvas_has_ink(img_data)):
+                        st.toast("Canvas is blank. Write your answer first, then press Submit.", icon="⚠️")
                     else:
-                        allowed_now, _, reset_str = check_rate_limit_enforce(sid)
+                        allowed_now, _, reset_str = check_rate_limit(sid)
                         if not allowed_now:
                             st.error(f"You’ve reached the limit of {RATE_LIMIT_MAX} submissions per hour. Please try again at {reset_str}.")
                         else:
@@ -1868,9 +1779,12 @@ elif nav == "🔒 Teacher Dashboard":
     with st.expander("Database tools"):
         if st.button("Reconnect to database", key="reconnect_db_teacher"):
             _cached_engine.clear()
+            load_attempts_df_cached.clear()
+            load_question_bank_df_cached.clear()
+            load_question_by_id_cached.clear()
+            download_from_storage_cached.clear()
             st.session_state["db_table_ready"] = False
             st.session_state["bank_table_ready"] = False
-            st.session_state["cached_bank_df"] = None
             st.session_state["cached_labels_map_key"] = None
             st.rerun()
         if st.session_state.get("db_last_error"):
@@ -1937,9 +1851,12 @@ else:
     with st.expander("Database tools"):
         if st.button("Reconnect to database", key="reconnect_db_bank"):
             _cached_engine.clear()
+            load_attempts_df_cached.clear()
+            load_question_bank_df_cached.clear()
+            load_question_by_id_cached.clear()
+            download_from_storage_cached.clear()
             st.session_state["db_table_ready"] = False
             st.session_state["bank_table_ready"] = False
-            st.session_state["cached_bank_df"] = None
             st.session_state["cached_labels_map_key"] = None
             st.rerun()
         if st.session_state.get("db_last_error"):
@@ -2010,8 +1927,8 @@ else:
                         est_seconds=10.0
                     )
 
-                    qtxt = normalize_markdown(str(draft_raw.get("question_text", "") or ""))
-                    mstxt = normalize_markdown(str(draft_raw.get("markscheme_text", "") or ""))
+                    qtxt = str(draft_raw.get("question_text", "") or "").strip()
+                    mstxt = str(draft_raw.get("markscheme_text", "") or "").strip()
                     mm = clamp_int(draft_raw.get("max_marks", int(marks_req)), 1, 50, default=int(marks_req))
                     tags = draft_raw.get("tags", [])
                     warnings = draft_raw.get("warnings", [])
@@ -2059,11 +1976,6 @@ else:
                 d_qtext = st.text_area("Question text (student will see this)", value=d.get("question_text", ""), height=180, key="draft_qtext")
                 d_mstext = st.text_area("Mark scheme (teacher-only)", value=d.get("markscheme_text", ""), height=220, key="draft_mstext")
 
-                warn_q = markdown_latex_warnings(d_qtext)
-                warn_ms = markdown_latex_warnings(d_mstext)
-                if warn_q or warn_ms:
-                    st.info("Formatting notes:\n" + "\n".join([f"- {w}" for w in (warn_q + warn_ms)][:8]))
-
                 p1, p2 = st.columns(2)
                 with p1:
                     render_md_box("Preview: Question (student view)", d_qtext, empty_text="No question text.")
@@ -2089,14 +2001,16 @@ else:
                             question_label=d_label.strip(),
                             max_marks=int(d_marks),
                             tags=tags,
-                            question_text=normalize_markdown(d_qtext),
-                            markscheme_text=normalize_markdown(d_mstext),
+                            question_text=d_qtext.strip(),
+                            markscheme_text=d_mstext.strip(),
                             question_image_path=None,
                             markscheme_image_path=None,
                         )
                         if ok:
                             st.session_state["ai_draft"] = None
-                            st.session_state["cached_bank_df"] = None
+                            # clear caches so the new question appears immediately
+                            load_question_bank_df_cached.clear()
+                            load_question_by_id_cached.clear()
                             st.session_state["cached_labels_map_key"] = None
                             st.success("Approved and saved. Students can now access this under AI Practice.")
                         else:
@@ -2179,13 +2093,15 @@ else:
                             question_label=question_label.strip(),
                             max_marks=int(max_marks_in),
                             tags=tags,
-                            question_text=normalize_markdown(q_text_opt or ""),
+                            question_text=(q_text_opt or "").strip(),
                             markscheme_text="",
                             question_image_path=q_path,
                             markscheme_image_path=ms_path
                         )
                         if ok_db:
-                            st.session_state["cached_bank_df"] = None
+                            load_question_bank_df_cached.clear()
+                            load_question_by_id_cached.clear()
+                            download_from_storage_cached.clear()
                             st.session_state["cached_labels_map_key"] = None
                             st.success("Saved. This question is now available in the Student page.")
                         else:
@@ -2202,26 +2118,16 @@ else:
                 st.info("No questions yet.")
             else:
                 df_all = df_all.copy()
-                df_all["id"] = df_all["id"].astype(int)
-                df_all["max_marks"] = df_all["max_marks"].astype(int)
-                df_all["label"] = (
-                    df_all["assignment_name"].astype(str)
-                    + " | "
-                    + df_all["question_label"].astype(str)
-                    + " ("
-                    + df_all["max_marks"].astype(str)
-                    + " marks) ["
-                    + df_all["source"].astype(str)
-                    + "] [id "
-                    + df_all["id"].astype(str)
-                    + "]"
+                df_all["label"] = df_all.apply(
+                    lambda r: f"{r['assignment_name']} | {r['question_label']} ({int(r['max_marks'])} marks) [{r['source']}] [id {int(r['id'])}]",
+                    axis=1
                 )
                 pick = st.selectbox("Select an entry to preview", df_all["label"].tolist(), key="bank_preview_pick")
                 pick_id = int(df_all.loc[df_all["label"] == pick, "id"].iloc[0])
                 row = load_question_by_id(pick_id)
 
-                q_text = normalize_markdown((row.get("question_text") or "").strip())
-                ms_text = normalize_markdown((row.get("markscheme_text") or "").strip())
+                q_text = (row.get("question_text") or "").strip()
+                ms_text = (row.get("markscheme_text") or "").strip()
                 q_path = (row.get("question_image_path") or "").strip()
                 ms_path = (row.get("markscheme_image_path") or "").strip()
 
@@ -2235,7 +2141,7 @@ else:
                         if q_img is not None:
                             st.image(q_img, use_container_width=True)
                         if q_text:
-                            render_markdown(q_text)
+                            st.markdown(q_text, unsafe_allow_html=False)
                         if (q_img is None) and (not q_text):
                             st.caption("No question text/image.")
                 with pv2:
@@ -2244,7 +2150,7 @@ else:
                         if ms_img is not None:
                             st.image(ms_img, use_container_width=True)
                         if ms_text:
-                            render_markdown(ms_text)
+                            st.markdown(ms_text, unsafe_allow_html=False)
                         if (ms_img is None) and (not ms_text):
                             st.caption("No mark scheme text/image (image-only teacher uploads are supported).")
 
