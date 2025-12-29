@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "subject_key": "aqa_gcse_physics",
+    "display_name": "AQA GCSE Physics (Separate)",
+    "exam_board": "AQA",
+    "qualification": "GCSE",
+    "pathway": "separate",
+    "version_label": "v1",
+    "last_reviewed_utc": "2025-12-29T00:00:00Z",
+    "source_refs": []
+  },
+  "scope": {
+    "tier": "higher_only",
+    "calculator": "allowed",
+    "units_standard": "SI",
+    "equation_sheet": "gcse_aqa"
+  },
+  "topic_tree": [],
+  "allowed_topics": {
+    "tags": [],
+    "tag_to_topic_codes": {}
+  },
+  "must_avoid": {
+    "concepts": [],
+    "patterns_regex": [],
+    "notes": ""
+  },
+  "command_words": [
+    { "word": "describe", "expectation": "State key features; no extended reasoning needed." },
+    { "word": "explain", "expectation": "Use cause and effect, because/therefore, link ideas." },
+    { "word": "calculate", "expectation": "Show working; final answer with unit; sensible rounding." }
+  ],
+  "question_style_rules": [
+    "Must be original (no copyrighted exam questions).",
+    "Use Markdown; LaTeX only inside $...$ or $$...$$.",
+    "GCSE-appropriate contexts and numbers."
+  ],
+  "mark_scheme_rules": [
+    "Part-by-part marks with explicit [n] per part.",
+    "If multi-step calculation, include method mark plus accuracy mark.",
+    "End with: TOTAL = <total_marks>."
+  ],
+  "compliance_checks": {
+    "require_total_line": true,
+    "require_part_marks": true,
+    "max_marks_range": [1, 12],
+    "block_if_patterns_match": true,
+    "topic_tag_must_be_in_allowed_topics": true
+  }
+}
