@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
 from typing import Tuple, Optional, Dict, Any, List
+import pathlib
 
 # ============================================================
 # LOGGING
@@ -93,7 +94,7 @@ QUESTION_MAX_MB = 5.0
 MARKSCHEME_MAX_MB = 5.0
 CANVAS_MAX_MB = 2.0
 
-# AI question generation
+# AI question generation (legacy fallback list; spec packs are preferred)
 AQA_GCSE_HIGHER_TOPICS = [
     "Energy stores and transfers",
     "Work done and power",
@@ -133,6 +134,113 @@ AQA_GCSE_HIGHER_TOPICS = [
 QUESTION_TYPES = ["Calculation", "Explanation", "Practical/Methods", "Graph/Analysis", "Mixed"]
 DIFFICULTIES = ["Easy", "Medium", "Hard"]
 
+# =========================
+# --- SUBJECTS (AQA GCSE Higher) ---
+# =========================
+DEFAULT_SUBJECT_KEY = "aqa_gcse_physics"
+
+SUBJECT_CATALOG: Dict[str, str] = {
+    # Separate sciences
+    "aqa_gcse_biology": "AQA GCSE Biology (Separate, Higher)",
+    "aqa_gcse_chemistry": "AQA GCSE Chemistry (Separate, Higher)",
+    "aqa_gcse_physics": "AQA GCSE Physics (Separate, Higher)",
+    # Combined Science Trilogy (discipline-specific)
+    "aqa_combined_biology": "AQA GCSE Combined Science: Biology (Higher)",
+    "aqa_combined_chemistry": "AQA GCSE Combined Science: Chemistry (Higher)",
+    "aqa_combined_physics": "AQA GCSE Combined Science: Physics (Higher)",
+}
+
+SUBJECT_KEYS_ORDERED: List[str] = [
+    "aqa_gcse_biology",
+    "aqa_gcse_chemistry",
+    "aqa_gcse_physics",
+    "aqa_combined_biology",
+    "aqa_combined_chemistry",
+    "aqa_combined_physics",
+]
+
+
+def subject_label(subject_key: str) -> str:
+    return SUBJECT_CATALOG.get(subject_key, subject_key or DEFAULT_SUBJECT_KEY)
+
+
+# =========================
+# --- SPEC PACK LOADING ---
+# =========================
+def _spec_path_for(subject_key: str) -> pathlib.Path:
+    # Support both repo-root runs and Streamlit Cloud runs.
+    sk = (subject_key or DEFAULT_SUBJECT_KEY).strip() or DEFAULT_SUBJECT_KEY
+    p1 = pathlib.Path("specs") / f"{sk}.json"
+    if p1.exists():
+        return p1
+    try:
+        here = pathlib.Path(__file__).resolve().parent
+        p2 = here / "specs" / f"{sk}.json"
+        return p2
+    except Exception:
+        return p1
+
+
+@st.cache_data(ttl=3600)
+def load_spec_pack_cached(subject_key: str, mtime: float) -> Dict[str, Any]:
+    p = _spec_path_for(subject_key)
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception as e:
+        LOGGER.error("Spec pack parse failed", extra={"ctx": {"component": "spec", "error": type(e).__name__, "path": str(p)}})
+        return {}
+
+
+def load_spec_pack(subject_key: str) -> Dict[str, Any]:
+    p = _spec_path_for(subject_key)
+    try:
+        mt = p.stat().st_mtime if p.exists() else 0.0
+    except Exception:
+        mt = 0.0
+    return load_spec_pack_cached(subject_key, mt)
+
+
+def allowed_topics_from_spec(spec_pack: Dict[str, Any]) -> List[Dict[str, Any]]:
+    topics = spec_pack.get("allowed_topics", [])
+    if isinstance(topics, list):
+        out = []
+        for t in topics:
+            if isinstance(t, dict) and str(t.get("code", "")).strip():
+                out.append({
+                    "code": str(t.get("code", "")).strip(),
+                    "title": str(t.get("title", "")).strip(),
+                    "ht_only": bool(t.get("ht_only", False)),
+                })
+        return out
+    return []
+
+
+def allowed_topic_codes(spec_pack: Dict[str, Any]) -> List[str]:
+    return [t["code"] for t in allowed_topics_from_spec(spec_pack)]
+
+
+def _summarize_allowed_topics_for_prompt(spec_pack: Dict[str, Any], max_items: int = 120) -> str:
+    topics = allowed_topics_from_spec(spec_pack)
+    if not topics:
+        return "(No spec pack topics found. Use the official AQA specification.)"
+    # Prefer higher-level codes (shorter) for compactness
+    def depth(code: str) -> int:
+        return len([p for p in code.split(".") if p.strip()])
+
+    topics_sorted = sorted(topics, key=lambda t: (depth(t["code"]), t["code"]))
+    items = topics_sorted[:max_items]
+    lines = []
+    for t in items:
+        code = t["code"]
+        title = t["title"]
+        suffix = " (HT only)" if t.get("ht_only") else ""
+        lines.append(f"- {code} {title}{suffix}".strip())
+    if len(topics_sorted) > max_items:
+        lines.append(f"... ({len(topics_sorted) - max_items} more)")
+    return "\n".join(lines)
+
 # ============================================================
 # DATABASE DDLs
 #   IMPORTANT: avoid $$ PL/pgSQL blocks inside app DDL to prevent split/execution issues.
@@ -147,12 +255,13 @@ create index if not exists idx_rate_limits_window_start_time
   on public.rate_limits (window_start_time);
 """.strip()
 
-# NOTE: No trigger/function here. Keeping DDL simple avoids "unterminated dollar-quoted string" errors.
 QUESTION_BANK_DDL = """
 create table if not exists public.question_bank_v1 (
   id bigserial primary key,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+
+  subject_key text not null default 'aqa_gcse_physics',
 
   source text not null check (source in ('teacher','ai_generated')),
   created_by text,
@@ -171,8 +280,11 @@ create table if not exists public.question_bank_v1 (
   is_active boolean not null default true
 );
 
-create unique index if not exists uq_question_bank_source_assignment_label
-  on public.question_bank_v1 (source, assignment_name, question_label);
+create unique index if not exists uq_question_bank_subject_source_assignment_label
+  on public.question_bank_v1 (subject_key, source, assignment_name, question_label);
+
+create index if not exists idx_question_bank_subject
+  on public.question_bank_v1 (subject_key);
 
 create index if not exists idx_question_bank_assignment
   on public.question_bank_v1 (assignment_name);
@@ -235,6 +347,7 @@ _ss_init("db_last_error", "")
 _ss_init("db_table_ready", False)
 _ss_init("bank_table_ready", False)
 _ss_init("is_teacher", False)
+_ss_init("subject_key", DEFAULT_SUBJECT_KEY)
 
 # Canvas robustness cache
 _ss_init("last_canvas_image_data", None)
@@ -372,6 +485,7 @@ def ensure_attempts_table():
     create table if not exists public.physics_attempts_v1 (
       id bigserial primary key,
       created_at timestamptz not null default now(),
+      subject_key text not null default 'aqa_gcse_physics',
       student_id text not null,
       question_key text not null,
       mode text not null,
@@ -381,15 +495,28 @@ def ensure_attempts_table():
       feedback_points jsonb,
       next_steps jsonb
     );
+    create index if not exists idx_attempts_subject_created_at
+      on public.physics_attempts_v1 (subject_key, created_at desc);
     """
 
     ddl_alter = """
+    alter table public.physics_attempts_v1
+      add column if not exists subject_key text;
+    update public.physics_attempts_v1
+      set subject_key = 'aqa_gcse_physics'
+      where subject_key is null or subject_key = '';
+    alter table public.physics_attempts_v1
+      alter column subject_key set not null;
+
     alter table public.physics_attempts_v1
       add column if not exists readback_type text;
     alter table public.physics_attempts_v1
       add column if not exists readback_markdown text;
     alter table public.physics_attempts_v1
       add column if not exists readback_warnings jsonb;
+
+    create index if not exists idx_attempts_subject_created_at
+      on public.physics_attempts_v1 (subject_key, created_at desc);
     """
 
     try:
@@ -424,9 +551,28 @@ def ensure_question_bank_table():
     eng = get_db_engine()
     if eng is None:
         return
+    ddl_migrate = """
+    alter table public.question_bank_v1
+      add column if not exists subject_key text;
+    update public.question_bank_v1
+      set subject_key = 'aqa_gcse_physics'
+      where subject_key is null or subject_key = '';
+
+    alter table public.question_bank_v1
+      alter column subject_key set not null;
+
+    drop index if exists public.uq_question_bank_source_assignment_label;
+
+    create unique index if not exists uq_question_bank_subject_source_assignment_label
+      on public.question_bank_v1 (subject_key, source, assignment_name, question_label);
+
+    create index if not exists idx_question_bank_subject
+      on public.question_bank_v1 (subject_key);
+    """
     try:
         with eng.begin() as conn:
             _exec_sql_many(conn, QUESTION_BANK_DDL)
+            _exec_sql_many(conn, ddl_migrate)
         st.session_state["bank_table_ready"] = True
         st.session_state["db_last_error"] = ""
         LOGGER.info("Question bank table ready", extra={"ctx": {"component": "db", "table": "question_bank_v1"}})
@@ -798,128 +944,55 @@ def _compress_bytes_to_limit(
     ct = "image/jpeg" if target_fmt == "JPEG" else "image/png"
     LOGGER.warning(
         "Image compression applied",
-        extra={"ctx": {"component": "image", "from": _human_mb(size_bytes), "to": _human_mb(len(best_bytes)), "quality": best_quality}},
+        extra={"ctx": {"component": "image", "purpose": _purpose, "quality": best_quality, "bytes": len(best_bytes)}},
     )
     return True, best_bytes, ct, ""
 
-# ============================================================
-# CANVAS HELPERS
-# ============================================================
-def canvas_has_ink(image_data: np.ndarray) -> bool:
-    """
-    More reliable detection (especially for light pencil strokes / iPad).
-    Uses per-channel max difference against background and counts pixels.
-    """
-    if image_data is None:
-        return False
-    try:
-        arr = np.asarray(image_data)
-        if arr.dtype != np.uint8:
-            arr = arr.astype(np.uint8)
-    except Exception:
-        return False
 
-    if arr.ndim != 3 or arr.shape[2] < 3:
-        return False
-
-    rgb = arr[:, :, :3]
-    bg = np.array(CANVAS_BG_RGB, dtype=np.uint8)
-
-    diff = np.max(np.abs(rgb.astype(np.int16) - bg.astype(np.int16)), axis=2)
-    ink_pixels = int(np.count_nonzero(diff > 10))
-    return ink_pixels >= 25
-
-
-def preprocess_canvas_image(image_data: np.ndarray) -> Image.Image:
-    raw_img = Image.fromarray(np.asarray(image_data).astype("uint8"))
-    if raw_img.mode == "RGBA":
-        white_bg = Image.new("RGB", raw_img.size, (255, 255, 255))
-        white_bg.paste(raw_img, mask=raw_img.split()[3])
-        img = white_bg
-    else:
-        img = raw_img.convert("RGB")
-    if img.width > MAX_IMAGE_WIDTH:
-        ratio = MAX_IMAGE_WIDTH / img.width
-        img = img.resize((MAX_IMAGE_WIDTH, max(1, int(img.height * ratio))))
-    return img
-
-# ============================================================
-# JSON HELPERS
-# ============================================================
-def encode_image(image_pil: Image.Image) -> str:
+def encode_image(image: Image.Image) -> str:
     buffered = io.BytesIO()
-    image_pil.save(buffered, format="PNG", optimize=True)
-    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+    image.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode()
 
 
-def safe_parse_json(text_str: str):
+def clamp_int(x, lo: int, hi: int, default: int = 0) -> int:
     try:
-        return json.loads(text_str)
+        v = int(x)
     except Exception:
-        pass
-    m = re.search(r"\{.*\}", text_str, re.DOTALL)
-    if m:
-        try:
-            return json.loads(m.group(0))
-        except Exception:
-            return None
-    return None
+        return int(default)
+    return max(int(lo), min(int(hi), int(v)))
 
 
-def clamp_int(value, lo, hi, default=0):
+def safe_parse_json(s: str) -> dict:
+    if not isinstance(s, str):
+        return {}
+    s2 = s.strip()
+    if not s2:
+        return {}
     try:
-        v = int(value)
+        return json.loads(s2)
     except Exception:
-        v = default
-    return max(lo, min(hi, v))
+        # Try to salvage by extracting first {...}
+        m = re.search(r"\{.*\}", s2, flags=re.DOTALL)
+        if m:
+            try:
+                return json.loads(m.group(0))
+            except Exception:
+                return {}
+        return {}
+
 
 # ============================================================
-# MARKDOWN RENDER HELPERS
+# ATTEMPTS INSERT + LOAD
 # ============================================================
-def render_md_box(title: str, md_text: str, caption: str = "", empty_text: str = ""):
-    st.markdown(f"**{title}**")
-    with st.container(border=True):
-        txt = (md_text or "").strip()
-        if txt:
-            st.markdown(txt)
-        else:
-            st.caption(empty_text or "No content.")
-    if caption:
-        st.caption(caption)
-
-# ============================================================
-# PROGRESS INDICATORS
-# ============================================================
-def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: float) -> dict:
-    with st.status(f"Processing… (typically {typical_range})", expanded=True) as status:
-        progress = st.progress(0)
-        start = time.monotonic()
-
-        with ThreadPoolExecutor(max_workers=1) as ex:
-            fut = ex.submit(task_fn)
-            while not fut.done():
-                elapsed = time.monotonic() - start
-                frac = min(0.95, max(0.02, elapsed / max(1e-6, est_seconds)))
-                progress.progress(int(frac * 100))
-                time.sleep(0.12)
-
-            report = fut.result()
-
-        progress.progress(100)
-        status.update(label="✓ Done", state="complete", expanded=False)
-
-    return report
-
-# ============================================================
-# DB OPERATIONS (attempts + question bank)
-# ============================================================
-def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
+def insert_attempt(student_id: str, subject_key: str, question_key: str, report: dict, mode: str):
     eng = get_db_engine()
     if eng is None:
         return
     ensure_attempts_table()
 
     sid = (student_id or "").strip() or f"anon_{st.session_state['anon_id']}"
+    sk = (subject_key or DEFAULT_SUBJECT_KEY).strip() or DEFAULT_SUBJECT_KEY
 
     m_awarded = int(report.get("marks_awarded", 0))
     m_max = int(report.get("max_marks", 1))
@@ -928,15 +1001,15 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
     ns_json = json.dumps(report.get("next_steps", [])[:6])
 
     rb_type = str(report.get("readback_type", "") or "")[:40]
-    rb_md = str(report.get("readback_markdown", "") or "")[:8000]
+    rb_md = str(report.get("readback_markdown", "") or "")[:6000]
     rb_warn = json.dumps(report.get("readback_warnings", [])[:6])
 
     query = """
-        insert into public.physics_attempts_v1
-        (student_id, question_key, mode, marks_awarded, max_marks, summary, feedback_points, next_steps,
+    insert into public.physics_attempts_v1
+        (student_id, subject_key, question_key, mode, marks_awarded, max_marks, summary, feedback_points, next_steps,
          readback_type, readback_markdown, readback_warnings)
-        values
-        (:student_id, :question_key, :mode, :marks_awarded, :max_marks, :summary,
+    values
+        (:student_id, :subject_key, :question_key, :mode, :marks_awarded, :max_marks, :summary,
          CAST(:feedback_points AS jsonb), CAST(:next_steps AS jsonb),
          :readback_type, :readback_markdown, CAST(:readback_warnings AS jsonb))
     """
@@ -944,6 +1017,7 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
         with eng.begin() as conn:
             conn.execute(text(query), {
                 "student_id": sid,
+                "subject_key": sk,
                 "question_key": question_key,
                 "mode": mode,
                 "marks_awarded": m_awarded,
@@ -961,21 +1035,23 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str):
 
 
 @st.cache_data(ttl=20)
-def load_attempts_df_cached(_fp: str, limit: int = 5000) -> pd.DataFrame:
+def load_attempts_df_cached(_fp: str, subject_key: str, limit: int = 5000) -> pd.DataFrame:
     eng = get_db_engine()
     if eng is None:
         return pd.DataFrame()
     ensure_attempts_table()
+    sk = (subject_key or DEFAULT_SUBJECT_KEY).strip() or DEFAULT_SUBJECT_KEY
     with eng.connect() as conn:
         df = pd.read_sql(
             text("""
-                select created_at, student_id, question_key, mode, marks_awarded, max_marks, readback_type
+                select created_at, subject_key, student_id, question_key, mode, marks_awarded, max_marks, readback_type
                 from public.physics_attempts_v1
+                where subject_key = :sk
                 order by created_at desc
                 limit :limit
             """),
             conn,
-            params={"limit": int(limit)},
+            params={"limit": int(limit), "sk": sk},
         )
     if not df.empty:
         df["marks_awarded"] = pd.to_numeric(df["marks_awarded"], errors="coerce").fillna(0).astype(int)
@@ -983,17 +1059,17 @@ def load_attempts_df_cached(_fp: str, limit: int = 5000) -> pd.DataFrame:
     return df
 
 
-def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
+def load_attempts_df(subject_key: str, limit: int = 5000) -> pd.DataFrame:
     fp = (st.secrets.get("DATABASE_URL", "") or "")[:40]
     try:
-        return load_attempts_df_cached(fp, limit=limit)
+        return load_attempts_df_cached(fp, subject_key=subject_key, limit=limit)
     except Exception as e:
         st.session_state["db_last_error"] = f"Load Error: {type(e).__name__}: {e}"
         return pd.DataFrame()
 
 
 @st.cache_data(ttl=30)
-def load_question_bank_df_cached(_fp: str, limit: int = 5000, include_inactive: bool = False) -> pd.DataFrame:
+def load_question_bank_df_cached(_fp: str, subject_key: str, limit: int = 5000, include_inactive: bool = False) -> pd.DataFrame:
     """
     NOTE: This returns a *summary* table for listing/filtering, so we include
     light metadata + tags/question_text (for search). Full row is loaded by id.
@@ -1002,12 +1078,19 @@ def load_question_bank_df_cached(_fp: str, limit: int = 5000, include_inactive: 
     if eng is None:
         return pd.DataFrame()
     ensure_question_bank_table()
-    where = "" if include_inactive else "where is_active = true"
+
+    sk = (subject_key or DEFAULT_SUBJECT_KEY).strip() or DEFAULT_SUBJECT_KEY
+    where_bits = ["subject_key = :sk"]
+    if not include_inactive:
+        where_bits.append("is_active = true")
+    where = "where " + " and ".join(where_bits)
+
     with eng.connect() as conn:
         df = pd.read_sql(
             text(f"""
                 select
                   id, created_at, updated_at,
+                  subject_key,
                   source, assignment_name, question_label,
                   max_marks, tags, question_text,
                   is_active
@@ -1017,15 +1100,15 @@ def load_question_bank_df_cached(_fp: str, limit: int = 5000, include_inactive: 
                 limit :limit
             """),
             conn,
-            params={"limit": int(limit)},
+            params={"limit": int(limit), "sk": sk},
         )
     return df
 
 
-def load_question_bank_df(limit: int = 5000, include_inactive: bool = False) -> pd.DataFrame:
+def load_question_bank_df(subject_key: str, limit: int = 5000, include_inactive: bool = False) -> pd.DataFrame:
     fp = (st.secrets.get("DATABASE_URL", "") or "")[:40]
     try:
-        return load_question_bank_df_cached(fp, limit=limit, include_inactive=include_inactive)
+        return load_question_bank_df_cached(fp, subject_key=subject_key, limit=limit, include_inactive=include_inactive)
     except Exception as e:
         st.session_state["db_last_error"] = f"Load Question Bank Error: {type(e).__name__}: {e}"
         return pd.DataFrame()
@@ -1055,6 +1138,7 @@ def load_question_by_id(qid: int) -> Dict[str, Any]:
 
 
 def insert_question_bank_row(
+    subject_key: str,
     source: str,
     created_by: str,
     assignment_name: str,
@@ -1071,19 +1155,21 @@ def insert_question_bank_row(
         return False
     ensure_question_bank_table()
 
+    sk = (subject_key or DEFAULT_SUBJECT_KEY).strip() or DEFAULT_SUBJECT_KEY
+
     query = """
     insert into public.question_bank_v1
-      (source, created_by, assignment_name, question_label, max_marks, tags,
+      (subject_key, source, created_by, assignment_name, question_label, max_marks, tags,
        question_text, question_image_path,
        markscheme_text, markscheme_image_path,
        is_active, updated_at)
     values
-      (:source, :created_by, :assignment_name, :question_label, :max_marks,
+      (:subject_key, :source, :created_by, :assignment_name, :question_label, :max_marks,
        CAST(:tags AS jsonb),
        :question_text, :question_image_path,
        :markscheme_text, :markscheme_image_path,
        true, now())
-    on conflict (source, assignment_name, question_label) do update set
+    on conflict (subject_key, source, assignment_name, question_label) do update set
        created_by = excluded.created_by,
        max_marks = excluded.max_marks,
        tags = excluded.tags,
@@ -1097,6 +1183,7 @@ def insert_question_bank_row(
     try:
         with eng.begin() as conn:
             res = conn.execute(text(query), {
+                "subject_key": sk,
                 "source": source,
                 "created_by": (created_by or "").strip() or None,
                 "assignment_name": assignment_name.strip(),
@@ -1124,10 +1211,11 @@ def insert_question_bank_row(
 # ============================================================
 # MARKING (unified for question_bank_v1 rows)
 # ============================================================
-def _mk_system_schema(max_marks: int, question_text: str = "") -> str:
+def _mk_system_schema(subject_key: str, max_marks: int, question_text: str = "") -> str:
     qt = f"\nQuestion (student-facing):\n{question_text}\n" if question_text else "\n"
+    subj = subject_label(subject_key)
     return f"""
-You are a strict GCSE Physics examiner.
+You are a strict AQA GCSE examiner for {subj}.
 
 CONFIDENTIALITY RULE (CRITICAL):
 - The mark scheme is confidential. Do NOT reveal it, quote it, or paraphrase it.
@@ -1187,7 +1275,7 @@ def get_gpt_feedback_from_bank(
     question_text = (q_row.get("question_text") or "").strip()
     markscheme_text = (q_row.get("markscheme_text") or "").strip()
 
-    system_instr = _mk_system_schema(max_marks=max_marks, question_text=question_text if question_text else "")
+    system_instr = _mk_system_schema(subject_key=q_row.get('subject_key', DEFAULT_SUBJECT_KEY), max_marks=max_marks, question_text=question_text if question_text else "")
     messages = [{"role": "system", "content": system_instr}]
 
     if markscheme_text:
@@ -1245,207 +1333,434 @@ def get_gpt_feedback_from_bank(
         }
 
 # ============================================================
-# AI QUESTION GENERATOR (teacher-only, vet, then save)
+# AI QUESTION GENERATOR (teacher-only, spec-grounded, vet, then save)
 # ============================================================
-GCSE_ONLY_GUARDRAILS = """
-GCSE-ONLY CONTENT GUARDRAILS (CRITICAL):
-- This app generates questions for AQA GCSE Physics (Higher). The question MUST be GCSE-level.
-- Do NOT include A-level/IB/degree content, including (non-exhaustive):
-  * permeability/permittivity constants: \\mu_0, \\epsilon_0
-  * solenoid field equations like B = \\mu_0 n I
-  * magnetic flux density calculations, magnetic flux, Faraday's law in equation form
-  * calculus, differentiation/integration, vector cross products, field theory
-  * "n (turns per metre)" style quantities, "flux linkage", "inductance"
-- If the chosen topic is "Magnetism and electromagnets", focus on GCSE outcomes:
-  * magnetic fields around magnets/wires, compasses, plotting fields
-  * electromagnets (coil + iron core), factors affecting strength (current, turns, core)
-  * uses and safety, qualitative reasoning, simple circuit context
-  * avoid any magnetic field strength formula or B calculations.
-""".strip()
-
 MARKDOWN_LATEX_RULES = """
 FORMATTING RULES:
-- question_text MUST be valid Markdown and must render well in Streamlit's st.markdown.
+- question_markdown MUST be valid Markdown and must render well in Streamlit's st.markdown.
 - Use LaTeX only inside $...$ or $$...$$.
 - Use (a), (b), (c) subparts as plain text, and put any equations in LaTeX.
 - Use SI units and clear formatting.
 """.strip()
 
 
-def generate_practice_question_with_ai(
-    topic_text: str,
-    difficulty: str,
-    qtype: str,
-    marks: int,
-    extra_instructions: str = "",
-) -> Dict[str, Any]:
-    def _extract_total_from_marksheme(ms: str) -> Optional[int]:
-        m = re.search(r"\btotal\b\s*[:=]\s*(\d+)\b", ms or "", flags=re.IGNORECASE)
-        if not m:
-            return None
-        try:
-            return int(m.group(1))
-        except Exception:
-            return None
+PHYSICS_FORBIDDEN_PATTERNS = [
+    (r"\\mu_0|\bmu0\b|\bμ0\b", "Uses μ0 (not GCSE)"),
+    (r"\\epsilon_0|\bepsilon0\b|\bε0\b", "Uses ε0 (not GCSE)"),
+    (r"\bB\s*=\s*\\mu_0\s*n\s*I\b|\bB\s*=\s*μ0\s*n\s*I\b", "Uses solenoid field equation B=μ0 n I (not GCSE)"),
+    (r"\bflux\b|\bflux linkage\b|\binductance\b", "Uses flux/inductance language (not GCSE here)"),
+    (r"\bFaraday\b|\bLenz\b", "Uses Faraday/Lenz law (not GCSE equation form here)"),
+    (r"\bcalculus\b|\bdifferentiat|\bintegrat", "Uses calculus (not GCSE)"),
+]
 
-    def _has_part_marking(ms: str) -> bool:
-        s = ms or ""
-        return bool(re.search(r"(\([a-z]\)|\b[a-z]\))\s.*\[\s*\d+\s*\]", s, flags=re.IGNORECASE | re.DOTALL))
 
-    def _forbidden_found(q: str, ms: str) -> List[str]:
-        t = (q or "") + "\n" + (ms or "")
-        bad = []
-        patterns = [
-            (r"\\mu_0|\bmu0\b|\bμ0\b", "Uses μ0 (not GCSE)"),
-            (r"\\epsilon_0|\bepsilon0\b|\bε0\b", "Uses ε0 (not GCSE)"),
-            (r"\bB\s*=\s*\\mu_0\s*n\s*I\b|\bB\s*=\s*μ0\s*n\s*I\b", "Uses solenoid field equation B=μ0 n I (not GCSE)"),
-            (r"\bflux\b|\bflux linkage\b|\binductance\b", "Uses flux/inductance language (not GCSE here)"),
-            (r"\bFaraday\b|\bLenz\b", "Uses Faraday/Lenz law (not GCSE equation form here)"),
-            (r"\bcalculus\b|\bdifferentiat|\bintegrat", "Uses calculus (not GCSE)"),
-        ]
-        for pat, label in patterns:
-            if re.search(pat, t, flags=re.IGNORECASE):
-                bad.append(label)
-        return bad
+def _spec_focus_snippet(spec_pack: Dict[str, Any], topic_code: str, max_items: int = 10) -> str:
+    topic_code = (topic_code or "").strip()
+    if not topic_code:
+        return ""
+    cmap = spec_pack.get("content_map", {})
+    if not isinstance(cmap, dict):
+        return ""
+    entry = cmap.get(topic_code, {})
+    if not isinstance(entry, dict):
+        return ""
+    items: List[str] = []
+    for k in ["content", "skills"]:
+        v = entry.get(k, [])
+        if isinstance(v, list):
+            for x in v[:max_items]:
+                s = str(x).strip()
+                if s:
+                    items.append(f"- {s}")
+    return "\n".join(items[:max_items])
 
-    def _validate(d: Dict[str, Any]) -> Tuple[bool, List[str]]:
-        reasons: List[str] = []
-        qtxt = str(d.get("question_text", "") or "").strip()
-        mstxt = str(d.get("markscheme_text", "") or "").strip()
 
-        if not qtxt:
-            reasons.append("Missing question_text.")
-        if not mstxt:
-            reasons.append("Missing markscheme_text.")
+def _extract_total_from_marksheme(ms: str) -> Optional[int]:
+    m = re.search(r"\bTOTAL\b\s*[:=]\s*(\d+)\b", ms or "", flags=re.IGNORECASE)
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except Exception:
+        return None
 
-        mm = d.get("max_marks", None)
-        try:
-            mm_int = int(mm)
-        except Exception:
-            mm_int = None
-        if mm_int != int(marks):
-            reasons.append(f"max_marks must equal {int(marks)}.")
 
-        total = _extract_total_from_marksheme(mstxt)
-        if total != int(marks):
-            reasons.append(f"Mark scheme TOTAL must equal {int(marks)}.")
+def _has_part_marking(ms: str) -> bool:
+    s = ms or ""
+    return bool(re.search(r"(\([a-z]\)|\b[a-z]\))\s.*\[\s*\d+\s*\]", s, flags=re.IGNORECASE | re.DOTALL))
 
-        if not _has_part_marking(mstxt):
-            reasons.append("Mark scheme must include part-by-part marks like '(a) ... [2]'.")
 
-        bad = _forbidden_found(qtxt, mstxt)
-        reasons.extend(bad)
+def _deterministic_draft_checks(subject_key: str, draft: Dict[str, Any], marks: int) -> Tuple[bool, List[str]]:
+    reasons: List[str] = []
+    qmd = str(draft.get("question_markdown", "") or "").strip()
+    msmd = str(draft.get("mark_scheme_markdown", "") or "").strip()
+    if not qmd:
+        reasons.append("Missing question_markdown.")
+    if not msmd:
+        reasons.append("Missing mark_scheme_markdown.")
 
-        if "$" in qtxt and "\\(" in qtxt:
-            reasons.append("Use $...$ for LaTeX, avoid \\(...\\).")
+    try:
+        tm = int(draft.get("total_marks", marks))
+    except Exception:
+        tm = None
+    if tm != int(marks):
+        reasons.append(f"total_marks must equal {int(marks)}.")
 
-        return (len(reasons) == 0), reasons
+    total_line = _extract_total_from_marksheme(msmd)
+    if total_line != int(marks):
+        reasons.append(f"Mark scheme must end with: TOTAL = {int(marks)}")
 
-    def _call_model(repair: bool, reasons: Optional[List[str]] = None) -> Dict[str, Any]:
-        system = f"""
-You are an expert AQA GCSE Physics (Higher) question writer and examiner.
+    if not _has_part_marking(msmd):
+        reasons.append("Mark scheme must include part-by-part marks like '(a) ... [2]'.")
+
+    if "$" in qmd and "\\(" in qmd:
+        reasons.append("Use $...$ for LaTeX, avoid \\(...\\).")
+
+    sk = (subject_key or DEFAULT_SUBJECT_KEY)
+    if sk in ("aqa_gcse_physics", "aqa_combined_physics"):
+        combined = qmd + "\n" + msmd
+        for pat, label in PHYSICS_FORBIDDEN_PATTERNS:
+            if re.search(pat, combined, flags=re.IGNORECASE):
+                reasons.append(label)
+
+    # topic_tag presence
+    tt = str(draft.get("topic_tag", "") or "").strip()
+    if not tt:
+        reasons.append("Missing topic_tag.")
+    return (len(reasons) == 0), reasons
+
+
+def _topic_code_set(spec_pack: Dict[str, Any]) -> set:
+    return set(allowed_topic_codes(spec_pack))
+
+
+def _build_generation_system_prompt(subject_key: str, spec_pack: Dict[str, Any]) -> str:
+    subj = subject_label(subject_key)
+    spec_topics = _summarize_allowed_topics_for_prompt(spec_pack, max_items=140)
+    command_words = spec_pack.get("command_words", [])
+    must_avoid = spec_pack.get("must_avoid", [])
+    mark_rules = spec_pack.get("mark_scheme_rules", [])
+
+    def _as_bullets(x, max_n: int = 20) -> str:
+        if not isinstance(x, list):
+            return ""
+        xs = [str(i).strip() for i in x if str(i).strip()]
+        xs = xs[:max_n]
+        return "\n".join([f"- {i}" for i in xs])
+
+    return f"""
+You are an expert AQA GCSE question writer and examiner for {subj}.
 
 Hard rules:
 1) Create an ORIGINAL practice question. Do not reproduce copyrighted exam questions.
-2) Must match AQA GCSE Physics Higher style and standard.
-3) Stay strictly GCSE-level. Do not drift into A-level content.
-4) Marks must be allocated per part, and the total must equal max_marks EXACTLY.
+2) Must match AQA GCSE style and standard for the given subject and tier.
+3) Stay strictly within the specification.
+4) Marks must be allocated per part, and the total must equal total_marks EXACTLY.
 5) The mark scheme must include marking points for EVERY part.
-6) Calculation marking must be GCSE-appropriate:
-   - If a calculation requires more than one step, allocate at least 2 marks:
-     one method mark (setup/substitution/rearrangement) and one accuracy mark (answer with unit).
-7) Return ONLY valid JSON, nothing else.
-
-{GCSE_ONLY_GUARDRAILS}
+6) Return ONLY valid JSON, nothing else.
 
 {MARKDOWN_LATEX_RULES}
 
-Schema:
+Specification grounding:
+Allowed topic codes and titles (choose ONE code for topic_tag that best matches the question):
+{spec_topics}
+
+Command words (preferred where appropriate):
+{_as_bullets(command_words, max_n=20)}
+
+Must avoid:
+{_as_bullets(must_avoid, max_n=18)}
+
+Mark scheme rules:
+{_as_bullets(mark_rules, max_n=18)}
+
+Output JSON schema (must match exactly):
 {{
-  "question_text": "string",
-  "markscheme_text": "string",
-  "max_marks": integer,
-  "tags": ["string", "string", ...]
+  "question_markdown": "string",
+  "mark_scheme_markdown": "string",
+  "total_marks": integer,
+  "topic_tag": "string (one code from allowed_topics, e.g. '4.1.1')",
+  "tags": ["string", "..."],
+  "warnings": ["string", "..."]
 }}
 
-Mark scheme formatting requirements inside markscheme_text:
+Mark scheme formatting requirements inside mark_scheme_markdown:
 - Use a part-by-part breakdown with explicit mark allocation, for example:
   (a) ... [2]
   (b) ... [3]
-- End with: TOTAL = <max_marks>
+- End with EXACTLY: TOTAL = <total_marks>
 """.strip()
 
-        base_user = f"""
-Topic: {topic_text.strip()}
+
+def _call_structured_generator(
+    subject_key: str,
+    spec_pack: Dict[str, Any],
+    topic_tag_hint: str,
+    topic_free_text: str,
+    difficulty: str,
+    qtype: str,
+    marks: int,
+    extra_instructions: str,
+    repair: bool = False,
+    repair_notes: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    system = _build_generation_system_prompt(subject_key, spec_pack)
+    sk = (subject_key or DEFAULT_SUBJECT_KEY).strip() or DEFAULT_SUBJECT_KEY
+
+    hint = (topic_tag_hint or "").strip()
+    free = (topic_free_text or "").strip()
+
+    focus_snip = _spec_focus_snippet(spec_pack, hint) if hint else ""
+    if focus_snip:
+        focus_snip = "\nKey spec statements for this topic:\n" + focus_snip
+
+    base_user = f"""
+Topic code hint (if provided, you MUST use it as topic_tag): {hint if hint else "(none)"}
+Topic focus / subtopic: {free if free else "(none)"}
 Difficulty: {difficulty}
 Question type: {qtype}
-max_marks: {int(marks)}
+total_marks: {int(marks)}
 
 Additional teacher instructions (optional):
-{extra_instructions.strip() if extra_instructions else "(none)"}
+{(extra_instructions or "").strip() if extra_instructions else "(none)"}
 
 Constraints:
-- Keep the question clearly GCSE. Avoid any forbidden content in the guardrails.
+- Keep the question clearly GCSE and within the specification.
 - Ensure the question is in Markdown and uses LaTeX only inside $...$ or $$...$$.
-- End markscheme_text with EXACTLY: TOTAL = {int(marks)}.
+- End mark_scheme_markdown with EXACTLY: TOTAL = {int(marks)}.
+{focus_snip}
 """.strip()
 
-        if not repair:
-            user = base_user
-        else:
-            bullet_reasons = "\n".join([f"- {r}" for r in (reasons or [])]) or "- (unspecified)"
-            user = f"""
-You previously generated a draft that failed validation. Fix it and return corrected JSON only.
+    if not repair:
+        user = base_user
+    else:
+        notes = "\n".join([f"- {n}" for n in (repair_notes or [])]) or "- (unspecified)"
+        user = f"""
+You previously generated a draft that failed checks. Fix it and return corrected JSON only.
 
-Validation failures:
-{bullet_reasons}
+Failures:
+{notes}
 
 You MUST:
-- Keep topic, difficulty, type and max_marks unchanged.
-- Remove any forbidden GCSE-only content (see guardrails).
-- Ensure Markdown + LaTeX formatting rules are followed.
-- Make the TOTAL line match max_marks exactly: TOTAL = {int(marks)}.
-""".strip() + "\n\n" + base_user
+- Keep total_marks unchanged: {int(marks)}.
+- Use topic_tag = {hint} exactly if a hint was provided; otherwise choose a valid topic code.
+- Fix all failures listed above.
+""" + "\n\n" + base_user
 
+    try:
         response = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            max_completion_tokens=2500,
+            max_completion_tokens=2600,
             response_format={"type": "json_object"},
         )
         raw = response.choices[0].message.content or ""
         data = safe_parse_json(raw) or {}
-        return data
+        if not isinstance(data, dict):
+            return {}
+        # Normalise
+        out = {
+            "question_markdown": str(data.get("question_markdown", "") or "").strip(),
+            "mark_scheme_markdown": str(data.get("mark_scheme_markdown", "") or "").strip(),
+            "total_marks": clamp_int(data.get("total_marks", marks), 1, 50, default=int(marks)),
+            "topic_tag": str(data.get("topic_tag", "") or "").strip(),
+            "tags": data.get("tags", []),
+            "warnings": data.get("warnings", []),
+        }
+        if not isinstance(out["tags"], list):
+            out["tags"] = []
+        out["tags"] = [str(t).strip() for t in out["tags"] if str(t).strip()][:12]
+        if not isinstance(out["warnings"], list):
+            out["warnings"] = []
+        out["warnings"] = [str(w).strip() for w in out["warnings"] if str(w).strip()][:12]
 
-    data = _call_model(repair=False)
-    ok, reasons = _validate(data)
+        # Force topic_tag to hint when given
+        if hint:
+            out["topic_tag"] = hint
 
-    if not ok:
-        data2 = _call_model(repair=True, reasons=reasons)
-        ok2, reasons2 = _validate(data2)
-        if ok2:
-            data = data2
-        else:
-            data = data2 if isinstance(data2, dict) and data2 else data
-            data["warnings"] = reasons2[:10]
+        # Ensure total_marks exact
+        out["total_marks"] = int(marks)
+        return out
+    except Exception as e:
+        LOGGER.error("AI generator failed", extra={"ctx": {"component": "ai_gen", "error": type(e).__name__, "subject": sk}})
+        return {}
 
-    out = {
-        "question_text": str(data.get("question_text", "") or "").strip(),
-        "markscheme_text": str(data.get("markscheme_text", "") or "").strip(),
-        "max_marks": int(marks),
-        "tags": data.get("tags", []),
-        "warnings": data.get("warnings", []),
+
+def spec_compliance_check(
+    subject_key: str,
+    spec_pack: Dict[str, Any],
+    draft: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Second-pass compliance check (cheap): returns JSON:
+      compliant true/false, reasons, suggested_fixes, topic_tag_valid
+    """
+    sk = (subject_key or DEFAULT_SUBJECT_KEY).strip() or DEFAULT_SUBJECT_KEY
+    subj = subject_label(sk)
+
+    allowed = allowed_topics_from_spec(spec_pack)
+    # Keep payload compact
+    allowed_compact = [{"code": t["code"], "title": t["title"]} for t in allowed[:260]]
+
+    must_avoid = spec_pack.get("must_avoid", [])
+    if not isinstance(must_avoid, list):
+        must_avoid = []
+    must_avoid = [str(x).strip() for x in must_avoid if str(x).strip()][:18]
+
+    system = f"""
+You are a strict AQA GCSE specification compliance auditor for {subj}.
+You will be given a proposed ORIGINAL practice question and mark scheme.
+Decide if it is compliant with the allowed topic codes list and GCSE level.
+
+Output ONLY valid JSON in this schema:
+{{
+  "compliant": true/false,
+  "topic_tag_valid": true/false,
+  "reasons": ["..."],
+  "suggested_fixes": ["..."]
+}}
+
+Rules:
+- topic_tag_valid is true only if topic_tag is exactly one of the allowed topic codes provided.
+- compliant should be false if the content is beyond-spec, not GCSE, or mismatched topic_tag.
+- Do not be overly strict about phrasing, but be strict about content scope and exam level.
+""".strip()
+
+    user = {
+        "topic_tag": str(draft.get("topic_tag", "") or "").strip(),
+        "total_marks": int(draft.get("total_marks", 0) or 0),
+        "question_markdown": str(draft.get("question_markdown", "") or "").strip(),
+        "mark_scheme_markdown": str(draft.get("mark_scheme_markdown", "") or "").strip(),
+        "allowed_topics": allowed_compact,
+        "must_avoid": must_avoid,
     }
-    if not isinstance(out["tags"], list):
-        out["tags"] = []
-    out["tags"] = [str(t).strip() for t in out["tags"] if str(t).strip()][:12]
-    if not isinstance(out["warnings"], list):
-        out["warnings"] = []
-    out["warnings"] = [str(w) for w in out["warnings"]][:10]
-    return out
+
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": json.dumps(user, ensure_ascii=False)},
+            ],
+            max_completion_tokens=900,
+            response_format={"type": "json_object"},
+        )
+        raw = resp.choices[0].message.content or ""
+        data = safe_parse_json(raw) or {}
+        if not isinstance(data, dict):
+            data = {}
+    except Exception as e:
+        data = {"compliant": False, "topic_tag_valid": False, "reasons": [f"Compliance check failed: {type(e).__name__}"], "suggested_fixes": []}
+
+    # Defensive normalisation
+    compliant = bool(data.get("compliant", False))
+    tvalid = bool(data.get("topic_tag_valid", False))
+    reasons = data.get("reasons", [])
+    fixes = data.get("suggested_fixes", [])
+    if not isinstance(reasons, list):
+        reasons = []
+    if not isinstance(fixes, list):
+        fixes = []
+    reasons = [str(r).strip() for r in reasons if str(r).strip()][:10]
+    fixes = [str(f).strip() for f in fixes if str(f).strip()][:10]
+
+    # Deterministic topic validation
+    topic_tag = str(draft.get("topic_tag", "") or "").strip()
+    if topic_tag and _topic_code_set(spec_pack):
+        tvalid_det = topic_tag in _topic_code_set(spec_pack)
+        tvalid = tvalid and tvalid_det
+        if not tvalid_det:
+            reasons.insert(0, "topic_tag is not one of the allowed topic codes.")
+        compliant = compliant and tvalid_det
+
+    # Physics deterministic forbidden patterns
+    sk = (subject_key or DEFAULT_SUBJECT_KEY)
+    if sk in ("aqa_gcse_physics", "aqa_combined_physics"):
+        combined = (draft.get("question_markdown") or "") + "\n" + (draft.get("mark_scheme_markdown") or "")
+        for pat, label in PHYSICS_FORBIDDEN_PATTERNS:
+            if re.search(pat, combined, flags=re.IGNORECASE):
+                compliant = False
+                if label not in reasons:
+                    reasons.append(label)
+
+    return {
+        "compliant": bool(compliant),
+        "topic_tag_valid": bool(tvalid),
+        "reasons": reasons,
+        "suggested_fixes": fixes,
+    }
+
+
+def generate_practice_question_with_ai(
+    subject_key: str,
+    spec_pack: Dict[str, Any],
+    topic_tag_hint: str,
+    topic_free_text: str,
+    difficulty: str,
+    qtype: str,
+    marks: int,
+    extra_instructions: str = "",
+) -> Dict[str, Any]:
+    """
+    Generation pipeline:
+    - Structured generation (JSON)
+    - Deterministic checks
+    - Spec compliance check (AI)
+    - Auto-revise once if non-compliant
+    """
+    draft = _call_structured_generator(
+        subject_key=subject_key,
+        spec_pack=spec_pack,
+        topic_tag_hint=topic_tag_hint,
+        topic_free_text=topic_free_text,
+        difficulty=difficulty,
+        qtype=qtype,
+        marks=int(marks),
+        extra_instructions=extra_instructions or "",
+        repair=False,
+    )
+
+    ok_det, det_reasons = _deterministic_draft_checks(subject_key, draft, marks=int(marks))
+    compliance = spec_compliance_check(subject_key, spec_pack, draft) if draft else {"compliant": False, "topic_tag_valid": False, "reasons": ["Empty draft"], "suggested_fixes": []}
+
+    if ok_det and compliance.get("compliant", False):
+        draft["compliance"] = compliance
+        return draft
+
+    # Auto-revise once
+    repair_notes = det_reasons[:]
+    if compliance and not compliance.get("compliant", False):
+        repair_notes.extend([f"Compliance: {r}" for r in compliance.get("reasons", [])])
+
+    draft2 = _call_structured_generator(
+        subject_key=subject_key,
+        spec_pack=spec_pack,
+        topic_tag_hint=topic_tag_hint,
+        topic_free_text=topic_free_text,
+        difficulty=difficulty,
+        qtype=qtype,
+        marks=int(marks),
+        extra_instructions=extra_instructions or "",
+        repair=True,
+        repair_notes=repair_notes[:14],
+    )
+
+    ok_det2, det_reasons2 = _deterministic_draft_checks(subject_key, draft2, marks=int(marks))
+    compliance2 = spec_compliance_check(subject_key, spec_pack, draft2) if draft2 else {"compliant": False, "topic_tag_valid": False, "reasons": ["Empty draft"], "suggested_fixes": []}
+
+    warnings = []
+    if not ok_det2:
+        warnings.extend(det_reasons2[:8])
+    if not compliance2.get("compliant", False):
+        warnings.extend([f"Compliance: {r}" for r in compliance2.get("reasons", [])][:8])
+
+    draft2["warnings"] = list(dict.fromkeys([str(w).strip() for w in warnings if str(w).strip()]))[:12]
+    draft2["compliance"] = compliance2
+    draft2["save_blocked"] = not (ok_det2 and compliance2.get("compliant", False))
+    return draft2
 
 # ============================================================
 # REPORT RENDERER
@@ -1475,6 +1790,34 @@ def render_report(report: dict):
         st.markdown("**Next steps:**")
         for n in report["next_steps"]:
             st.write(f"- {n}")
+
+# ============================================================
+# AI HELPER: progress wrapper (existing)
+# ============================================================
+def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str = "a few seconds", est_seconds: float = 8.0):
+    start = time.time()
+    try:
+        with st.status("🤖 Working…", expanded=False) as status:
+            status.update(label=f"🤖 Working… (usually {typical_range})", state="running")
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(task_fn)
+                out = fut.result()
+            status.update(label=f"✅ Done in {time.time() - start:.1f}s", state="complete")
+        return out
+    except Exception as e:
+        LOGGER.error("AI task failed", extra={"ctx": {"component": "ai", "error": type(e).__name__, **(ctx or {})}})
+        raise e
+
+# ============================================================
+# RENDER MD BOX (existing)
+# ============================================================
+def render_md_box(title: str, md: str, empty_text: str = "(empty)"):
+    st.markdown(f"**{title}**")
+    with st.container(border=True):
+        if (md or "").strip():
+            st.markdown(md)
+        else:
+            st.caption(empty_text)
 
 # ============================================================
 # NAVIGATION
@@ -1512,7 +1855,27 @@ if nav == "🧑‍🎓 Student":
     expand_by_default = st.session_state.get("selected_qid") is None
 
     with st.expander("Question selection", expanded=expand_by_default):
-        sel1, sel2 = st.columns([2, 2])
+        sel0, sel1, sel2 = st.columns([2, 2, 2])
+        with sel0:
+            subject_key = st.selectbox(
+                "Subject",
+                SUBJECT_KEYS_ORDERED,
+                format_func=subject_label,
+                key="student_subject",
+            )
+            prev_sk = st.session_state.get("active_subject_student", DEFAULT_SUBJECT_KEY)
+            st.session_state["subject_key"] = subject_key
+            if subject_key != prev_sk:
+                st.session_state["active_subject_student"] = subject_key
+                st.session_state["selected_qid"] = None
+                st.session_state["cached_q_row"] = None
+                st.session_state["cached_q_path"] = ""
+                st.session_state["cached_ms_path"] = ""
+                st.session_state["cached_question_img"] = None
+                st.session_state["feedback"] = None
+                st.session_state["last_canvas_image_data"] = None
+                st.session_state["canvas_key"] += 1
+
         with sel1:
             source = st.selectbox("Source", source_options, key="student_source")
         with sel2:
@@ -1526,7 +1889,7 @@ if nav == "🧑‍🎓 Student":
         if not db_ready():
             st.error("Database not ready. Configure DATABASE_URL first.")
         else:
-            dfb = load_question_bank_df(limit=5000)
+            dfb = load_question_bank_df(subject_key=subject_key, limit=5000)
             if dfb.empty:
                 st.info("No questions in the database yet. Ask your teacher to generate or upload questions in the Question Bank page.")
             else:
@@ -1561,7 +1924,7 @@ if nav == "🧑‍🎓 Student":
                         choices = df2["label"].tolist()
                         labels_map = dict(zip(df2["label"], df2["id"]))
 
-                        choice_key = f"student_question_choice::{source}::{assignment_filter}"
+                        choice_key = f"student_question_choice::{subject_key}::{source}::{assignment_filter}"
                         if st.session_state.get(choice_key) not in choices:
                             st.session_state[choice_key] = choices[0]
 
@@ -1670,7 +2033,7 @@ if nav == "🧑‍🎓 Student":
                         )
 
                         if db_ready() and q_key:
-                            insert_attempt(student_id, q_key, st.session_state["feedback"], mode="text")
+                            insert_attempt(student_id, subject_key, q_key, st.session_state["feedback"], mode="text")
 
         with tab_write:
             tool_row = st.columns([2, 1])
@@ -1699,84 +2062,60 @@ if nav == "🧑‍🎓 Student":
                 update_streamlit=True,
             )
 
-            if canvas_result is not None and getattr(canvas_result, "image_data", None) is not None:
-                if canvas_has_ink(canvas_result.image_data):
-                    st.session_state["last_canvas_image_data"] = canvas_result.image_data
+            if canvas_result.image_data is not None:
+                st.session_state["last_canvas_image_data"] = canvas_result.image_data
 
-            submitted_writing = st.button(
-                "Submit Writing",
-                type="primary",
-                disabled=not AI_READY or not db_ready(),
-                key="submit_writing_btn",
-            )
-
-            if submitted_writing:
+            if st.button("Submit Drawing", type="primary", disabled=not AI_READY or not db_ready(), key="submit_canvas_btn"):
                 sid = _effective_student_id(student_id)
-
                 if not q_row:
                     st.error("Please select a question first.")
+                elif st.session_state.get("last_canvas_image_data") is None:
+                    st.warning("Please draw your answer first.")
                 else:
-                    img_data = None
-                    if canvas_result is not None and getattr(canvas_result, "image_data", None) is not None:
-                        img_data = canvas_result.image_data
-                    if img_data is None:
-                        img_data = st.session_state.get("last_canvas_image_data")
-
-                    if img_data is None or (not canvas_has_ink(img_data)):
-                        st.toast("Canvas is blank. Write your answer first, then press Submit.", icon="⚠️")
-                        st.stop()
-
                     try:
                         allowed_now, _, reset_str = _check_rate_limit_db(sid)
                     except Exception:
                         allowed_now, reset_str = True, ""
                     if not allowed_now:
                         st.error(f"You’ve reached the limit of {RATE_LIMIT_MAX} submissions per hour. Please try again at {reset_str}.")
-                        st.stop()
+                    else:
+                        increment_rate_limit(sid)
 
-                    img_for_ai = preprocess_canvas_image(img_data)
+                        img_arr = st.session_state["last_canvas_image_data"]
+                        img = Image.fromarray(img_arr.astype("uint8"), mode="RGBA").convert("RGB")
 
-                    canvas_bytes = _encode_image_bytes(img_for_ai, "JPEG", quality=80)
-                    ok_canvas, msg_canvas = validate_image_file(canvas_bytes, CANVAS_MAX_MB, "canvas")
-                    if not ok_canvas:
-                        okc, outb, _outct, err = _compress_bytes_to_limit(
-                            canvas_bytes, CANVAS_MAX_MB, _purpose="canvas", prefer_fmt="JPEG"
-                        )
-                        if not okc:
-                            st.error(err or msg_canvas)
-                            st.stop()
-                        img_for_ai = Image.open(io.BytesIO(outb)).convert("RGB")
+                        def task2():
+                            ms_path = (st.session_state.get("cached_ms_path") or q_row.get("markscheme_image_path") or "").strip()
+                            ms_img = None
+                            if ms_path:
+                                fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
+                                ms_bytes = cached_download_from_storage(ms_path, fp)
+                                ms_img = bytes_to_pil(ms_bytes) if ms_bytes else None
+                            return get_gpt_feedback_from_bank(
+                                student_answer=img,
+                                q_row=q_row,
+                                is_student_image=True,
+                                question_img=question_img,
+                                markscheme_img=ms_img
+                            )
 
-                    increment_rate_limit(sid)
-
-                    def task():
-                        ms_path = (st.session_state.get("cached_ms_path") or q_row.get("markscheme_image_path") or "").strip()
-                        ms_img = None
-                        if ms_path:
-                            fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
-                            ms_bytes = cached_download_from_storage(ms_path, fp)
-                            ms_img = bytes_to_pil(ms_bytes) if ms_bytes else None
-                        return get_gpt_feedback_from_bank(
-                            student_answer=img_for_ai,
-                            q_row=q_row,
-                            is_student_image=True,
-                            question_img=question_img,
-                            markscheme_img=ms_img
+                        st.session_state["feedback"] = _run_ai_with_progress(
+                            task_fn=task2,
+                            ctx={"student_id": sid, "question": q_key or "", "mode": "image"},
+                            typical_range="6-12 seconds",
+                            est_seconds=10.0
                         )
 
-                    st.session_state["feedback"] = _run_ai_with_progress(
-                        task_fn=task,
-                        ctx={"student_id": sid, "question": q_key or "", "mode": "writing"},
-                        typical_range="8-15 seconds",
-                        est_seconds=13.0
-                    )
-
-                    if db_ready() and q_key:
-                        insert_attempt(student_id, q_key, st.session_state["feedback"], mode="writing")
+                        if db_ready() and q_key:
+                            insert_attempt(student_id, subject_key, q_key, st.session_state["feedback"], mode="image")
 
     with col2:
-        st.subheader("👨‍🏫 Report")
-        with st.container(border=True):
+        st.subheader("🧠 AI Feedback")
+        if not AI_READY:
+            st.warning("AI is not connected. Configure OPENAI_API_KEY.")
+        elif not q_row:
+            st.info("Select a question first.")
+        else:
             if st.session_state["feedback"]:
                 render_report(st.session_state["feedback"])
                 st.divider()
@@ -1825,13 +2164,21 @@ elif nav == "🔒 Teacher Dashboard":
             st.session_state["is_teacher"] = True
             ensure_attempts_table()
 
-            df = load_attempts_df(limit=5000)
+            subject_key_dash = st.selectbox(
+                "Subject",
+                SUBJECT_KEYS_ORDERED,
+                format_func=subject_label,
+                key="teacher_dash_subject",
+            )
+            st.session_state["subject_key"] = subject_key_dash
+
+            df = load_attempts_df(subject_key=subject_key_dash, limit=5000)
 
             if st.session_state.get("db_last_error"):
                 st.error(f"Database Error: {st.session_state['db_last_error']}")
 
             if df.empty:
-                st.info("No attempts logged yet.")
+                st.info("No attempts logged yet for this subject.")
             else:
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Total attempts", int(len(df)))
@@ -1898,8 +2245,17 @@ else:
             st.session_state["is_teacher"] = True
             ensure_question_bank_table()
 
+            subject_key_bank = st.selectbox(
+                "Subject",
+                SUBJECT_KEYS_ORDERED,
+                format_func=subject_label,
+                key="teacher_bank_subject",
+            )
+            st.session_state["subject_key"] = subject_key_bank
+            spec_pack = load_spec_pack(subject_key_bank)
+
             st.write("### Question Bank manager")
-            st.caption("Use the tabs below to (1) browse and preview what is already in the bank, (2) generate AI practice questions, or (3) upload scanned questions. All features are unchanged, only reorganised.")
+            st.caption("Use the tabs below to (1) browse and preview what is already in the bank, (2) generate AI practice questions, or (3) upload scanned questions.")
 
             tab_browse, tab_ai, tab_upload = st.tabs(["🔎 Browse & preview", "🤖 AI generator", "🖼️ Upload scans"])
 
@@ -1908,10 +2264,10 @@ else:
             # -------------------------
             with tab_browse:
                 st.write("## 🔎 Browse & preview")
-                df_all = load_question_bank_df(limit=5000, include_inactive=False)
+                df_all = load_question_bank_df(subject_key=subject_key_bank, limit=5000, include_inactive=False)
 
                 if df_all.empty:
-                    st.info("No questions yet.")
+                    st.info("No questions yet for this subject.")
                 else:
                     df_all = df_all.copy()
 
@@ -1969,7 +2325,7 @@ else:
                         def _fmt_label(r):
                             asg = str(r.get("assignment_name") or "").strip()
                             ql = str(r.get("question_label") or "").strip()
-                            src = str(r.get("source") or "").strip()
+                            srcx = str(r.get("source") or "").strip()
                             try:
                                 mk = int(r.get("max_marks") or 0)
                             except Exception:
@@ -1978,7 +2334,7 @@ else:
                                 qid = int(r.get("id"))
                             except Exception:
                                 qid = -1
-                            return f"{asg} | {ql} ({mk} marks) [{src}] [id {qid}]"
+                            return f"{asg} | {ql} ({mk} marks) [{srcx}] [id {qid}]"
 
                         df_f["label"] = df_f.apply(_fmt_label, axis=1)
                         options = df_f["label"].tolist()
@@ -1990,73 +2346,79 @@ else:
                         pick_id = int(df_f.loc[df_f["label"] == pick, "id"].iloc[0])
 
                         row = load_question_by_id(pick_id) or {}
-                        q_text = (row.get("question_text") or "").strip()
-                        ms_text = (row.get("markscheme_text") or "").strip()
+                        q_text2 = (row.get("question_text") or "").strip()
+                        ms_text2 = (row.get("markscheme_text") or "").strip()
 
-                        q_img = None
-                        q_path = row.get("question_image_path")
-                        if isinstance(q_path, str) and q_path.strip():
-                            q_img = safe_bytes_to_pil(cached_download_from_storage(q_path))
-
-                        ms_img = None
-                        ms_path = row.get("markscheme_image_path")
-                        if isinstance(ms_path, str) and ms_path.strip():
-                            ms_img = safe_bytes_to_pil(cached_download_from_storage(ms_path))
-
-                        meta1, meta2, meta3, meta4 = st.columns([3, 2, 2, 1])
-                        with meta1:
-                            st.caption(f"Assignment: {row.get('assignment_name', '')}")
-                        with meta2:
-                            st.caption(f"Label: {row.get('question_label', '')}")
-                        with meta3:
-                            st.caption(f"Source: {row.get('source', '')}")
-                        with meta4:
-                            st.caption(f"ID: {row.get('id', '')}")
-
-                        pv1, pv2 = st.columns(2)
-
-                        with pv1:
-                            st.markdown("**Question (student view)**")
+                        st.write("### Preview")
+                        p1, p2 = st.columns([2, 2])
+                        with p1:
+                            st.markdown("**Question**")
                             with st.container(border=True):
-                                if q_img is not None:
-                                    st.image(q_img, use_container_width=True)
-                                if q_text:
-                                    st.markdown(q_text)
-                                if (q_img is None) and (not q_text):
-                                    st.caption("No question text/image.")
-
-                        with pv2:
+                                qpath = (row.get("question_image_path") or "").strip()
+                                if qpath:
+                                    fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
+                                    b = cached_download_from_storage(qpath, fp)
+                                    img = safe_bytes_to_pil(b)
+                                    if img is not None:
+                                        st.image(img, use_container_width=True)
+                                    else:
+                                        st.warning("Question image missing or could not be decoded.")
+                                if q_text2:
+                                    st.markdown(q_text2)
+                                if (not qpath) and (not q_text2):
+                                    st.caption("(no question content)")
+                        with p2:
                             st.markdown("**Mark scheme (teacher only)**")
                             with st.container(border=True):
-                                if ms_img is not None:
-                                    st.image(ms_img, use_container_width=True)
-                                if ms_text:
-                                    st.markdown(ms_text)
-                                if (ms_img is None) and (not ms_text):
-                                    st.caption("No mark scheme text/image (image-only teacher uploads are supported).")
-
-                st.divider()
-                st.write("### Recent question bank entries")
-                df_bank = load_question_bank_df(limit=50, include_inactive=False)
-                if not df_bank.empty:
-                    st.dataframe(df_bank[["created_at", "source", "assignment_name", "question_label", "max_marks", "id"]], use_container_width=True)
-                else:
-                    st.info("No recent entries.")
+                                mspath = (row.get("markscheme_image_path") or "").strip()
+                                if mspath:
+                                    fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
+                                    b2 = cached_download_from_storage(mspath, fp)
+                                    img2 = safe_bytes_to_pil(b2)
+                                    if img2 is not None:
+                                        st.image(img2, use_container_width=True)
+                                    else:
+                                        st.warning("Mark scheme image missing or could not be decoded.")
+                                if ms_text2:
+                                    st.markdown(ms_text2)
+                                if (not mspath) and (not ms_text2):
+                                    st.caption("(no mark scheme content)")
 
             # -------------------------
             # AI generator
             # -------------------------
             with tab_ai:
-                st.write("## 🤖 Generate practice question with AI (teacher vetting required)")
+                st.write("## 🤖 AI generator")
+                st.caption("Spec-grounded structured generation + compliance check. Teacher vetting required.")
 
                 gen_c1, gen_c2 = st.columns([2, 1])
                 with gen_c1:
-                    topic_mode = st.radio("Topic input", ["Choose from AQA list", "Describe a topic"], horizontal=True, key="topic_mode")
-                    if topic_mode == "Choose from AQA list":
-                        topic_choice = st.selectbox("AQA GCSE Physics Higher topic", AQA_GCSE_HIGHER_TOPICS, key="topic_choice")
-                        topic_text = topic_choice
+                    topics = allowed_topics_from_spec(spec_pack)
+                    topic_options: List[str] = []
+                    if topics:
+                        def _depth(code: str) -> int:
+                            return len([p for p in (code or '').split('.') if p.strip()])
+                        topics_small = [t for t in topics if _depth(t.get('code','')) <= 3]
+                        topics_small = topics_small[:600]
+                        topic_options = [f"{t['code']} {t['title']}".strip() for t in topics_small]
+
+                    if topic_options:
+                        topic_pick = st.selectbox(
+                            "Topic (from specification)",
+                            topic_options,
+                            key="topic_pick",
+                            help="Pick a spec code (recommended). You can add extra focus below.",
+                        )
+                        topic_tag_hint = (topic_pick.split(" ", 1)[0] if topic_pick else "").strip()
                     else:
-                        topic_text = st.text_input("Describe the topic", placeholder="e.g. stopping distance with thinking vs braking distance", key="topic_text")
+                        st.caption("Spec pack not found or empty for this subject. You can still describe a topic below.")
+                        topic_tag_hint = ""
+
+                    topic_free_text = st.text_input(
+                        "Focus / subtopic (optional)",
+                        placeholder="e.g. stopping distance with thinking vs braking distance",
+                        key="topic_text"
+                    )
 
                     qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
                     difficulty = st.selectbox("Difficulty", DIFFICULTIES, key="gen_difficulty")
@@ -2080,12 +2442,15 @@ else:
                         st.rerun()
 
                 if gen_clicked:
-                    if not (topic_text or "").strip():
-                        st.warning("Please choose or describe a topic first.")
+                    if not ((topic_tag_hint or "").strip() or (topic_free_text or "").strip()):
+                        st.warning("Please choose a spec topic or describe a topic first.")
                     else:
                         def task_generate():
                             return generate_practice_question_with_ai(
-                                topic_text=topic_text.strip(),
+                                subject_key=subject_key_bank,
+                                spec_pack=spec_pack,
+                                topic_tag_hint=topic_tag_hint,
+                                topic_free_text=topic_free_text,
                                 difficulty=difficulty,
                                 qtype=qtype,
                                 marks=int(marks_req),
@@ -2099,10 +2464,11 @@ else:
                             est_seconds=10.0
                         )
 
-                        qtxt = str(draft_raw.get("question_text", "") or "").strip()
-                        mstxt = str(draft_raw.get("markscheme_text", "") or "").strip()
-                        mm = clamp_int(draft_raw.get("max_marks", int(marks_req)), 1, 50, default=int(marks_req))
+                        qtxt = str(draft_raw.get("question_markdown", "") or "").strip()
+                        mstxt = str(draft_raw.get("mark_scheme_markdown", "") or "").strip()
+                        mm = clamp_int(draft_raw.get("total_marks", int(marks_req)), 1, 50, default=int(marks_req))
                         tags = draft_raw.get("tags", [])
+                        topic_tag = str(draft_raw.get("topic_tag", "") or "").strip()
                         warnings = draft_raw.get("warnings", [])
                         if not isinstance(tags, list):
                             tags = []
@@ -2113,7 +2479,8 @@ else:
                             st.error("AI did not return a valid draft. Please try again.")
                         else:
                             token = pysecrets.token_hex(3)
-                            default_label = f"AI-{slugify(topic_text)[:24]}-{token}"
+                            topic_for_label = (topic_tag_hint or topic_free_text or "topic")
+                            default_label = f"AI-{slugify(topic_for_label)[:24]}-{token}"
 
                             st.session_state["ai_draft"] = {
                                 "assignment_name": (assignment_name_ai or "").strip() or "AI Practice",
@@ -2121,8 +2488,11 @@ else:
                                 "max_marks": int(mm),
                                 "tags": [str(t).strip() for t in tags if str(t).strip()][:10],
                                 "question_text": qtxt,
+                                "topic_tag": topic_tag,
                                 "markscheme_text": mstxt,
                                 "warnings": warnings[:10],
+                                "compliance": draft_raw.get("compliance", {}),
+                                "save_blocked": bool(draft_raw.get("save_blocked", False)),
                             }
                             st.success("Draft generated. Please vet and edit below, then approve to save.")
 
@@ -2138,6 +2508,7 @@ else:
                         d_assignment = st.text_input("Assignment name", value=d.get("assignment_name", "AI Practice"), key="draft_assignment")
                         d_label = st.text_input("Question label", value=d.get("question_label", ""), key="draft_label")
                         d_marks = st.number_input("Max marks", min_value=1, max_value=50, value=int(d.get("max_marks", 4)), step=1, key="draft_marks")
+                        d_topic_tag = st.text_input("Topic tag (spec code)", value=d.get("topic_tag", ""), key="draft_topic_tag")
                         d_tags_str = st.text_input("Tags (comma separated)", value=", ".join(d.get("tags", [])), key="draft_tags")
 
                     with ed2:
@@ -2160,13 +2531,46 @@ else:
                         elif not d_qtext.strip() or not d_mstext.strip():
                             st.error("Question text and mark scheme cannot be blank.")
                         else:
-                            combined = d_qtext + "\n" + d_mstext
-                            if re.search(r"\\mu_0|\bμ0\b|\\epsilon_0|\bε0\b|B\s*=\s*\\mu_0\s*n\s*I", combined, flags=re.IGNORECASE):
-                                st.error("This draft contains non-GCSE content (e.g. μ0/ε0 or B=μ0 n I). Please edit it out before saving.")
+                            draft_for_check = {
+                                "question_markdown": d_qtext.strip(),
+                                "mark_scheme_markdown": d_mstext.strip(),
+                                "total_marks": int(d_marks),
+                                "topic_tag": (d_topic_tag or "").strip(),
+                            }
+
+                            ok_det_now, det_reasons_now = _deterministic_draft_checks(
+                                subject_key_bank, draft_for_check, marks=int(d_marks)
+                            )
+                            compliance_now = spec_compliance_check(subject_key_bank, spec_pack, draft_for_check)
+
+                            if not ok_det_now or not compliance_now.get("compliant", False):
+                                st.error("Spec/format checks failed. Please fix the issues below before saving.")
+                                if det_reasons_now:
+                                    st.warning(
+                                        "Format/marking issues:\n\n"
+                                        + "\n".join([f"- {r}" for r in det_reasons_now[:10]])
+                                    )
+                                if compliance_now.get("reasons"):
+                                    st.warning(
+                                        "Spec compliance issues:\n\n"
+                                        + "\n".join([f"- {r}" for r in compliance_now.get("reasons", [])[:10]])
+                                    )
+                                if compliance_now.get("suggested_fixes"):
+                                    st.info(
+                                        "Suggested fixes:\n\n"
+                                        + "\n".join([f"- {f}" for f in compliance_now.get("suggested_fixes", [])[:10]])
+                                    )
                                 st.stop()
 
                             tags = [t.strip() for t in (d_tags_str or "").split(",") if t.strip()]
+                            tt = (d_topic_tag or "").strip()
+                            if tt:
+                                topic_tag_token = f"topic:{tt}"
+                                if topic_tag_token not in tags:
+                                    tags = [topic_tag_token] + tags
+
                             ok = insert_question_bank_row(
+                                subject_key=subject_key_bank,
                                 source="ai_generated",
                                 created_by="teacher",
                                 assignment_name=d_assignment.strip(),
@@ -2249,8 +2653,8 @@ else:
                         q_ext = ".jpg" if q_ct == "image/jpeg" else ".png"
                         ms_ext = ".jpg" if ms_ct == "image/jpeg" else ".png"
 
-                        q_path = f"{assignment_slug}/{token}/{qlabel_slug}_question{q_ext}"
-                        ms_path = f"{assignment_slug}/{token}/{qlabel_slug}_markscheme{ms_ext}"
+                        q_path = f"{subject_key_bank}/{assignment_slug}/{token}/{qlabel_slug}_question{q_ext}"
+                        ms_path = f"{subject_key_bank}/{assignment_slug}/{token}/{qlabel_slug}_markscheme{ms_ext}"
 
                         ok1 = upload_to_storage(q_path, q_bytes, q_ct)
                         ok2 = upload_to_storage(ms_path, ms_bytes, ms_ct)
@@ -2259,6 +2663,7 @@ else:
 
                         if ok1 and ok2:
                             ok_db = insert_question_bank_row(
+                                subject_key=subject_key_bank,
                                 source="teacher",
                                 created_by="teacher",
                                 assignment_name=assignment_name.strip(),
