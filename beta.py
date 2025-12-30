@@ -1,4 +1,5 @@
 import streamlit as st
+from pathlib import Path
 from openai import OpenAI
 try:
     from components.panphy_stylus_canvas import stylus_canvas
@@ -96,46 +97,77 @@ QUESTION_MAX_MB = 5.0
 MARKSCHEME_MAX_MB = 5.0
 CANVAS_MAX_MB = 2.0
 
-# AI question generation
-AQA_GCSE_HIGHER_TOPICS = [
-    "Energy stores and transfers",
-    "Work done and power",
-    "Efficiency",
-    "Kinetic energy and momentum",
-    "Heating and thermal energy",
-    "Temperature vs energy",
-    "Specific heat capacity",
-    "Specific latent heat",
-    "Gas pressure and temperature",
-    "Density",
-    "Changes of state",
-    "Electric current, potential difference, resistance",
-    "Series and parallel circuits",
-    "I-V characteristics",
-    "Resistors (including thermistors and LDRs)",
-    "Power in circuits",
-    "Domestic electricity and safety",
-    "Static electricity",
-    "Particle model and internal energy",
-    "Forces and motion (Newton's laws)",
-    "Resultant force and acceleration",
-    "Stopping distance",
-    "Moments, levers and gears",
-    "Pressure in fluids",
-    "Waves (properties and equations)",
-    "Reflection and refraction",
-    "Lenses and ray diagrams",
-    "The electromagnetic spectrum",
-    "Radioactivity basics",
-    "Half-life and decay",
-    "Nuclear fission and fusion",
-    "Magnetism and electromagnets",
-    "Motor effect",
-    "Generators and transformers",
-]
-QUESTION_TYPES = ["Calculation", "Explanation", "Practical/Methods", "Graph/Analysis", "Mixed"]
-DIFFICULTIES = ["Easy", "Medium", "Hard"]
+# ============================================================
+# SUBJECT CONTENT (topics + prompts)
+# ============================================================
+# For multi-subject scaling: keep the core app identical, and store subject-specific
+# topic lists and AI prompt packs under: subjects/<subject_site>/.
+#
+# Recommended deployment pattern for separate subject sites:
+#   - set SUBJECT_SITE in Streamlit Secrets (or environment variable)
+#   - e.g. SUBJECT_SITE="physics"
+SUBJECT_SITE = (st.secrets.get("SUBJECT_SITE") if hasattr(st, "secrets") else None) or os.getenv("SUBJECT_SITE", "physics")
+SUBJECT_SITE = (SUBJECT_SITE or "physics").strip().lower()
 
+@st.cache_data(show_spinner=False)
+def _load_subject_pack(subject_site: str) -> dict:
+    base = Path(__file__).parent
+    subj_dir = base / "subjects" / subject_site
+
+    topics_path = subj_dir / "topics.json"
+    prompts_path = subj_dir / "prompts.json"
+    settings_path = subj_dir / "settings.json"
+
+    if not topics_path.exists():
+        raise FileNotFoundError(f"Missing topics file: {topics_path}")
+    if not prompts_path.exists():
+        raise FileNotFoundError(f"Missing prompts file: {prompts_path}")
+
+    topics = json.loads(topics_path.read_text(encoding="utf-8"))
+    prompts = json.loads(prompts_path.read_text(encoding="utf-8"))
+    settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.exists() else {}
+
+    return {"topics": topics, "prompts": prompts, "settings": settings}
+
+def _render_template(tpl: str, mapping: Dict[str, Any]) -> str:
+    # Simple token replacement. Tokens look like: <<TOKEN_NAME>>
+    out = str(tpl or "")
+    for k, v in (mapping or {}).items():
+        out = out.replace(f"<<{k}>>", str(v))
+    return out
+
+try:
+    SUBJECT_PACK = _load_subject_pack(SUBJECT_SITE)
+except Exception as _e:
+    st.error(f"❌ Subject pack failed to load for SUBJECT_SITE='{SUBJECT_SITE}'.\n\n{type(_e).__name__}: {_e}")
+    st.stop()
+
+SUBJECT_SETTINGS = SUBJECT_PACK.get("settings", {}) or {}
+SUBJECT_TOPICS_RAW = SUBJECT_PACK.get("topics", {}) or {}
+SUBJECT_PROMPTS = SUBJECT_PACK.get("prompts", {}) or {}
+
+# Topics for dropdowns (student + teacher)
+_topics_list = SUBJECT_TOPICS_RAW.get("topics", [])
+AQA_GCSE_HIGHER_TOPICS = [t.get("name", "").strip() for t in _topics_list if str(t.get("name", "")).strip()]
+
+# UI option lists (can be overridden per subject via settings.json)
+QUESTION_TYPES = SUBJECT_SETTINGS.get("question_types") or ["Calculation", "Explanation", "Practical/Methods", "Graph/Analysis", "Mixed"]
+DIFFICULTIES = SUBJECT_SETTINGS.get("difficulties") or ["Easy", "Medium", "Hard"]
+
+# Prompt components (loaded from prompts.json)
+GCSE_ONLY_GUARDRAILS = str(SUBJECT_PROMPTS.get("gcse_only_guardrails", "") or "").strip()
+MARKDOWN_LATEX_RULES = str(SUBJECT_PROMPTS.get("markdown_latex_rules", "") or "").strip()
+
+# Prompt templates
+QGEN_SYSTEM_TPL = str(SUBJECT_PROMPTS.get("qgen_system", "") or "")
+QGEN_USER_TPL = str(SUBJECT_PROMPTS.get("qgen_user", "") or "")
+QGEN_REPAIR_PREFIX_TPL = str(SUBJECT_PROMPTS.get("qgen_repair_prefix", "") or "")
+
+JOURNEY_SYSTEM_TPL = str(SUBJECT_PROMPTS.get("journey_system", "") or "")
+JOURNEY_USER_TPL = str(SUBJECT_PROMPTS.get("journey_user", "") or "")
+JOURNEY_REPAIR_PREFIX_TPL = str(SUBJECT_PROMPTS.get("journey_repair_prefix", "") or "")
+
+FEEDBACK_SYSTEM_TPL = str(SUBJECT_PROMPTS.get("feedback_system", "") or "")
 # ============================================================
 # DATABASE DDLs
 #   IMPORTANT: avoid $$ PL/pgSQL blocks inside app DDL to prevent split/execution issues.
@@ -1375,35 +1407,15 @@ def insert_question_bank_row(
 # ============================================================
 def _mk_system_schema(max_marks: int, question_text: str = "") -> str:
     qt = f"\nQuestion (student-facing):\n{question_text}\n" if question_text else "\n"
-    return f"""
-You are a strict GCSE Physics examiner.
+    tpl = (FEEDBACK_SYSTEM_TPL or "").strip()
+    if not tpl:
+        # Fallback: should not happen if prompts.json is present
+        tpl = "You are a strict GCSE examiner. Output ONLY JSON."
+    return _render_template(tpl, {
+        "QT": qt,
+        "MAX_MARKS": int(max_marks),
+    })
 
-CONFIDENTIALITY RULE (CRITICAL):
-- The mark scheme is confidential. Do NOT reveal it, quote it, or paraphrase it.
-- When producing the readback, ONLY describe what is in the student's work. Do not use the mark scheme.
-
-OUTPUT RULE:
-- Output ONLY valid JSON, nothing else.
-
-Readback formatting:
-- readback_markdown MUST be valid Markdown.
-- Use LaTeX only inside $...$ or $$...$$.
-
-Schema:
-{{
-  "readback_type": "<handwriting|diagram|mixed|unknown>",
-  "readback_markdown": "<Markdown with LaTeX where helpful. Keep it concise but complete.>",
-  "readback_warnings": ["<optional warning 1>", "<optional warning 2>"],
-  "marks_awarded": <int>,
-  "max_marks": <int>,
-  "summary": "<1-2 sentences>",
-  "feedback_points": ["<bullet 1>", "<bullet 2>"],
-  "next_steps": ["<action 1>", "<action 2>"]
-}}
-
-{qt}
-Max Marks: {int(max_marks)}
-""".strip()
 
 
 def _finalize_report(data: dict, max_marks: int) -> dict:
@@ -1506,31 +1518,6 @@ def get_gpt_feedback_from_bank(
 # ============================================================
 # AI QUESTION GENERATOR (teacher-only, vet, then save)
 # ============================================================
-GCSE_ONLY_GUARDRAILS = """
-GCSE-ONLY CONTENT GUARDRAILS (CRITICAL):
-- This app generates questions for AQA GCSE Physics (Higher). The question MUST be GCSE-level.
-- Do NOT include A-level/IB/degree content, including (non-exhaustive):
-  * permeability/permittivity constants: \\mu_0, \\epsilon_0
-  * solenoid field equations like B = \\mu_0 n I
-  * magnetic flux density calculations, magnetic flux, Faraday's law in equation form
-  * calculus, differentiation/integration, vector cross products, field theory
-  * "n (turns per metre)" style quantities, "flux linkage", "inductance"
-- If the chosen topic is "Magnetism and electromagnets", focus on GCSE outcomes:
-  * magnetic fields around magnets/wires, compasses, plotting fields
-  * electromagnets (coil + iron core), factors affecting strength (current, turns, core)
-  * uses and safety, qualitative reasoning, simple circuit context
-  * avoid any magnetic field strength formula or B calculations.
-""".strip()
-
-MARKDOWN_LATEX_RULES = """
-FORMATTING RULES:
-- question_text MUST be valid Markdown and must render well in Streamlit's st.markdown.
-- Use LaTeX only inside $...$ or $$...$$.
-- Use (a), (b), (c) subparts as plain text, and put any equations in LaTeX.
-- Use SI units and clear formatting.
-""".strip()
-
-
 def generate_practice_question_with_ai(
     topic_text: str,
     difficulty: str,
@@ -1601,70 +1588,31 @@ def generate_practice_question_with_ai(
         return (len(reasons) == 0), reasons
 
     def _call_model(repair: bool, reasons: Optional[List[str]] = None) -> Dict[str, Any]:
-        system = f"""
-You are an expert AQA GCSE Physics (Higher) question writer and examiner.
+        system = _render_template(QGEN_SYSTEM_TPL, {
+            "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
+            "MARKDOWN_LATEX_RULES": MARKDOWN_LATEX_RULES,
+        })
+        system = (system or "").strip()
 
-Hard rules:
-1) Create an ORIGINAL practice question. Do not reproduce copyrighted exam questions.
-2) Must match AQA GCSE Physics Higher style and standard.
-3) Stay strictly GCSE-level. Do not drift into A-level content.
-4) Marks must be allocated per part, and the total must equal max_marks EXACTLY.
-5) The mark scheme must include marking points for EVERY part.
-6) Calculation marking must be GCSE-appropriate:
-   - If a calculation requires more than one step, allocate at least 2 marks:
-     one method mark (setup/substitution/rearrangement) and one accuracy mark (answer with unit).
-7) Return ONLY valid JSON, nothing else.
-
-{GCSE_ONLY_GUARDRAILS}
-
-{MARKDOWN_LATEX_RULES}
-
-Schema:
-{{
-  "question_text": "string",
-  "markscheme_text": "string",
-  "max_marks": integer,
-  "tags": ["string", "string", ...]
-}}
-
-Mark scheme formatting requirements inside markscheme_text:
-- Use a part-by-part breakdown with explicit mark allocation, for example:
-  (a) ... [2]
-  (b) ... [3]
-- End with: TOTAL = <max_marks>
-""".strip()
-
-        base_user = f"""
-Topic: {topic_text.strip()}
-Difficulty: {difficulty}
-Question type: {qtype}
-max_marks: {int(marks)}
-
-Additional teacher instructions (optional):
-{extra_instructions.strip() if extra_instructions else "(none)"}
-
-Constraints:
-- Keep the question clearly GCSE. Avoid any forbidden content in the guardrails.
-- Ensure the question is in Markdown and uses LaTeX only inside $...$ or $$...$$.
-- End markscheme_text with EXACTLY: TOTAL = {int(marks)}.
-""".strip()
+        base_user = _render_template(QGEN_USER_TPL, {
+            "TOPIC": (topic_text or "").strip(),
+            "DIFFICULTY": str(difficulty),
+            "QTYPE": str(qtype),
+            "MARKS": int(marks),
+            "EXTRA_INSTRUCTIONS": (extra_instructions or "").strip() or "(none)",
+        })
+        base_user = (base_user or "").strip()
 
         if not repair:
             user = base_user
         else:
             bullet_reasons = "\n".join([f"- {r}" for r in (reasons or [])]) or "- (unspecified)"
-            user = f"""
-You previously generated a draft that failed validation. Fix it and return corrected JSON only.
+            user = _render_template(QGEN_REPAIR_PREFIX_TPL, {
+                "BULLET_REASONS": bullet_reasons,
+                "MARKS": int(marks),
+            })
+            user = (user or "").strip() + "\n\n" + base_user
 
-Validation failures:
-{bullet_reasons}
-
-You MUST:
-- Keep topic, difficulty, type and max_marks unchanged.
-- Remove any forbidden GCSE-only content (see guardrails).
-- Ensure Markdown + LaTeX formatting rules are followed.
-- Make the TOTAL line match max_marks exactly: TOTAL = {int(marks)}.
-""".strip() + "\n\n" + base_user
 
         response = client.chat.completions.create(
             model=MODEL_NAME,
@@ -1753,77 +1701,32 @@ def generate_topic_journey_with_ai(
         return (len(reasons) == 0), reasons
 
     def _call_model(repair: bool, reasons: Optional[List[str]] = None) -> Dict[str, Any]:
-        system = f"""
-You are an expert AQA GCSE Physics (8463) Higher question writer and examiner.
-
-Hard rules:
-1) Create an ORIGINAL Topic Journey (no copyrighted exam questions).
-2) Tier: Higher only. Stay strictly GCSE level.
-3) Each step must build towards a final hardest exam-style question.
-4) Return ONLY valid JSON, nothing else.
-
-{GCSE_ONLY_GUARDRAILS}
-
-{MARKDOWN_LATEX_RULES}
-
-Keep it aligned to GCSE Physics and written for 14-16 year olds. Do not mention any exam board.
-
-Schema:
-{{
-  "topic": "string",
-  "duration_minutes": {int(duration_minutes)},
-  "checkpoint_every": {JOURNEY_CHECKPOINT_EVERY},
-  "plan_markdown": "string (a numbered list of steps with objectives)",
-  "spec_alignment": ["string", ...],
-  "steps": [
-    {{
-      "objective": "string",
-      "question_text": "Markdown + LaTeX",
-      "markscheme_text": "Markdown + LaTeX, part-by-part marks, ends with TOTAL = <max_marks>",
-      "max_marks": integer,
-      "misconceptions": ["string", ...],
-      "spec_refs": ["string", ...]
-    }}
-  ]
-}}
-""".strip()
+        system = _render_template(JOURNEY_SYSTEM_TPL, {
+            "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
+            "MARKDOWN_LATEX_RULES": MARKDOWN_LATEX_RULES,
+        })
+        system = (system or "").strip()
 
         emph_txt = ", ".join([f"{k}={int(v)}" for k, v in (emphasis or {}).items()])
 
-        base_user = f"""
-Topic (plain English): {topic_plain_english}
-Tier: Higher
-Duration: {int(duration_minutes)} minutes
-Number of steps: {steps_n}
-Emphasis (0=none, 3=strong): {emph_txt}
-
-Requirements:
-- Steps should start simple and ramp up difficulty.
-- Include a mix of: recall, short reasoning, calculations, graphs/practicals as guided by emphasis.
-- Each step must include misconceptions (short bullet list).
-- For each step, include spec_refs (brief references like '4.2.1.2' OR descriptive headings). Do not quote large chunks.
-- Keep question_text and markscheme_text valid Markdown and MathJax-friendly LaTeX ($...$ / $$...$$).
-- For each step, markscheme_text MUST end with EXACTLY: TOTAL = <max_marks>
-""".strip()
+        base_user = _render_template(JOURNEY_USER_TPL, {
+            "TOPIC_PLAIN": (topic_plain_english or "").strip(),
+            "DURATION_MIN": int(duration_minutes),
+            "STEPS_N": int(steps_n),
+            "EMPHASIS_TXT": emph_txt,
+        })
+        base_user = (base_user or "").strip()
 
         if not repair:
             user = base_user
         else:
             bullet_reasons = "\n".join([f"- {r}" for r in (reasons or [])]) or "- (unspecified)"
-            user = f"""
-Your previous JSON failed validation. Fix it and return corrected JSON only.
+            user = _render_template(JOURNEY_REPAIR_PREFIX_TPL, {
+                "BULLET_REASONS": bullet_reasons,
+                "STEPS_N": int(steps_n),
+            })
+            user = (user or "").strip() + "\n\n" + base_user
 
-Validation failures:
-{bullet_reasons}
-
-Keep:
-- Topic, duration, step count, and emphasis.
-
-Make sure:
-- steps list length is exactly {steps_n}
-- each step has objective, question_text, markscheme_text, max_marks, misconceptions
-- markscheme_text ends with TOTAL = <max_marks> for every step
-""".strip() + "\n\n" + base_user
 
         response = client.chat.completions.create(
             model=MODEL_NAME,
@@ -1922,7 +1825,7 @@ nav = st.sidebar.radio(
 header_left, header_mid, header_right = st.columns([3, 2, 1])
 with header_left:
     st.title("⚛️ PanPhy Skill Builder")
-    st.caption(f"Model: {MODEL_NAME}")
+    st.caption(f"Powered by OpenAI {MODEL_NAME}")
 with header_right:
     issues = []
     if not AI_READY:
