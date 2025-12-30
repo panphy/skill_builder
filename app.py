@@ -245,6 +245,19 @@ def get_topic_names_for_track(track: str) -> List[str]:
         names.append(name)
     return names
 
+
+
+def get_topic_track_ok(topic_name: str) -> str:
+    """Return track eligibility for a topic name in TOPICS_CATALOG: 'both' or 'separate_only'."""
+    name_norm = (topic_name or "").strip().lower()
+    if not name_norm:
+        return "both"
+    for t in TOPICS_CATALOG:
+        nm = str(t.get("name", "")).strip().lower()
+        if nm == name_norm:
+            tok = str(t.get("track_ok", "both") or "both").strip().lower()
+            return tok if tok in ("both", "separate_only") else "both"
+    return "both"
 # UI option lists (can be overridden per subject via settings.json)
 QUESTION_TYPES = SUBJECT_SETTINGS.get("question_types") or ["Calculation", "Explanation", "Practical/Methods", "Graph/Analysis", "Mixed"]
 DIFFICULTIES = SUBJECT_SETTINGS.get("difficulties") or ["Easy", "Medium", "Hard"]
@@ -328,6 +341,10 @@ alter table public.question_bank_v1
   add column if not exists subject_site text not null default '{SUBJECT_SITE}';
 alter table public.question_bank_v1
   add column if not exists track_ok text not null default 'both';
+
+drop index if exists public.uq_question_bank_source_assignment_label;
+create unique index if not exists uq_question_bank_subject_source_assignment_label
+  on public.question_bank_v1 (subject_site, source, assignment_name, question_label);
 
 """
 
@@ -1457,6 +1474,8 @@ def insert_question_bank_row(
     markscheme_image_path: Optional[str] = None,
     question_type: str = "single",
     journey_json: Optional[dict] = None,
+    subject_site: Optional[str] = None,
+    track_ok: str = "both",
 ) -> bool:
     eng = get_db_engine()
     if eng is None:
@@ -1484,7 +1503,7 @@ def insert_question_bank_row(
        :question_text, :question_image_path,
        :markscheme_text, :markscheme_image_path,
        true, now())
-    on conflict (source, assignment_name, question_label) do update set
+    on conflict (subject_site, source, assignment_name, question_label) do update set
        created_by = excluded.created_by,
        subject_site = excluded.subject_site,
        track_ok = excluded.track_ok,
@@ -1967,9 +1986,41 @@ if _sb_track != st.session_state.get("track", TRACK_DEFAULT):
     _set_query_param(**{TRACK_PARAM: _sb_track})
 _persist_track_to_browser(st.session_state.get("track", TRACK_DEFAULT))
 
+with st.sidebar:
+    if st.session_state.get("track", TRACK_DEFAULT) == "combined":
+        if hasattr(st, "badge"):
+            st.badge("COMBINED", color="orange")
+        else:
+            st.markdown(":orange-badge[COMBINED]")
+    else:
+        if hasattr(st, "badge"):
+            st.badge("SEPARATE", color="primary")
+        else:
+            st.markdown(":blue-badge[SEPARATE]")
+    st.caption("The badge shows whether COMBINED or SEPARATED Physics selected.")
 
 header_left, header_mid, header_right = st.columns([3, 2, 1])
+
+# Track badge (visual cue)
+_track = st.session_state.get("track", TRACK_DEFAULT)
+
+def _render_badge(label: str, *, color: str, icon: str | None = None):
+    # st.badge exists in newer Streamlit. Fall back to the markdown badge directive if needed.
+    if hasattr(st, "badge"):
+        st.badge(label, color=color, icon=icon)
+    else:
+        # markdown directive supports only the basic palette (no 'primary')
+        md_color = color if color in {"red","orange","yellow","blue","green","violet","gray","grey"} else "blue"
+        st.markdown(f":{md_color}-badge[{label}]")
+
+with header_right:
+    if _track == "combined":
+        _render_badge("COMBINED", color="orange", icon=":material/merge_type:")
+    else:
+        _render_badge("SEPARATE", color="primary", icon=":material/call_split:")
+
 with header_left:
+
     st.title("⚛️ PanPhy Skill Builder")
     st.caption(f"Powered by OpenAI {MODEL_NAME}")
 with header_right:
@@ -3147,6 +3198,12 @@ else:
                             topic_text = topic_choice
                         else:
                             topic_text = st.text_input("Describe the topic", placeholder="e.g. stopping distance with thinking vs braking distance", key="topic_text")
+                            free_text_separate_only = st.checkbox(
+                                "Separate-only (not for Combined)",
+                                value=False,
+                                key="gen_free_text_separate_only",
+                                help="Tick this if the topic/question you are describing includes Separate-only content. If unticked, it will be saved as eligible for both Combined + Separate.",
+                            )
 
                         qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
                         difficulty = st.selectbox("Difficulty", DIFFICULTIES, key="gen_difficulty")
@@ -3207,10 +3264,16 @@ else:
                                 else:
                                     token = pysecrets.token_hex(3)
                                     default_label = f"AI-{slugify(topic_text)[:24]}-{token}"
+                                    # Track eligibility for this draft
+                                    if topic_mode == "Choose from AQA list":
+                                        draft_track_ok = get_topic_track_ok(topic_text)
+                                    else:
+                                        draft_track_ok = "separate_only" if st.session_state.get("gen_free_text_separate_only") else "both"
 
                                     st.session_state["ai_draft"] = {
                                         "assignment_name": (assignment_name_ai or "").strip() or "AI Practice",
                                         "question_label": default_label,
+                                        "track_ok": draft_track_ok,
                                         "max_marks": int(mm),
                                         "tags": [str(t).strip() for t in tags if str(t).strip()][:10],
                                         "question_text": qtxt,
@@ -3262,7 +3325,7 @@ else:
                                     source="ai_generated",
                                     created_by="teacher",
                                     subject_site=SUBJECT_SITE,
-                                    track_ok=st.session_state.get("teacher_track_ok", "both"),
+                                    track_ok=d.get("track_ok", st.session_state.get("teacher_track_ok", "both")),
                                     assignment_name=d_assignment.strip(),
                                     question_label=d_label.strip(),
                                     max_marks=int(d_marks),
@@ -3289,6 +3352,12 @@ else:
                             "Topic in plain English",
                             placeholder="e.g. Resistance and I-V characteristics (including filament lamp)",
                             key="jour_topic"
+                        )
+                        journey_free_text_separate_only = st.checkbox(
+                            "Separate-only journey (not for Combined)",
+                            value=False,
+                            key="jour_free_text_separate_only",
+                            help="Tick this if the journey includes Separate-only content (e.g. Space physics). Unticked means eligible for both Combined + Separate.",
                         )
                         j_duration = st.selectbox(
                             "Journey length (minutes)",
@@ -3363,9 +3432,11 @@ else:
                             else:
                                 token = pysecrets.token_hex(3)
                                 default_label = f"JOURNEY-{slugify(j_topic)[:24]}-{token}"
+                                draft_track_ok = "separate_only" if st.session_state.get("jour_free_text_separate_only") else "both"
                                 st.session_state["journey_draft"] = {
                                     "assignment_name": (j_assignment or "").strip() or "Topic Journey",
                                     "question_label": default_label,
+                                    "track_ok": draft_track_ok,
                                     "tags": [t.strip() for t in (j_tags or "").split(",") if t.strip()],
                                     "journey": data,
                                 }
@@ -3458,7 +3529,7 @@ else:
                                         source="ai_generated",
                                         created_by="teacher",
                                         subject_site=SUBJECT_SITE,
-                                        track_ok=st.session_state.get("teacher_track_ok", "both"),
+                                        track_ok=d.get("track_ok", st.session_state.get("teacher_track_ok", "both")),
                                         assignment_name=d_assignment.strip(),
                                         question_label=d_label.strip(),
                                         max_marks=int(total_marks) if total_marks > 0 else 1,
