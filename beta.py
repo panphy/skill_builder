@@ -1692,7 +1692,7 @@ if nav == "🧑‍🎓 Student":
             with tool_row[0]:
                 tool = st.radio("Tool", ["Pen", "Eraser"], horizontal=True, label_visibility="collapsed", key="canvas_tool")
             with tool_row[1]:
-                stylus_only = st.checkbox("Stylus-only", value=st.session_state.get("stylus_only_enabled", True), help="When enabled, ignore finger/palm touches and accept stylus only (best with Apple Pencil). Turn off to allow finger drawing.", key="stylus_only_enabled")
+                stylus_only = st.checkbox("Stylus-only", help="When enabled, ignore finger/palm touches and accept stylus only (best with Apple Pencil). Turn off to allow finger drawing.", key="stylus_only_enabled")
             undo_clicked = tool_row[2].button("↩️ Undo", use_container_width=True, key="canvas_undo")
             clear_clicked = tool_row[3].button("🗑️ Clear", use_container_width=True, key="canvas_clear")
 
