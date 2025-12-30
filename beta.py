@@ -194,7 +194,7 @@ def init_track_state():
 
 @st.cache_data(show_spinner=False)
 def _load_subject_pack(subject_site: str) -> dict:
-    base = Path(__file__).parentt
+    base = Path(__file__).resolve().parent
     subj_dir = base / "subjects" / subject_site
 
     topics_path = subj_dir / "topics.json"
