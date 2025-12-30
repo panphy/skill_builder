@@ -1,181 +1,335 @@
 {
-  "metadata": {
-    "subject": "physics",
-    "exam_board": "AQA",
-    "spec_code": "8463",
-    "tier": "Higher",
-    "version": "v1"
+  "schema_version": "2025-12-30",
+  "board": "AQA",
+  "subject_site": "physics",
+  "specs": {
+    "separate_physics": {
+      "code": "8463",
+      "title": "GCSE Physics (8463)"
+    },
+    "combined_trilogy": {
+      "code": "8464",
+      "title": "GCSE Combined Science: Trilogy (8464) - Physics subject content"
+    }
   },
+  "source_materials": {
+    "aqa_8463_subject_content_url": "https://www.aqa.org.uk/subjects/physics/gcse/physics-8463/specification/subject-content",
+    "aqa_8464_physics_subject_content_url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/physics-subject-content",
+    "aqa_8464_pdf": "https://filestore.aqa.org.uk/resources/science/specifications/AQA-8464-SP-2016.PDF",
+    "aqa_8463_pdf": "https://cdn.sanity.io/files/p28bar15/green/e96b2cef624c0970b0f90d9678a438580aed0f65.pdf"
+  },
+  "generated_utc": "2025-12-30T21:16:30Z",
   "topics": [
     {
-      "id": "energy-stores-and-transfers",
-      "name": "Energy stores and transfers",
-      "track_ok": "both"
+      "id": "4.1.1",
+      "name": "Energy: Energy changes in a system, and the ways energy is stored",
+      "group": "Energy",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.1.1",
+        "aqa_8464": "6.1.1"
+      }
     },
     {
-      "id": "work-done-and-power",
-      "name": "Work done and power",
-      "track_ok": "both"
+      "id": "4.1.2",
+      "name": "Energy: Conservation and dissipation of energy",
+      "group": "Energy",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.1.2",
+        "aqa_8464": "6.1.2"
+      }
     },
     {
-      "id": "efficiency",
-      "name": "Efficiency",
-      "track_ok": "both"
+      "id": "4.1.3",
+      "name": "Energy: National and global energy resources",
+      "group": "Energy",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.1.3",
+        "aqa_8464": "6.1.3"
+      }
     },
     {
-      "id": "kinetic-energy-and-momentum",
-      "name": "Kinetic energy and momentum",
-      "track_ok": "both"
+      "id": "4.2.1",
+      "name": "Electricity: Current, potential difference and resistance",
+      "group": "Electricity",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.2.1",
+        "aqa_8464": "6.2.1"
+      }
     },
     {
-      "id": "heating-and-thermal-energy",
-      "name": "Heating and thermal energy",
-      "track_ok": "both"
+      "id": "4.2.2",
+      "name": "Electricity: Series and parallel circuits",
+      "group": "Electricity",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.2.2",
+        "aqa_8464": "6.2.2"
+      }
     },
     {
-      "id": "temperature-vs-energy",
-      "name": "Temperature vs energy",
-      "track_ok": "both"
+      "id": "4.2.3",
+      "name": "Electricity: Domestic uses and safety",
+      "group": "Electricity",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.2.3",
+        "aqa_8464": "6.2.3"
+      }
     },
     {
-      "id": "specific-heat-capacity",
-      "name": "Specific heat capacity",
-      "track_ok": "both"
+      "id": "4.2.4",
+      "name": "Electricity: Energy transfers",
+      "group": "Electricity",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.2.4",
+        "aqa_8464": "6.2.4"
+      }
     },
     {
-      "id": "specific-latent-heat",
-      "name": "Specific latent heat",
-      "track_ok": "both"
+      "id": "national_grid",
+      "name": "Electricity: The National Grid (includes transformers)",
+      "group": "Electricity",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.2.4.3",
+        "aqa_8464": "6.2.4.3"
+      },
+      "notes": "Useful when focusing specifically on transformers/efficient power transmission."
     },
     {
-      "id": "gas-pressure-and-temperature",
-      "name": "Gas pressure and temperature",
-      "track_ok": "both"
+      "id": "4.2.5",
+      "name": "Electricity: Static electricity (physics only) (Separate only)",
+      "group": "Electricity",
+      "track_ok": "separate_only",
+      "spec_refs": {
+        "aqa_8463": "4.2.5",
+        "aqa_8464": null
+      }
     },
     {
-      "id": "density",
-      "name": "Density",
-      "track_ok": "both"
+      "id": "4.3.1",
+      "name": "Particle model of matter: Changes of state and the particle model",
+      "group": "Particle model of matter",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.3.1",
+        "aqa_8464": "6.3.1"
+      }
     },
     {
-      "id": "changes-of-state",
-      "name": "Changes of state",
-      "track_ok": "both"
+      "id": "4.3.2",
+      "name": "Particle model of matter: Internal energy and energy transfers",
+      "group": "Particle model of matter",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.3.2",
+        "aqa_8464": "6.3.2"
+      }
     },
     {
-      "id": "electric-current-potential-difference-resistance",
-      "name": "Electric current, potential difference, resistance",
-      "track_ok": "both"
+      "id": "4.3.3",
+      "name": "Particle model of matter: Particle model and pressure",
+      "group": "Particle model of matter",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.3.3",
+        "aqa_8464": "6.3.3"
+      }
     },
     {
-      "id": "series-and-parallel-circuits",
-      "name": "Series and parallel circuits",
-      "track_ok": "both"
+      "id": "4.4.1",
+      "name": "Atomic structure: Atoms and isotopes",
+      "group": "Atomic structure",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.4.1",
+        "aqa_8464": "6.4.1"
+      }
     },
     {
-      "id": "i-v-characteristics",
-      "name": "I-V characteristics",
-      "track_ok": "both"
+      "id": "4.4.2",
+      "name": "Atomic structure: Atoms and nuclear radiation",
+      "group": "Atomic structure",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.4.2",
+        "aqa_8464": "6.4.2"
+      }
     },
     {
-      "id": "resistors-including-thermistors-and-ldrs",
-      "name": "Resistors (including thermistors and LDRs)",
-      "track_ok": "both"
+      "id": "4.4.3",
+      "name": "Atomic structure: Hazards and uses of radioactive emissions and of background (Separate only)",
+      "group": "Atomic structure",
+      "track_ok": "separate_only",
+      "spec_refs": {
+        "aqa_8463": "4.4.3",
+        "aqa_8464": null
+      }
     },
     {
-      "id": "power-in-circuits",
-      "name": "Power in circuits",
-      "track_ok": "both"
+      "id": "4.4.4",
+      "name": "Atomic structure: Nuclear fission and fusion (physics only) (Separate only)",
+      "group": "Atomic structure",
+      "track_ok": "separate_only",
+      "spec_refs": {
+        "aqa_8463": "4.4.4",
+        "aqa_8464": null
+      }
     },
     {
-      "id": "domestic-electricity-and-safety",
-      "name": "Domestic electricity and safety",
-      "track_ok": "both"
+      "id": "4.5.1",
+      "name": "Forces: Forces and their interactions",
+      "group": "Forces",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.5.1",
+        "aqa_8464": "6.5.1"
+      }
     },
     {
-      "id": "static-electricity",
-      "name": "Static electricity",
-      "track_ok": "both"
+      "id": "4.5.2",
+      "name": "Forces: Work done and energy transfer",
+      "group": "Forces",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.5.2",
+        "aqa_8464": "6.5.2"
+      }
     },
     {
-      "id": "particle-model-and-internal-energy",
-      "name": "Particle model and internal energy",
-      "track_ok": "both"
+      "id": "4.5.3",
+      "name": "Forces: Forces and elasticity",
+      "group": "Forces",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.5.3",
+        "aqa_8464": "6.5.3"
+      }
     },
     {
-      "id": "forces-and-motion-newton-s-laws",
-      "name": "Forces and motion (Newton's laws)",
-      "track_ok": "both"
+      "id": "4.5.4",
+      "name": "Forces: Moments, levers and gears (physics only) (Separate only)",
+      "group": "Forces",
+      "track_ok": "separate_only",
+      "spec_refs": {
+        "aqa_8463": "4.5.4",
+        "aqa_8464": null
+      }
     },
     {
-      "id": "resultant-force-and-acceleration",
-      "name": "Resultant force and acceleration",
-      "track_ok": "both"
+      "id": "4.5.5",
+      "name": "Forces: Pressure and pressure differences in fluids (physics only) (Separate only)",
+      "group": "Forces",
+      "track_ok": "separate_only",
+      "spec_refs": {
+        "aqa_8463": "4.5.5",
+        "aqa_8464": null
+      }
     },
     {
-      "id": "stopping-distance",
-      "name": "Stopping distance",
-      "track_ok": "both"
+      "id": "4.5.6",
+      "name": "Forces: Forces and motion",
+      "group": "Forces",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.5.6",
+        "aqa_8464": "6.5.4"
+      }
     },
     {
-      "id": "moments-levers-and-gears",
-      "name": "Moments, levers and gears",
-      "track_ok": "both"
+      "id": "4.5.7",
+      "name": "Forces: Momentum (HT only)",
+      "group": "Forces",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.5.7",
+        "aqa_8464": "6.5.5"
+      }
     },
     {
-      "id": "pressure-in-fluids",
-      "name": "Pressure in fluids",
-      "track_ok": "both"
+      "id": "4.6.1",
+      "name": "Waves: Waves in air, fluids and solids",
+      "group": "Waves",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.6.1",
+        "aqa_8464": "6.6.1"
+      }
     },
     {
-      "id": "waves-properties-and-equations",
-      "name": "Waves (properties and equations)",
-      "track_ok": "both"
+      "id": "4.6.2",
+      "name": "Waves: Electromagnetic waves",
+      "group": "Waves",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.6.2",
+        "aqa_8464": "6.6.2"
+      }
     },
     {
-      "id": "reflection-and-refraction",
-      "name": "Reflection and refraction",
-      "track_ok": "both"
+      "id": "4.6.3",
+      "name": "Waves: Black body radiation (physics only) (Separate only)",
+      "group": "Waves",
+      "track_ok": "separate_only",
+      "spec_refs": {
+        "aqa_8463": "4.6.3",
+        "aqa_8464": null
+      }
     },
     {
-      "id": "lenses-and-ray-diagrams",
-      "name": "Lenses and ray diagrams",
-      "track_ok": "both"
+      "id": "4.7.1",
+      "name": "Magnetism and electromagnetism: Permanent and induced magnetism, magnetic forces and fields",
+      "group": "Magnetism and electromagnetism",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.7.1",
+        "aqa_8464": "6.7.1"
+      }
     },
     {
-      "id": "the-electromagnetic-spectrum",
-      "name": "The electromagnetic spectrum",
-      "track_ok": "both"
+      "id": "4.7.2",
+      "name": "Magnetism and electromagnetism: The motor effect",
+      "group": "Magnetism and electromagnetism",
+      "track_ok": "both",
+      "spec_refs": {
+        "aqa_8463": "4.7.2",
+        "aqa_8464": "6.7.2"
+      }
     },
     {
-      "id": "radioactivity-basics",
-      "name": "Radioactivity basics",
-      "track_ok": "both"
+      "id": "4.7.3",
+      "name": "Magnetism and electromagnetism: Induced potential, transformers and the National Grid (physics (Separate only)",
+      "group": "Magnetism and electromagnetism",
+      "track_ok": "separate_only",
+      "spec_refs": {
+        "aqa_8463": "4.7.3",
+        "aqa_8464": null
+      }
     },
     {
-      "id": "half-life-and-decay",
-      "name": "Half-life and decay",
-      "track_ok": "both"
+      "id": "4.8.1",
+      "name": "Space physics: Solar system; stability of orbital motions; satellites (physics only) (Separate only)",
+      "group": "Space physics",
+      "track_ok": "separate_only",
+      "spec_refs": {
+        "aqa_8463": "4.8.1",
+        "aqa_8464": null
+      }
     },
     {
-      "id": "nuclear-fission-and-fusion",
-      "name": "Nuclear fission and fusion",
-      "track_ok": "both"
-    },
-    {
-      "id": "magnetism-and-electromagnets",
-      "name": "Magnetism and electromagnets",
-      "track_ok": "both"
-    },
-    {
-      "id": "motor-effect",
-      "name": "Motor effect",
-      "track_ok": "both"
-    },
-    {
-      "id": "generators-and-transformers",
-      "name": "Generators and transformers",
-      "track_ok": "both"
+      "id": "4.8.2",
+      "name": "Space physics: Red-shift (physics only) (Separate only)",
+      "group": "Space physics",
+      "track_ok": "separate_only",
+      "spec_refs": {
+        "aqa_8463": "4.8.2",
+        "aqa_8464": null
+      }
     }
   ]
 }
