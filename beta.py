@@ -588,10 +588,6 @@ def check_rate_limit_cached(student_id: str, _fp: str) -> Tuple[bool, int, str]:
         return True, RATE_LIMIT_MAX, ""
 
 
-def check_rate_limit(student_id: str) -> Tuple[bool, int, str]:
-    fp = (st.secrets.get("DATABASE_URL", "") or "")[:40]
-    return check_rate_limit_cached(student_id, fp)
-
 
 def increment_rate_limit(student_id: str):
     if st.session_state.get("is_teacher", False):
@@ -1717,30 +1713,6 @@ You MUST:
 DURATION_TO_STEPS = {10: 5, 20: 8, 30: 12}
 JOURNEY_CHECKPOINT_EVERY = 3
 
-def _load_local_aqa_8463_spec_snippet(max_chars: int = 6000) -> str:
-    """
-    Optional: if you have a local extracted spec JSON/text in your repo, place it under ./specs/.
-    We only load a short snippet for guardrails (avoid large prompts).
-    """
-    candidates = [
-        "specs/aqa_8463_physics.json",
-        "specs/aqa_8463_physics_higher.json",
-        "specs/8463.json",
-        "specs/8463_physics.json",
-        "specs/aqa-8463-physics.json",
-    ]
-    for p in candidates:
-        try:
-            if os.path.exists(p):
-                raw = open(p, "r", encoding="utf-8").read()
-                raw = raw.strip()
-                if not raw:
-                    continue
-                return raw[:max_chars]
-        except Exception:
-            continue
-    return ""
-
 def generate_topic_journey_with_ai(
     topic_plain_english: str,
     duration_minutes: int,
@@ -1748,9 +1720,6 @@ def generate_topic_journey_with_ai(
 ) -> Dict[str, Any]:
     steps_n = DURATION_TO_STEPS.get(int(duration_minutes), 8)
     topic_plain_english = (topic_plain_english or "").strip()
-
-    spec_snip = _load_local_aqa_8463_spec_snippet()
-
     def _validate(d: Dict[str, Any]) -> Tuple[bool, List[str]]:
         reasons: List[str] = []
         if not isinstance(d, dict):
@@ -1797,8 +1766,7 @@ Hard rules:
 
 {MARKDOWN_LATEX_RULES}
 
-Optional local spec snippet (may be partial). Use it only as guidance:
-{spec_snip if spec_snip else "(not available)"}
+Keep it aligned to GCSE Physics and written for 14-16 year olds. Do not mention any exam board.
 
 Schema:
 {{
@@ -3260,17 +3228,44 @@ else:
                             placeholder="e.g. Resistance and I-V characteristics (including filament lamp)",
                             key="jour_topic"
                         )
-                        j_duration = st.selectbox("Journey length", [10, 20, 30], index=1, key="jour_duration")
+                        j_duration = st.selectbox(
+                            "Journey length (minutes)",
+                            [10, 20, 30],
+                            index=1,
+                            key="jour_duration",
+                            help="How long (in minutes) this Topic Journey is designed to take. This controls how many steps are generated.",
+                        )
                         st.caption(f"Will generate {DURATION_TO_STEPS.get(int(j_duration), 8)} steps.")
+                        st.caption("Focus sliders: 0 = none, 1 = light, 2 = medium, 3 = heavy. This adjusts the mix of step types in the journey.")
                         e1, e2, e3, e4 = st.columns(4)
                         with e1:
-                            emph_calc = st.slider("Calculation", 0, 3, 2, key="jour_emph_calc")
+                            emph_calc = st.slider(
+                                "Calculation focus",
+                                0, 3, 2,
+                                key="jour_emph_calc",
+                                help="How much of the journey should involve calculation practice.",
+                            )
                         with e2:
-                            emph_expl = st.slider("Explanation", 0, 3, 2, key="jour_emph_expl")
+                            emph_expl = st.slider(
+                                "Explanation focus",
+                                0, 3, 2,
+                                key="jour_emph_expl",
+                                help="How much of the journey should involve written explanations and reasoning.",
+                            )
                         with e3:
-                            emph_graph = st.slider("Graph", 0, 3, 1, key="jour_emph_graph")
+                            emph_graph = st.slider(
+                                "Graph focus",
+                                0, 3, 1,
+                                key="jour_emph_graph",
+                                help="How much of the journey should involve interpreting or sketching graphs, or analysing data.",
+                            )
                         with e4:
-                            emph_prac = st.slider("Practical", 0, 3, 1, key="jour_emph_prac")
+                            emph_prac = st.slider(
+                                "Practical focus",
+                                0, 3, 1,
+                                key="jour_emph_prac",
+                                help="How much of the journey should involve practical methods, required apparatus, variables, and analysis.",
+                            )
 
                         j_assignment = st.text_input("Assignment name for saving", value="Topic Journey", key="jour_assignment")
                         j_tags = st.text_input("Tags (comma separated)", value="", key="jour_tags")
