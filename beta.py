@@ -1052,6 +1052,9 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
   border-radius: 18px;
   padding: 20px 22px;
   box-shadow: 0 14px 42px rgba(0,0,0,0.28);
+  /* IMPORTANT: Streamlit dark-mode sets default text to light.
+     Our card is light, so we must force a dark text color here. */
+  color: rgba(0,0,0,0.88);
 }}
 .pp-row {{
   display: flex;
@@ -1069,6 +1072,7 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
   opacity: 0.85;
   margin-top: 2px;
   line-height: 1.25rem;
+  color: rgba(0,0,0,0.72);
 }}
 .pp-spinner {{
   width: 34px;
@@ -1104,6 +1108,7 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
   margin-top: 8px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  color: rgba(0,0,0,0.72);
 }}
 </style>
 
