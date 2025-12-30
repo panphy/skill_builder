@@ -1019,24 +1019,132 @@ def render_md_box(title: str, md_text: str, caption: str = "", empty_text: str =
 # PROGRESS INDICATORS
 # ============================================================
 def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: float) -> dict:
-    with st.status(f"Processing… (typically {typical_range})", expanded=True) as status:
-        progress = st.progress(0)
-        start = time.monotonic()
+    """Run a blocking task while showing a full-page overlay to prevent mid-run interaction.
 
+    Streamlit remains responsive on the client while Python is executing. Students can keep drawing
+    or changing selections after pressing Submit, which makes the UX confusing because the feedback
+    corresponds to the *submitted* state, not the later edits. This overlay blocks pointer interaction
+    until the task finishes.
+    """
+    overlay = st.empty()
+
+    def _render_overlay(pct: int, subtitle: str):
+        pct = int(max(0, min(100, pct)))
+        overlay.markdown(
+            f"""
+<style>
+/* PanPhy full-page UI blocker */
+.pp-overlay {{
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.25);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: all;
+}}
+.pp-overlay-card {{
+  width: min(560px, 92vw);
+  background: rgba(255,255,255,0.96);
+  border-radius: 18px;
+  padding: 20px 22px;
+  box-shadow: 0 14px 42px rgba(0,0,0,0.28);
+}}
+.pp-row {{
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}}
+.pp-title {{
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  padding: 0;
+}}
+.pp-sub {{
+  font-size: 0.92rem;
+  opacity: 0.85;
+  margin-top: 2px;
+  line-height: 1.25rem;
+}}
+.pp-spinner {{
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 4px solid rgba(0,0,0,0.15);
+  border-top-color: rgba(0,0,0,0.55);
+  animation: pp-spin 0.9s linear infinite;
+  flex: 0 0 auto;
+}}
+@keyframes pp-spin {{
+  from {{ transform: rotate(0deg); }}
+  to   {{ transform: rotate(360deg); }}
+}}
+.pp-bar {{
+  width: 100%;
+  height: 10px;
+  background: rgba(0,0,0,0.12);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 16px;
+}}
+.pp-bar-inner {{
+  height: 100%;
+  width: {pct}%;
+  background: rgba(0,0,0,0.55);
+  border-radius: 999px;
+  transition: width 120ms linear;
+}}
+.pp-pct {{
+  font-size: 0.85rem;
+  opacity: 0.75;
+  margin-top: 8px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}}
+</style>
+
+<div class="pp-overlay" role="status" aria-live="polite">
+  <div class="pp-overlay-card">
+    <div class="pp-row">
+      <div class="pp-spinner"></div>
+      <div>
+        <div class="pp-title">Processing…</div>
+        <div class="pp-sub">{subtitle}</div>
+      </div>
+    </div>
+    <div class="pp-bar"><div class="pp-bar-inner"></div></div>
+    <div class="pp-pct">{pct}%</div>
+  </div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+    start = time.monotonic()
+    _render_overlay(2, f"AI is working (typically {typical_range}). Please wait.")
+
+    try:
         with ThreadPoolExecutor(max_workers=1) as ex:
             fut = ex.submit(task_fn)
             while not fut.done():
                 elapsed = time.monotonic() - start
                 frac = min(0.95, max(0.02, elapsed / max(1e-6, est_seconds)))
-                progress.progress(int(frac * 100))
+                _render_overlay(int(frac * 100), f"AI is working (typically {typical_range}). Please wait.")
                 time.sleep(0.12)
 
             report = fut.result()
 
-        progress.progress(100)
-        status.update(label="✓ Done", state="complete", expanded=False)
+        _render_overlay(100, "Done. Updating your feedback…")
+        time.sleep(0.08)
+        return report
+    finally:
+        # Always remove the overlay, even if the AI call errors.
+        overlay.empty()
 
-    return report
 
 # ============================================================
 # DB OPERATIONS (attempts + question bank)
