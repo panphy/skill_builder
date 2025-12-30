@@ -109,9 +109,92 @@ CANVAS_MAX_MB = 2.0
 SUBJECT_SITE = (st.secrets.get("SUBJECT_SITE") if hasattr(st, "secrets") else None) or os.getenv("SUBJECT_SITE", "physics")
 SUBJECT_SITE = (SUBJECT_SITE or "physics").strip().lower()
 
+
+# ============================================================
+# TRACK (combined vs separate) - sticky via device localStorage + URL query param
+# ============================================================
+TRACK_PARAM = "track"
+TRACK_DEFAULT = "combined"
+TRACK_ALLOWED = {"combined", "separate"}
+TRACK_STORAGE_KEY = f"panphy_track_{SUBJECT_SITE}"
+
+def _get_query_param(key: str) -> str:
+    # Streamlit changed query param APIs across versions; support both.
+    try:
+        v = st.query_params.get(key)
+        if isinstance(v, list):
+            return (v[0] or "").strip()
+        return (v or "").strip()
+    except Exception:
+        qp = st.experimental_get_query_params()
+        v = qp.get(key, [""])[0]
+        return (v or "").strip()
+
+def _set_query_param(**kwargs):
+    try:
+        for k, v in kwargs.items():
+            st.query_params[k] = v
+    except Exception:
+        st.experimental_set_query_params(**kwargs)
+
+def _inject_track_restore_script():
+    # If URL has no ?track=..., restore from localStorage and hard-reload once.
+    st.markdown(
+        f"""
+<script>
+(function() {{
+  const KEY = {json.dumps(TRACK_STORAGE_KEY)};
+  const DEFAULT = {json.dumps(TRACK_DEFAULT)};
+  const url = new URL(window.location.href);
+  const hasTrack = url.searchParams.has({json.dumps(TRACK_PARAM)});
+  if (!hasTrack) {{
+    const saved = window.localStorage.getItem(KEY);
+    const useVal = (saved === "combined" || saved === "separate") ? saved : DEFAULT;
+    url.searchParams.set({json.dumps(TRACK_PARAM)}, useVal);
+    window.location.replace(url.toString());
+  }}
+}})();
+</script>
+""",
+        unsafe_allow_html=True
+    )
+
+def _persist_track_to_browser(track_value: str):
+    track_value = (track_value or "").strip().lower()
+    if track_value not in TRACK_ALLOWED:
+        track_value = TRACK_DEFAULT
+    st.markdown(
+        f"""
+<script>
+(function() {{
+  const KEY = {json.dumps(TRACK_STORAGE_KEY)};
+  try {{ window.localStorage.setItem(KEY, {json.dumps(track_value)}); }} catch (e) {{}}
+}})();
+</script>
+""",
+        unsafe_allow_html=True
+    )
+
+def init_track_state():
+    # Run restore script first so first load picks up localStorage
+    if "track_init_done" not in st.session_state:
+        st.session_state["track_init_done"] = True
+        _inject_track_restore_script()
+
+    qp_track = _get_query_param(TRACK_PARAM).lower()
+    if qp_track not in TRACK_ALLOWED:
+        qp_track = TRACK_DEFAULT
+
+    if st.session_state.get("track") not in TRACK_ALLOWED:
+        st.session_state["track"] = qp_track
+
+    # Keep URL in sync if needed
+    if _get_query_param(TRACK_PARAM).lower() != st.session_state["track"]:
+        _set_query_param(**{TRACK_PARAM: st.session_state["track"]})
+
 @st.cache_data(show_spinner=False)
 def _load_subject_pack(subject_site: str) -> dict:
-    base = Path(__file__).parent
+    base = Path(__file__).parentt
     subj_dir = base / "subjects" / subject_site
 
     topics_path = subj_dir / "topics.json"
@@ -147,8 +230,20 @@ SUBJECT_TOPICS_RAW = SUBJECT_PACK.get("topics", {}) or {}
 SUBJECT_PROMPTS = SUBJECT_PACK.get("prompts", {}) or {}
 
 # Topics for dropdowns (student + teacher)
-_topics_list = SUBJECT_TOPICS_RAW.get("topics", [])
-AQA_GCSE_HIGHER_TOPICS = [t.get("name", "").strip() for t in _topics_list if str(t.get("name", "")).strip()]
+TOPICS_CATALOG = SUBJECT_TOPICS_RAW.get("topics", [])
+
+def get_topic_names_for_track(track: str) -> List[str]:
+    track = (track or "").strip().lower()
+    names: List[str] = []
+    for t in TOPICS_CATALOG:
+        name = str(t.get("name", "")).strip()
+        if not name:
+            continue
+        track_ok = str(t.get("track_ok", "both")).strip().lower() or "both"
+        if track == "combined" and track_ok == "separate_only":
+            continue
+        names.append(name)
+    return names
 
 # UI option lists (can be overridden per subject via settings.json)
 QUESTION_TYPES = SUBJECT_SETTINGS.get("question_types") or ["Calculation", "Explanation", "Practical/Methods", "Graph/Analysis", "Mixed"]
@@ -168,6 +263,10 @@ JOURNEY_USER_TPL = str(SUBJECT_PROMPTS.get("journey_user", "") or "")
 JOURNEY_REPAIR_PREFIX_TPL = str(SUBJECT_PROMPTS.get("journey_repair_prefix", "") or "")
 
 FEEDBACK_SYSTEM_TPL = str(SUBJECT_PROMPTS.get("feedback_system", "") or "")
+
+# Initialize track selection (combined vs separate) early
+init_track_state()
+
 # ============================================================
 # DATABASE DDLs
 #   IMPORTANT: avoid $$ PL/pgSQL blocks inside app DDL to prevent split/execution issues.
@@ -220,11 +319,16 @@ create index if not exists idx_question_bank_active
 """.strip()
 
 
-QUESTION_BANK_ALTER_DDL = """
+QUESTION_BANK_ALTER_DDL = f"""
 alter table public.question_bank_v1
   add column if not exists question_type text default 'single';
 alter table public.question_bank_v1
   add column if not exists journey_json jsonb;
+alter table public.question_bank_v1
+  add column if not exists subject_site text not null default '{SUBJECT_SITE}';
+alter table public.question_bank_v1
+  add column if not exists track_ok text not null default 'both';
+
 """
 
 # =========================
@@ -468,7 +572,7 @@ def ensure_attempts_table():
     );
     """
 
-    ddl_alter = """
+    ddl_alter = f"""
     alter table public.physics_attempts_v1
       add column if not exists question_bank_id bigint;
     alter table public.physics_attempts_v1
@@ -480,7 +584,12 @@ def ensure_attempts_table():
       add column if not exists readback_markdown text;
     alter table public.physics_attempts_v1
       add column if not exists readback_warnings jsonb;
-    """
+    alter table public.physics_attempts_v1
+      add column if not exists subject_site text not null default '{SUBJECT_SITE}';
+    alter table public.physics_attempts_v1
+      add column if not exists track text not null default 'combined';
+
+"""
 
     try:
         with eng.begin() as conn:
@@ -1202,16 +1311,18 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str, 
 
     query = """
         insert into public.physics_attempts_v1
-        (student_id, question_key, question_bank_id, step_index, mode, marks_awarded, max_marks, summary, feedback_points, next_steps,
+        (subject_site, track, student_id, question_key, question_bank_id, step_index, mode, marks_awarded, max_marks, summary, feedback_points, next_steps,
          readback_type, readback_markdown, readback_warnings)
         values
-        (:student_id, :question_key, :question_bank_id, :step_index, :mode, :marks_awarded, :max_marks, :summary,
+        (:subject_site, :track, :student_id, :question_key, :question_bank_id, :step_index, :mode, :marks_awarded, :max_marks, :summary,
          CAST(:feedback_points AS jsonb), CAST(:next_steps AS jsonb),
          :readback_type, :readback_markdown, CAST(:readback_warnings AS jsonb))
     """
     try:
         with eng.begin() as conn:
             conn.execute(text(query), {
+                "subject_site": SUBJECT_SITE,
+                "track": st.session_state.get("track","combined"),
                 "student_id": sid,
                 "question_key": question_key,
                 "question_bank_id": int(question_bank_id) if question_bank_id is not None else None,
@@ -1246,7 +1357,7 @@ def load_attempts_df_cached(_fp: str, limit: int = 5000) -> pd.DataFrame:
                 limit :limit
             """),
             conn,
-            params={"limit": int(limit)},
+            params={"limit": int(limit), "subject_site": subject_site},
         )
     if not df.empty:
         df["marks_awarded"] = pd.to_numeric(df["marks_awarded"], errors="coerce").fillna(0).astype(int)
@@ -1264,7 +1375,7 @@ def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=30)
-def load_question_bank_df_cached(_fp: str, limit: int = 5000, include_inactive: bool = False) -> pd.DataFrame:
+def load_question_bank_df_cached(_fp: str, track: str, subject_site: str, limit: int = 5000, include_inactive: bool = False) -> pd.DataFrame:
     """
     NOTE: This returns a *summary* table for listing/filtering, so we include
     light metadata + tags/question_text (for search). Full row is loaded by id.
@@ -1273,7 +1384,15 @@ def load_question_bank_df_cached(_fp: str, limit: int = 5000, include_inactive: 
     if eng is None:
         return pd.DataFrame()
     ensure_question_bank_table()
-    where = "" if include_inactive else "where is_active = true"
+    track = (track or "").strip().lower()
+    subject_site = (subject_site or "").strip().lower() or SUBJECT_SITE
+    clauses = []
+    if not include_inactive:
+        clauses.append("is_active = true")
+    clauses.append("subject_site = :subject_site")
+    if track == "combined":
+        clauses.append("track_ok = 'both'")
+    where = ("where " + " and ".join(clauses)) if clauses else ""
     with eng.connect() as conn:
         df = pd.read_sql(
             text(f"""
@@ -1281,14 +1400,14 @@ def load_question_bank_df_cached(_fp: str, limit: int = 5000, include_inactive: 
                   id, created_at, updated_at,
                   source, assignment_name, question_label,
                   max_marks, question_type, tags, question_text,
-                  is_active
+                  subject_site, track_ok, is_active
                 from public.question_bank_v1
                 {where}
                 order by created_at desc
                 limit :limit
             """),
             conn,
-            params={"limit": int(limit)},
+            params={"limit": int(limit), "subject_site": subject_site},
         )
     return df
 
@@ -1296,7 +1415,7 @@ def load_question_bank_df_cached(_fp: str, limit: int = 5000, include_inactive: 
 def load_question_bank_df(limit: int = 5000, include_inactive: bool = False) -> pd.DataFrame:
     fp = (st.secrets.get("DATABASE_URL", "") or "")[:40]
     try:
-        return load_question_bank_df_cached(fp, limit=limit, include_inactive=include_inactive)
+        return load_question_bank_df_cached(fp, track=st.session_state.get('track','combined'), subject_site=SUBJECT_SITE, limit=limit, include_inactive=include_inactive)
     except Exception as e:
         st.session_state["db_last_error"] = f"Load Question Bank Error: {type(e).__name__}: {e}"
         return pd.DataFrame()
@@ -1310,8 +1429,8 @@ def load_question_by_id_cached(_fp: str, qid: int) -> Dict[str, Any]:
     ensure_question_bank_table()
     with eng.connect() as conn:
         row = conn.execute(
-            text("select * from public.question_bank_v1 where id = :id limit 1"),
-            {"id": int(qid)}
+            text("select * from public.question_bank_v1 where id = :id and subject_site = :subject_site limit 1"),
+            {"id": int(qid), "subject_site": SUBJECT_SITE}
         ).mappings().first()
     return dict(row) if row else {}
 
@@ -1344,24 +1463,31 @@ def insert_question_bank_row(
         return False
     ensure_question_bank_table()
 
+    subject_site = (subject_site or "").strip().lower() or SUBJECT_SITE
+    track_ok = (track_ok or "").strip().lower() or "both"
+    if track_ok not in ("both", "separate_only"):
+        track_ok = "both"
+
     qtype = (question_type or "single").strip().lower()
     if qtype not in ("single", "journey"):
         qtype = "single"
 
     query = """
     insert into public.question_bank_v1
-      (source, created_by, assignment_name, question_label, max_marks, question_type, journey_json, tags,
+      (source, created_by, subject_site, track_ok, assignment_name, question_label, max_marks, question_type, journey_json, tags,
        question_text, question_image_path,
        markscheme_text, markscheme_image_path,
        is_active, updated_at)
     values
-      (:source, :created_by, :assignment_name, :question_label, :max_marks, :question_type, CAST(:journey_json AS jsonb),
+      (:source, :created_by, :subject_site, :track_ok, :assignment_name, :question_label, :max_marks, :question_type, CAST(:journey_json AS jsonb),
        CAST(:tags AS jsonb),
        :question_text, :question_image_path,
        :markscheme_text, :markscheme_image_path,
        true, now())
     on conflict (source, assignment_name, question_label) do update set
        created_by = excluded.created_by,
+       subject_site = excluded.subject_site,
+       track_ok = excluded.track_ok,
        max_marks = excluded.max_marks,
        question_type = excluded.question_type,
        journey_json = excluded.journey_json,
@@ -1378,6 +1504,8 @@ def insert_question_bank_row(
             res = conn.execute(text(query), {
                 "source": source,
                 "created_by": (created_by or "").strip() or None,
+                "subject_site": subject_site,
+                "track_ok": track_ok,
                 "assignment_name": assignment_name.strip(),
                 "question_label": question_label.strip(),
                 "max_marks": int(max_marks),
@@ -1591,6 +1719,7 @@ def generate_practice_question_with_ai(
         system = _render_template(QGEN_SYSTEM_TPL, {
             "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
             "MARKDOWN_LATEX_RULES": MARKDOWN_LATEX_RULES,
+            "TRACK": st.session_state.get("track", TRACK_DEFAULT),
         })
         system = (system or "").strip()
 
@@ -1600,6 +1729,7 @@ def generate_practice_question_with_ai(
             "QTYPE": str(qtype),
             "MARKS": int(marks),
             "EXTRA_INSTRUCTIONS": (extra_instructions or "").strip() or "(none)",
+            "TRACK": st.session_state.get("track", TRACK_DEFAULT),
         })
         base_user = (base_user or "").strip()
 
@@ -1704,6 +1834,7 @@ def generate_topic_journey_with_ai(
         system = _render_template(JOURNEY_SYSTEM_TPL, {
             "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
             "MARKDOWN_LATEX_RULES": MARKDOWN_LATEX_RULES,
+            "TRACK": st.session_state.get("track", TRACK_DEFAULT),
         })
         system = (system or "").strip()
 
@@ -1821,6 +1952,21 @@ nav = st.sidebar.radio(
     index=0,
     key="nav_page",
 )
+
+# Track selector (sticky via localStorage + URL param)
+_sb_track_label = st.sidebar.selectbox(
+    "Track",
+    ["Combined", "Separate"],
+    index=0 if st.session_state.get("track", TRACK_DEFAULT) == "combined" else 1,
+    key="sidebar_track_label",
+    help="Combined hides Separate-only topics/questions. Separate shows everything.",
+)
+_sb_track = "combined" if _sb_track_label == "Combined" else "separate"
+if _sb_track != st.session_state.get("track", TRACK_DEFAULT):
+    st.session_state["track"] = _sb_track
+    _set_query_param(**{TRACK_PARAM: _sb_track})
+_persist_track_to_browser(st.session_state.get("track", TRACK_DEFAULT))
+
 
 header_left, header_mid, header_right = st.columns([3, 2, 1])
 with header_left:
@@ -2751,6 +2897,17 @@ else:
     st.divider()
     st.subheader("📚 Question Bank")
 
+    # Default track eligibility tag for any question you SAVE (AI drafts, edited, uploads).
+    _tt_label = st.selectbox(
+        "Track eligibility for saved items",
+        ["Both (Combined + Separate)", "Separate only"],
+        index=0,
+        key="teacher_track_ok_label",
+        help="If set to 'Separate only', Combined students will NOT see the item. Use this for separate-only content.",
+    )
+    st.session_state["teacher_track_ok"] = "both" if _tt_label.startswith("Both") else "separate_only"
+
+
     with st.expander("Database tools"):
         if st.button("Reconnect to database", key="reconnect_db_bank"):
             _cached_engine.clear()
@@ -2986,7 +3143,7 @@ else:
                     with gen_c1:
                         topic_mode = st.radio("Topic input", ["Choose from AQA list", "Describe a topic"], horizontal=True, key="topic_mode")
                         if topic_mode == "Choose from AQA list":
-                            topic_choice = st.selectbox("AQA GCSE Physics Higher topic", AQA_GCSE_HIGHER_TOPICS, key="topic_choice")
+                            topic_choice = st.selectbox("AQA GCSE Physics topic", get_topic_names_for_track(st.session_state.get("track", TRACK_DEFAULT)), key="topic_choice", help="Topics shown depend on Combined/Separate selection.")
                             topic_text = topic_choice
                         else:
                             topic_text = st.text_input("Describe the topic", placeholder="e.g. stopping distance with thinking vs braking distance", key="topic_text")
@@ -3104,6 +3261,8 @@ else:
                                 ok = insert_question_bank_row(
                                     source="ai_generated",
                                     created_by="teacher",
+                                    subject_site=SUBJECT_SITE,
+                                    track_ok=st.session_state.get("teacher_track_ok", "both"),
                                     assignment_name=d_assignment.strip(),
                                     question_label=d_label.strip(),
                                     max_marks=int(d_marks),
@@ -3298,6 +3457,8 @@ else:
                                     ok = insert_question_bank_row(
                                         source="ai_generated",
                                         created_by="teacher",
+                                        subject_site=SUBJECT_SITE,
+                                        track_ok=st.session_state.get("teacher_track_ok", "both"),
                                         assignment_name=d_assignment.strip(),
                                         question_label=d_label.strip(),
                                         max_marks=int(total_marks) if total_marks > 0 else 1,
@@ -3392,6 +3553,8 @@ else:
                             ok_db = insert_question_bank_row(
                                 source="teacher",
                                 created_by="teacher",
+                                subject_site=SUBJECT_SITE,
+                                track_ok=st.session_state.get("teacher_track_ok", "both"),
                                 assignment_name=assignment_name.strip(),
                                 question_label=question_label.strip(),
                                 max_marks=int(max_marks_in),
