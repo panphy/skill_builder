@@ -1,4 +1,5 @@
 import streamlit as st
+from pathlib import Path
 from openai import OpenAI
 try:
     from components.panphy_stylus_canvas import stylus_canvas
@@ -96,45 +97,175 @@ QUESTION_MAX_MB = 5.0
 MARKSCHEME_MAX_MB = 5.0
 CANVAS_MAX_MB = 2.0
 
-# AI question generation
-AQA_GCSE_HIGHER_TOPICS = [
-    "Energy stores and transfers",
-    "Work done and power",
-    "Efficiency",
-    "Kinetic energy and momentum",
-    "Heating and thermal energy",
-    "Temperature vs energy",
-    "Specific heat capacity",
-    "Specific latent heat",
-    "Gas pressure and temperature",
-    "Density",
-    "Changes of state",
-    "Electric current, potential difference, resistance",
-    "Series and parallel circuits",
-    "I-V characteristics",
-    "Resistors (including thermistors and LDRs)",
-    "Power in circuits",
-    "Domestic electricity and safety",
-    "Static electricity",
-    "Particle model and internal energy",
-    "Forces and motion (Newton's laws)",
-    "Resultant force and acceleration",
-    "Stopping distance",
-    "Moments, levers and gears",
-    "Pressure in fluids",
-    "Waves (properties and equations)",
-    "Reflection and refraction",
-    "Lenses and ray diagrams",
-    "The electromagnetic spectrum",
-    "Radioactivity basics",
-    "Half-life and decay",
-    "Nuclear fission and fusion",
-    "Magnetism and electromagnets",
-    "Motor effect",
-    "Generators and transformers",
-]
-QUESTION_TYPES = ["Calculation", "Explanation", "Practical/Methods", "Graph/Analysis", "Mixed"]
-DIFFICULTIES = ["Easy", "Medium", "Hard"]
+# ============================================================
+# SUBJECT CONTENT (topics + prompts)
+# ============================================================
+# For multi-subject scaling: keep the core app identical, and store subject-specific
+# topic lists and AI prompt packs under: subjects/<subject_site>/.
+#
+# Recommended deployment pattern for separate subject sites:
+#   - set SUBJECT_SITE in Streamlit Secrets (or environment variable)
+#   - e.g. SUBJECT_SITE="physics"
+SUBJECT_SITE = (st.secrets.get("SUBJECT_SITE") if hasattr(st, "secrets") else None) or os.getenv("SUBJECT_SITE", "physics")
+SUBJECT_SITE = (SUBJECT_SITE or "physics").strip().lower()
+
+
+# ============================================================
+# TRACK (combined vs separate) - sticky via device localStorage + URL query param
+# ============================================================
+TRACK_PARAM = "track"
+TRACK_DEFAULT = "combined"
+TRACK_ALLOWED = {"combined", "separate"}
+TRACK_STORAGE_KEY = f"panphy_track_{SUBJECT_SITE}"
+
+def _get_query_param(key: str) -> str:
+    # Streamlit changed query param APIs across versions; support both.
+    try:
+        v = st.query_params.get(key)
+        if isinstance(v, list):
+            return (v[0] or "").strip()
+        return (v or "").strip()
+    except Exception:
+        qp = st.experimental_get_query_params()
+        v = qp.get(key, [""])[0]
+        return (v or "").strip()
+
+def _set_query_param(**kwargs):
+    try:
+        for k, v in kwargs.items():
+            st.query_params[k] = v
+    except Exception:
+        st.experimental_set_query_params(**kwargs)
+
+def _inject_track_restore_script():
+    # If URL has no ?track=..., restore from localStorage and hard-reload once.
+    st.markdown(
+        f"""
+<script>
+(function() {{
+  const KEY = {json.dumps(TRACK_STORAGE_KEY)};
+  const DEFAULT = {json.dumps(TRACK_DEFAULT)};
+  const url = new URL(window.location.href);
+  const hasTrack = url.searchParams.has({json.dumps(TRACK_PARAM)});
+  if (!hasTrack) {{
+    const saved = window.localStorage.getItem(KEY);
+    const useVal = (saved === "combined" || saved === "separate") ? saved : DEFAULT;
+    url.searchParams.set({json.dumps(TRACK_PARAM)}, useVal);
+    window.location.replace(url.toString());
+  }}
+}})();
+</script>
+""",
+        unsafe_allow_html=True
+    )
+
+def _persist_track_to_browser(track_value: str):
+    track_value = (track_value or "").strip().lower()
+    if track_value not in TRACK_ALLOWED:
+        track_value = TRACK_DEFAULT
+    st.markdown(
+        f"""
+<script>
+(function() {{
+  const KEY = {json.dumps(TRACK_STORAGE_KEY)};
+  try {{ window.localStorage.setItem(KEY, {json.dumps(track_value)}); }} catch (e) {{}}
+}})();
+</script>
+""",
+        unsafe_allow_html=True
+    )
+
+def init_track_state():
+    # Run restore script first so first load picks up localStorage
+    if "track_init_done" not in st.session_state:
+        st.session_state["track_init_done"] = True
+        _inject_track_restore_script()
+
+    qp_track = _get_query_param(TRACK_PARAM).lower()
+    if qp_track not in TRACK_ALLOWED:
+        qp_track = TRACK_DEFAULT
+
+    if st.session_state.get("track") not in TRACK_ALLOWED:
+        st.session_state["track"] = qp_track
+
+    # Keep URL in sync if needed
+    if _get_query_param(TRACK_PARAM).lower() != st.session_state["track"]:
+        _set_query_param(**{TRACK_PARAM: st.session_state["track"]})
+
+@st.cache_data(show_spinner=False)
+def _load_subject_pack(subject_site: str) -> dict:
+    base = Path(__file__).resolve().parent
+    subj_dir = base / "subjects" / subject_site
+
+    topics_path = subj_dir / "topics.json"
+    prompts_path = subj_dir / "prompts.json"
+    settings_path = subj_dir / "settings.json"
+
+    if not topics_path.exists():
+        raise FileNotFoundError(f"Missing topics file: {topics_path}")
+    if not prompts_path.exists():
+        raise FileNotFoundError(f"Missing prompts file: {prompts_path}")
+
+    topics = json.loads(topics_path.read_text(encoding="utf-8"))
+    prompts = json.loads(prompts_path.read_text(encoding="utf-8"))
+    settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.exists() else {}
+
+    return {"topics": topics, "prompts": prompts, "settings": settings}
+
+def _render_template(tpl: str, mapping: Dict[str, Any]) -> str:
+    # Simple token replacement. Tokens look like: <<TOKEN_NAME>>
+    out = str(tpl or "")
+    for k, v in (mapping or {}).items():
+        out = out.replace(f"<<{k}>>", str(v))
+    return out
+
+try:
+    SUBJECT_PACK = _load_subject_pack(SUBJECT_SITE)
+except Exception as _e:
+    st.error(f"❌ Subject pack failed to load for SUBJECT_SITE='{SUBJECT_SITE}'.\n\n{type(_e).__name__}: {_e}")
+    st.stop()
+
+SUBJECT_SETTINGS = SUBJECT_PACK.get("settings", {}) or {}
+SUBJECT_TOPICS_RAW = SUBJECT_PACK.get("topics", {}) or {}
+SUBJECT_PROMPTS = SUBJECT_PACK.get("prompts", {}) or {}
+
+# Topics for dropdowns (student + teacher)
+TOPICS_CATALOG = SUBJECT_TOPICS_RAW.get("topics", [])
+
+def get_topic_names_for_track(track: str) -> List[str]:
+    track = (track or "").strip().lower()
+    names: List[str] = []
+    for t in TOPICS_CATALOG:
+        name = str(t.get("name", "")).strip()
+        if not name:
+            continue
+        track_ok = str(t.get("track_ok", "both")).strip().lower() or "both"
+        if track == "combined" and track_ok == "separate_only":
+            continue
+        names.append(name)
+    return names
+
+# UI option lists (can be overridden per subject via settings.json)
+QUESTION_TYPES = SUBJECT_SETTINGS.get("question_types") or ["Calculation", "Explanation", "Practical/Methods", "Graph/Analysis", "Mixed"]
+DIFFICULTIES = SUBJECT_SETTINGS.get("difficulties") or ["Easy", "Medium", "Hard"]
+
+# Prompt components (loaded from prompts.json)
+GCSE_ONLY_GUARDRAILS = str(SUBJECT_PROMPTS.get("gcse_only_guardrails", "") or "").strip()
+MARKDOWN_LATEX_RULES = str(SUBJECT_PROMPTS.get("markdown_latex_rules", "") or "").strip()
+
+# Prompt templates
+QGEN_SYSTEM_TPL = str(SUBJECT_PROMPTS.get("qgen_system", "") or "")
+QGEN_USER_TPL = str(SUBJECT_PROMPTS.get("qgen_user", "") or "")
+QGEN_REPAIR_PREFIX_TPL = str(SUBJECT_PROMPTS.get("qgen_repair_prefix", "") or "")
+
+JOURNEY_SYSTEM_TPL = str(SUBJECT_PROMPTS.get("journey_system", "") or "")
+JOURNEY_USER_TPL = str(SUBJECT_PROMPTS.get("journey_user", "") or "")
+JOURNEY_REPAIR_PREFIX_TPL = str(SUBJECT_PROMPTS.get("journey_repair_prefix", "") or "")
+
+FEEDBACK_SYSTEM_TPL = str(SUBJECT_PROMPTS.get("feedback_system", "") or "")
+
+# Initialize track selection (combined vs separate) early
+init_track_state()
 
 # ============================================================
 # DATABASE DDLs
@@ -188,11 +319,16 @@ create index if not exists idx_question_bank_active
 """.strip()
 
 
-QUESTION_BANK_ALTER_DDL = """
+QUESTION_BANK_ALTER_DDL = f"""
 alter table public.question_bank_v1
   add column if not exists question_type text default 'single';
 alter table public.question_bank_v1
   add column if not exists journey_json jsonb;
+alter table public.question_bank_v1
+  add column if not exists subject_site text not null default '{SUBJECT_SITE}';
+alter table public.question_bank_v1
+  add column if not exists track_ok text not null default 'both';
+
 """
 
 # =========================
@@ -436,7 +572,7 @@ def ensure_attempts_table():
     );
     """
 
-    ddl_alter = """
+    ddl_alter = f"""
     alter table public.physics_attempts_v1
       add column if not exists question_bank_id bigint;
     alter table public.physics_attempts_v1
@@ -448,7 +584,12 @@ def ensure_attempts_table():
       add column if not exists readback_markdown text;
     alter table public.physics_attempts_v1
       add column if not exists readback_warnings jsonb;
-    """
+    alter table public.physics_attempts_v1
+      add column if not exists subject_site text not null default '{SUBJECT_SITE}';
+    alter table public.physics_attempts_v1
+      add column if not exists track text not null default 'combined';
+
+"""
 
     try:
         with eng.begin() as conn:
@@ -1170,16 +1311,18 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str, 
 
     query = """
         insert into public.physics_attempts_v1
-        (student_id, question_key, question_bank_id, step_index, mode, marks_awarded, max_marks, summary, feedback_points, next_steps,
+        (subject_site, track, student_id, question_key, question_bank_id, step_index, mode, marks_awarded, max_marks, summary, feedback_points, next_steps,
          readback_type, readback_markdown, readback_warnings)
         values
-        (:student_id, :question_key, :question_bank_id, :step_index, :mode, :marks_awarded, :max_marks, :summary,
+        (:subject_site, :track, :student_id, :question_key, :question_bank_id, :step_index, :mode, :marks_awarded, :max_marks, :summary,
          CAST(:feedback_points AS jsonb), CAST(:next_steps AS jsonb),
          :readback_type, :readback_markdown, CAST(:readback_warnings AS jsonb))
     """
     try:
         with eng.begin() as conn:
             conn.execute(text(query), {
+                "subject_site": SUBJECT_SITE,
+                "track": st.session_state.get("track","combined"),
                 "student_id": sid,
                 "question_key": question_key,
                 "question_bank_id": int(question_bank_id) if question_bank_id is not None else None,
@@ -1214,7 +1357,7 @@ def load_attempts_df_cached(_fp: str, limit: int = 5000) -> pd.DataFrame:
                 limit :limit
             """),
             conn,
-            params={"limit": int(limit)},
+            params={"limit": int(limit), "subject_site": subject_site},
         )
     if not df.empty:
         df["marks_awarded"] = pd.to_numeric(df["marks_awarded"], errors="coerce").fillna(0).astype(int)
@@ -1232,7 +1375,7 @@ def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=30)
-def load_question_bank_df_cached(_fp: str, limit: int = 5000, include_inactive: bool = False) -> pd.DataFrame:
+def load_question_bank_df_cached(_fp: str, track: str, subject_site: str, limit: int = 5000, include_inactive: bool = False) -> pd.DataFrame:
     """
     NOTE: This returns a *summary* table for listing/filtering, so we include
     light metadata + tags/question_text (for search). Full row is loaded by id.
@@ -1241,7 +1384,15 @@ def load_question_bank_df_cached(_fp: str, limit: int = 5000, include_inactive: 
     if eng is None:
         return pd.DataFrame()
     ensure_question_bank_table()
-    where = "" if include_inactive else "where is_active = true"
+    track = (track or "").strip().lower()
+    subject_site = (subject_site or "").strip().lower() or SUBJECT_SITE
+    clauses = []
+    if not include_inactive:
+        clauses.append("is_active = true")
+    clauses.append("subject_site = :subject_site")
+    if track == "combined":
+        clauses.append("track_ok = 'both'")
+    where = ("where " + " and ".join(clauses)) if clauses else ""
     with eng.connect() as conn:
         df = pd.read_sql(
             text(f"""
@@ -1249,14 +1400,14 @@ def load_question_bank_df_cached(_fp: str, limit: int = 5000, include_inactive: 
                   id, created_at, updated_at,
                   source, assignment_name, question_label,
                   max_marks, question_type, tags, question_text,
-                  is_active
+                  subject_site, track_ok, is_active
                 from public.question_bank_v1
                 {where}
                 order by created_at desc
                 limit :limit
             """),
             conn,
-            params={"limit": int(limit)},
+            params={"limit": int(limit), "subject_site": subject_site},
         )
     return df
 
@@ -1264,7 +1415,7 @@ def load_question_bank_df_cached(_fp: str, limit: int = 5000, include_inactive: 
 def load_question_bank_df(limit: int = 5000, include_inactive: bool = False) -> pd.DataFrame:
     fp = (st.secrets.get("DATABASE_URL", "") or "")[:40]
     try:
-        return load_question_bank_df_cached(fp, limit=limit, include_inactive=include_inactive)
+        return load_question_bank_df_cached(fp, track=st.session_state.get('track','combined'), subject_site=SUBJECT_SITE, limit=limit, include_inactive=include_inactive)
     except Exception as e:
         st.session_state["db_last_error"] = f"Load Question Bank Error: {type(e).__name__}: {e}"
         return pd.DataFrame()
@@ -1278,8 +1429,8 @@ def load_question_by_id_cached(_fp: str, qid: int) -> Dict[str, Any]:
     ensure_question_bank_table()
     with eng.connect() as conn:
         row = conn.execute(
-            text("select * from public.question_bank_v1 where id = :id limit 1"),
-            {"id": int(qid)}
+            text("select * from public.question_bank_v1 where id = :id and subject_site = :subject_site limit 1"),
+            {"id": int(qid), "subject_site": SUBJECT_SITE}
         ).mappings().first()
     return dict(row) if row else {}
 
@@ -1312,24 +1463,31 @@ def insert_question_bank_row(
         return False
     ensure_question_bank_table()
 
+    subject_site = (subject_site or "").strip().lower() or SUBJECT_SITE
+    track_ok = (track_ok or "").strip().lower() or "both"
+    if track_ok not in ("both", "separate_only"):
+        track_ok = "both"
+
     qtype = (question_type or "single").strip().lower()
     if qtype not in ("single", "journey"):
         qtype = "single"
 
     query = """
     insert into public.question_bank_v1
-      (source, created_by, assignment_name, question_label, max_marks, question_type, journey_json, tags,
+      (source, created_by, subject_site, track_ok, assignment_name, question_label, max_marks, question_type, journey_json, tags,
        question_text, question_image_path,
        markscheme_text, markscheme_image_path,
        is_active, updated_at)
     values
-      (:source, :created_by, :assignment_name, :question_label, :max_marks, :question_type, CAST(:journey_json AS jsonb),
+      (:source, :created_by, :subject_site, :track_ok, :assignment_name, :question_label, :max_marks, :question_type, CAST(:journey_json AS jsonb),
        CAST(:tags AS jsonb),
        :question_text, :question_image_path,
        :markscheme_text, :markscheme_image_path,
        true, now())
     on conflict (source, assignment_name, question_label) do update set
        created_by = excluded.created_by,
+       subject_site = excluded.subject_site,
+       track_ok = excluded.track_ok,
        max_marks = excluded.max_marks,
        question_type = excluded.question_type,
        journey_json = excluded.journey_json,
@@ -1346,6 +1504,8 @@ def insert_question_bank_row(
             res = conn.execute(text(query), {
                 "source": source,
                 "created_by": (created_by or "").strip() or None,
+                "subject_site": subject_site,
+                "track_ok": track_ok,
                 "assignment_name": assignment_name.strip(),
                 "question_label": question_label.strip(),
                 "max_marks": int(max_marks),
@@ -1375,35 +1535,15 @@ def insert_question_bank_row(
 # ============================================================
 def _mk_system_schema(max_marks: int, question_text: str = "") -> str:
     qt = f"\nQuestion (student-facing):\n{question_text}\n" if question_text else "\n"
-    return f"""
-You are a strict GCSE Physics examiner.
+    tpl = (FEEDBACK_SYSTEM_TPL or "").strip()
+    if not tpl:
+        # Fallback: should not happen if prompts.json is present
+        tpl = "You are a strict GCSE examiner. Output ONLY JSON."
+    return _render_template(tpl, {
+        "QT": qt,
+        "MAX_MARKS": int(max_marks),
+    })
 
-CONFIDENTIALITY RULE (CRITICAL):
-- The mark scheme is confidential. Do NOT reveal it, quote it, or paraphrase it.
-- When producing the readback, ONLY describe what is in the student's work. Do not use the mark scheme.
-
-OUTPUT RULE:
-- Output ONLY valid JSON, nothing else.
-
-Readback formatting:
-- readback_markdown MUST be valid Markdown.
-- Use LaTeX only inside $...$ or $$...$$.
-
-Schema:
-{{
-  "readback_type": "<handwriting|diagram|mixed|unknown>",
-  "readback_markdown": "<Markdown with LaTeX where helpful. Keep it concise but complete.>",
-  "readback_warnings": ["<optional warning 1>", "<optional warning 2>"],
-  "marks_awarded": <int>,
-  "max_marks": <int>,
-  "summary": "<1-2 sentences>",
-  "feedback_points": ["<bullet 1>", "<bullet 2>"],
-  "next_steps": ["<action 1>", "<action 2>"]
-}}
-
-{qt}
-Max Marks: {int(max_marks)}
-""".strip()
 
 
 def _finalize_report(data: dict, max_marks: int) -> dict:
@@ -1506,31 +1646,6 @@ def get_gpt_feedback_from_bank(
 # ============================================================
 # AI QUESTION GENERATOR (teacher-only, vet, then save)
 # ============================================================
-GCSE_ONLY_GUARDRAILS = """
-GCSE-ONLY CONTENT GUARDRAILS (CRITICAL):
-- This app generates questions for AQA GCSE Physics (Higher). The question MUST be GCSE-level.
-- Do NOT include A-level/IB/degree content, including (non-exhaustive):
-  * permeability/permittivity constants: \\mu_0, \\epsilon_0
-  * solenoid field equations like B = \\mu_0 n I
-  * magnetic flux density calculations, magnetic flux, Faraday's law in equation form
-  * calculus, differentiation/integration, vector cross products, field theory
-  * "n (turns per metre)" style quantities, "flux linkage", "inductance"
-- If the chosen topic is "Magnetism and electromagnets", focus on GCSE outcomes:
-  * magnetic fields around magnets/wires, compasses, plotting fields
-  * electromagnets (coil + iron core), factors affecting strength (current, turns, core)
-  * uses and safety, qualitative reasoning, simple circuit context
-  * avoid any magnetic field strength formula or B calculations.
-""".strip()
-
-MARKDOWN_LATEX_RULES = """
-FORMATTING RULES:
-- question_text MUST be valid Markdown and must render well in Streamlit's st.markdown.
-- Use LaTeX only inside $...$ or $$...$$.
-- Use (a), (b), (c) subparts as plain text, and put any equations in LaTeX.
-- Use SI units and clear formatting.
-""".strip()
-
-
 def generate_practice_question_with_ai(
     topic_text: str,
     difficulty: str,
@@ -1601,70 +1716,33 @@ def generate_practice_question_with_ai(
         return (len(reasons) == 0), reasons
 
     def _call_model(repair: bool, reasons: Optional[List[str]] = None) -> Dict[str, Any]:
-        system = f"""
-You are an expert AQA GCSE Physics (Higher) question writer and examiner.
+        system = _render_template(QGEN_SYSTEM_TPL, {
+            "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
+            "MARKDOWN_LATEX_RULES": MARKDOWN_LATEX_RULES,
+            "TRACK": st.session_state.get("track", TRACK_DEFAULT),
+        })
+        system = (system or "").strip()
 
-Hard rules:
-1) Create an ORIGINAL practice question. Do not reproduce copyrighted exam questions.
-2) Must match AQA GCSE Physics Higher style and standard.
-3) Stay strictly GCSE-level. Do not drift into A-level content.
-4) Marks must be allocated per part, and the total must equal max_marks EXACTLY.
-5) The mark scheme must include marking points for EVERY part.
-6) Calculation marking must be GCSE-appropriate:
-   - If a calculation requires more than one step, allocate at least 2 marks:
-     one method mark (setup/substitution/rearrangement) and one accuracy mark (answer with unit).
-7) Return ONLY valid JSON, nothing else.
-
-{GCSE_ONLY_GUARDRAILS}
-
-{MARKDOWN_LATEX_RULES}
-
-Schema:
-{{
-  "question_text": "string",
-  "markscheme_text": "string",
-  "max_marks": integer,
-  "tags": ["string", "string", ...]
-}}
-
-Mark scheme formatting requirements inside markscheme_text:
-- Use a part-by-part breakdown with explicit mark allocation, for example:
-  (a) ... [2]
-  (b) ... [3]
-- End with: TOTAL = <max_marks>
-""".strip()
-
-        base_user = f"""
-Topic: {topic_text.strip()}
-Difficulty: {difficulty}
-Question type: {qtype}
-max_marks: {int(marks)}
-
-Additional teacher instructions (optional):
-{extra_instructions.strip() if extra_instructions else "(none)"}
-
-Constraints:
-- Keep the question clearly GCSE. Avoid any forbidden content in the guardrails.
-- Ensure the question is in Markdown and uses LaTeX only inside $...$ or $$...$$.
-- End markscheme_text with EXACTLY: TOTAL = {int(marks)}.
-""".strip()
+        base_user = _render_template(QGEN_USER_TPL, {
+            "TOPIC": (topic_text or "").strip(),
+            "DIFFICULTY": str(difficulty),
+            "QTYPE": str(qtype),
+            "MARKS": int(marks),
+            "EXTRA_INSTRUCTIONS": (extra_instructions or "").strip() or "(none)",
+            "TRACK": st.session_state.get("track", TRACK_DEFAULT),
+        })
+        base_user = (base_user or "").strip()
 
         if not repair:
             user = base_user
         else:
             bullet_reasons = "\n".join([f"- {r}" for r in (reasons or [])]) or "- (unspecified)"
-            user = f"""
-You previously generated a draft that failed validation. Fix it and return corrected JSON only.
+            user = _render_template(QGEN_REPAIR_PREFIX_TPL, {
+                "BULLET_REASONS": bullet_reasons,
+                "MARKS": int(marks),
+            })
+            user = (user or "").strip() + "\n\n" + base_user
 
-Validation failures:
-{bullet_reasons}
-
-You MUST:
-- Keep topic, difficulty, type and max_marks unchanged.
-- Remove any forbidden GCSE-only content (see guardrails).
-- Ensure Markdown + LaTeX formatting rules are followed.
-- Make the TOTAL line match max_marks exactly: TOTAL = {int(marks)}.
-""".strip() + "\n\n" + base_user
 
         response = client.chat.completions.create(
             model=MODEL_NAME,
@@ -1753,77 +1831,33 @@ def generate_topic_journey_with_ai(
         return (len(reasons) == 0), reasons
 
     def _call_model(repair: bool, reasons: Optional[List[str]] = None) -> Dict[str, Any]:
-        system = f"""
-You are an expert AQA GCSE Physics (8463) Higher question writer and examiner.
-
-Hard rules:
-1) Create an ORIGINAL Topic Journey (no copyrighted exam questions).
-2) Tier: Higher only. Stay strictly GCSE level.
-3) Each step must build towards a final hardest exam-style question.
-4) Return ONLY valid JSON, nothing else.
-
-{GCSE_ONLY_GUARDRAILS}
-
-{MARKDOWN_LATEX_RULES}
-
-Keep it aligned to GCSE Physics and written for 14-16 year olds. Do not mention any exam board.
-
-Schema:
-{{
-  "topic": "string",
-  "duration_minutes": {int(duration_minutes)},
-  "checkpoint_every": {JOURNEY_CHECKPOINT_EVERY},
-  "plan_markdown": "string (a numbered list of steps with objectives)",
-  "spec_alignment": ["string", ...],
-  "steps": [
-    {{
-      "objective": "string",
-      "question_text": "Markdown + LaTeX",
-      "markscheme_text": "Markdown + LaTeX, part-by-part marks, ends with TOTAL = <max_marks>",
-      "max_marks": integer,
-      "misconceptions": ["string", ...],
-      "spec_refs": ["string", ...]
-    }}
-  ]
-}}
-""".strip()
+        system = _render_template(JOURNEY_SYSTEM_TPL, {
+            "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
+            "MARKDOWN_LATEX_RULES": MARKDOWN_LATEX_RULES,
+            "TRACK": st.session_state.get("track", TRACK_DEFAULT),
+        })
+        system = (system or "").strip()
 
         emph_txt = ", ".join([f"{k}={int(v)}" for k, v in (emphasis or {}).items()])
 
-        base_user = f"""
-Topic (plain English): {topic_plain_english}
-Tier: Higher
-Duration: {int(duration_minutes)} minutes
-Number of steps: {steps_n}
-Emphasis (0=none, 3=strong): {emph_txt}
-
-Requirements:
-- Steps should start simple and ramp up difficulty.
-- Include a mix of: recall, short reasoning, calculations, graphs/practicals as guided by emphasis.
-- Each step must include misconceptions (short bullet list).
-- For each step, include spec_refs (brief references like '4.2.1.2' OR descriptive headings). Do not quote large chunks.
-- Keep question_text and markscheme_text valid Markdown and MathJax-friendly LaTeX ($...$ / $$...$$).
-- For each step, markscheme_text MUST end with EXACTLY: TOTAL = <max_marks>
-""".strip()
+        base_user = _render_template(JOURNEY_USER_TPL, {
+            "TOPIC_PLAIN": (topic_plain_english or "").strip(),
+            "DURATION_MIN": int(duration_minutes),
+            "STEPS_N": int(steps_n),
+            "EMPHASIS_TXT": emph_txt,
+        })
+        base_user = (base_user or "").strip()
 
         if not repair:
             user = base_user
         else:
             bullet_reasons = "\n".join([f"- {r}" for r in (reasons or [])]) or "- (unspecified)"
-            user = f"""
-Your previous JSON failed validation. Fix it and return corrected JSON only.
+            user = _render_template(JOURNEY_REPAIR_PREFIX_TPL, {
+                "BULLET_REASONS": bullet_reasons,
+                "STEPS_N": int(steps_n),
+            })
+            user = (user or "").strip() + "\n\n" + base_user
 
-Validation failures:
-{bullet_reasons}
-
-Keep:
-- Topic, duration, step count, and emphasis.
-
-Make sure:
-- steps list length is exactly {steps_n}
-- each step has objective, question_text, markscheme_text, max_marks, misconceptions
-- markscheme_text ends with TOTAL = <max_marks> for every step
-""".strip() + "\n\n" + base_user
 
         response = client.chat.completions.create(
             model=MODEL_NAME,
@@ -1918,6 +1952,21 @@ nav = st.sidebar.radio(
     index=0,
     key="nav_page",
 )
+
+# Track selector (sticky via localStorage + URL param)
+_sb_track_label = st.sidebar.selectbox(
+    "Track",
+    ["Combined", "Separate"],
+    index=0 if st.session_state.get("track", TRACK_DEFAULT) == "combined" else 1,
+    key="sidebar_track_label",
+    help="Combined hides Separate-only topics/questions. Separate shows everything.",
+)
+_sb_track = "combined" if _sb_track_label == "Combined" else "separate"
+if _sb_track != st.session_state.get("track", TRACK_DEFAULT):
+    st.session_state["track"] = _sb_track
+    _set_query_param(**{TRACK_PARAM: _sb_track})
+_persist_track_to_browser(st.session_state.get("track", TRACK_DEFAULT))
+
 
 header_left, header_mid, header_right = st.columns([3, 2, 1])
 with header_left:
@@ -2848,6 +2897,17 @@ else:
     st.divider()
     st.subheader("📚 Question Bank")
 
+    # Default track eligibility tag for any question you SAVE (AI drafts, edited, uploads).
+    _tt_label = st.selectbox(
+        "Track eligibility for saved items",
+        ["Both (Combined + Separate)", "Separate only"],
+        index=0,
+        key="teacher_track_ok_label",
+        help="If set to 'Separate only', Combined students will NOT see the item. Use this for separate-only content.",
+    )
+    st.session_state["teacher_track_ok"] = "both" if _tt_label.startswith("Both") else "separate_only"
+
+
     with st.expander("Database tools"):
         if st.button("Reconnect to database", key="reconnect_db_bank"):
             _cached_engine.clear()
@@ -3083,7 +3143,7 @@ else:
                     with gen_c1:
                         topic_mode = st.radio("Topic input", ["Choose from AQA list", "Describe a topic"], horizontal=True, key="topic_mode")
                         if topic_mode == "Choose from AQA list":
-                            topic_choice = st.selectbox("AQA GCSE Physics Higher topic", AQA_GCSE_HIGHER_TOPICS, key="topic_choice")
+                            topic_choice = st.selectbox("AQA GCSE Physics topic", get_topic_names_for_track(st.session_state.get("track", TRACK_DEFAULT)), key="topic_choice", help="Topics shown depend on Combined/Separate selection.")
                             topic_text = topic_choice
                         else:
                             topic_text = st.text_input("Describe the topic", placeholder="e.g. stopping distance with thinking vs braking distance", key="topic_text")
@@ -3201,6 +3261,8 @@ else:
                                 ok = insert_question_bank_row(
                                     source="ai_generated",
                                     created_by="teacher",
+                                    subject_site=SUBJECT_SITE,
+                                    track_ok=st.session_state.get("teacher_track_ok", "both"),
                                     assignment_name=d_assignment.strip(),
                                     question_label=d_label.strip(),
                                     max_marks=int(d_marks),
@@ -3395,6 +3457,8 @@ else:
                                     ok = insert_question_bank_row(
                                         source="ai_generated",
                                         created_by="teacher",
+                                        subject_site=SUBJECT_SITE,
+                                        track_ok=st.session_state.get("teacher_track_ok", "both"),
                                         assignment_name=d_assignment.strip(),
                                         question_label=d_label.strip(),
                                         max_marks=int(total_marks) if total_marks > 0 else 1,
@@ -3489,6 +3553,8 @@ else:
                             ok_db = insert_question_bank_row(
                                 source="teacher",
                                 created_by="teacher",
+                                subject_site=SUBJECT_SITE,
+                                track_ok=st.session_state.get("teacher_track_ok", "both"),
                                 assignment_name=assignment_name.strip(),
                                 question_label=question_label.strip(),
                                 max_marks=int(max_marks_in),
