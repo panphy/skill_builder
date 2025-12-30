@@ -2343,6 +2343,79 @@ else:
             with tab_ai:
                 st.write("## 🤖 Generate practice question with AI (teacher vetting required)")
 
+                # -------------------------
+                # Spec guardrail selector
+                # -------------------------
+                spec_pack = None
+                target_spec_code = ""
+                spec_path = ""
+                try:
+                    spec_files = list_spec_json_files()
+                    # Prefer default file if present
+                    try:
+                        default_idx = [Path(p).name for p in spec_files].index(DEFAULT_SPEC_FILENAME)
+                    except Exception:
+                        default_idx = 0
+                    spec_path = st.selectbox(
+                        "Spec pack JSON (for guardrails)",
+                        options=spec_files,
+                        index=default_idx if spec_files else 0,
+                        format_func=lambda p: Path(p).name,
+                        key="spec_pack_path",
+                        help="Put your extracted spec JSON in ./specs/ (repo root). Example: specs/aqa_gcse_physics.json",
+                    )
+                    try:
+                        spec_pack = load_spec_pack(spec_path)
+                    except Exception as e:
+                        spec_pack = None
+                        st.warning(f"Spec pack not loaded: {e}")
+                except Exception as e:
+                    spec_pack = None
+                    st.warning(f"Spec pack discovery error: {e}")
+
+                if spec_pack:
+                    code_to_title, code_to_ht = build_spec_indexes(spec_pack)
+
+                    def _code_sort_key(c: str):
+                        parts = []
+                        for p in str(c).split("."):
+                            if p.isdigit():
+                                parts.append(int(p))
+                            else:
+                                parts.append(p)
+                        return parts
+
+                    codes = sorted(code_to_title.keys(), key=_code_sort_key)
+                    target_spec_code = st.selectbox(
+                        "Target AQA spec section (code)",
+                        options=[""] + codes,
+                        format_func=lambda c: "(no target guardrail)" if c == "" else f"{c} - {code_to_title.get(c, '')}{' [HT]' if code_to_ht.get(c) else ''}",
+                        key="target_spec_code",
+                        help="The generator will be anchored to this section and the app will produce an alignment report after drafting.",
+                    )
+
+                    # Quick spec pack quality indicator
+                    content_map = spec_pack.get("content_map") or {}
+                    nonempty = 0
+                    for _, v in content_map.items():
+                        lines = (v or {}).get("content") or []
+                        if any(str(x).strip() for x in lines):
+                            nonempty += 1
+                    st.caption(f"Spec pack content coverage: {nonempty}/{max(len(content_map),1)} sections have extracted wording. If this is low, re-run your extractor with content enabled.")
+
+                    if target_spec_code:
+                        path_pairs = spec_path_for_code(target_spec_code, code_to_title)
+                        if path_pairs:
+                            st.caption("Spec path: " + "  ›  ".join([f"{c} {t}" for c, t in path_pairs]))
+                        excerpt = spec_excerpt_for_code(spec_pack, target_spec_code)
+                        with st.expander("Spec anchor excerpt (used for guardrails)", expanded=False):
+                            if excerpt.strip():
+                                st.text(excerpt.strip()[:3000])
+                            else:
+                                st.info("No extracted wording found for this code in the spec pack (titles only). Consider improving the extractor output.")
+                else:
+                    st.info("No spec pack loaded. The generator will still work, but without spec cross-checking. Add JSON to ./specs/ to enable guardrails.")
+
                 gen_c1, gen_c2 = st.columns([2, 1])
                 with gen_c1:
                     topic_mode = st.radio("Topic input", ["Choose from AQA list", "Describe a topic"], horizontal=True, key="topic_mode")
