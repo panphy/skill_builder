@@ -1,0 +1,177 @@
+{
+  "spec_code": "8463",
+  "subject": "Physics",
+  "board": "AQA",
+  "source_pdf": "AQA-8463-SP.pdf",
+  "generated_utc": "2025-12-30T21:14:41Z",
+  "topics": [
+    {
+      "spec_ref": "4.1",
+      "title": "Energy",
+      "subtopics": [
+        {
+          "spec_ref": "4.1.1",
+          "title": "Energy changes in a system, and the ways energy is stored"
+        },
+        {
+          "spec_ref": "4.1.2",
+          "title": "Conservation and dissipation of energy"
+        },
+        {
+          "spec_ref": "4.1.3",
+          "title": "National and global energy resources"
+        }
+      ]
+    },
+    {
+      "spec_ref": "4.2",
+      "title": "Electricity",
+      "subtopics": [
+        {
+          "spec_ref": "4.2.1",
+          "title": "Current, potential difference and resistance"
+        },
+        {
+          "spec_ref": "4.2.2",
+          "title": "Series and parallel circuits"
+        },
+        {
+          "spec_ref": "4.2.3",
+          "title": "Domestic uses and safety"
+        },
+        {
+          "spec_ref": "4.2.4",
+          "title": "Energy transfers"
+        },
+        {
+          "spec_ref": "4.2.5",
+          "title": "Static electricity (physics only)"
+        }
+      ]
+    },
+    {
+      "spec_ref": "4.3",
+      "title": "Particle model of matter",
+      "subtopics": [
+        {
+          "spec_ref": "4.3.1",
+          "title": "Changes of state and the particle model"
+        },
+        {
+          "spec_ref": "4.3.2",
+          "title": "Internal energy and energy transfers"
+        },
+        {
+          "spec_ref": "4.3.3",
+          "title": "Particle model and pressure"
+        }
+      ]
+    },
+    {
+      "spec_ref": "4.4",
+      "title": "Atomic structure",
+      "subtopics": [
+        {
+          "spec_ref": "4.4.1",
+          "title": "Atoms and isotopes"
+        },
+        {
+          "spec_ref": "4.4.2",
+          "title": "Atoms and nuclear radiation"
+        },
+        {
+          "spec_ref": "4.4.3",
+          "title": "Hazards and uses of radioactive emissions and of background"
+        },
+        {
+          "spec_ref": "4.4.4",
+          "title": "Nuclear fission and fusion (physics only)"
+        }
+      ]
+    },
+    {
+      "spec_ref": "4.5",
+      "title": "Forces",
+      "subtopics": [
+        {
+          "spec_ref": "4.5.1",
+          "title": "Forces and their interactions"
+        },
+        {
+          "spec_ref": "4.5.2",
+          "title": "Work done and energy transfer"
+        },
+        {
+          "spec_ref": "4.5.3",
+          "title": "Forces and elasticity"
+        },
+        {
+          "spec_ref": "4.5.4",
+          "title": "Moments, levers and gears (physics only)"
+        },
+        {
+          "spec_ref": "4.5.5",
+          "title": "Pressure and pressure differences in fluids (physics only)"
+        },
+        {
+          "spec_ref": "4.5.6",
+          "title": "Forces and motion"
+        },
+        {
+          "spec_ref": "4.5.7",
+          "title": "Momentum (HT only)"
+        }
+      ]
+    },
+    {
+      "spec_ref": "4.6",
+      "title": "Waves",
+      "subtopics": [
+        {
+          "spec_ref": "4.6.1",
+          "title": "Waves in air, fluids and solids"
+        },
+        {
+          "spec_ref": "4.6.2",
+          "title": "Electromagnetic waves"
+        },
+        {
+          "spec_ref": "4.6.3",
+          "title": "Black body radiation (physics only)"
+        }
+      ]
+    },
+    {
+      "spec_ref": "4.7",
+      "title": "Magnetism and electromagnetism",
+      "subtopics": [
+        {
+          "spec_ref": "4.7.1",
+          "title": "Permanent and induced magnetism, magnetic forces and fields"
+        },
+        {
+          "spec_ref": "4.7.2",
+          "title": "The motor effect"
+        },
+        {
+          "spec_ref": "4.7.3",
+          "title": "Induced potential, transformers and the National Grid (physics"
+        }
+      ]
+    },
+    {
+      "spec_ref": "4.8",
+      "title": "Space physics (physics only)",
+      "subtopics": [
+        {
+          "spec_ref": "4.8.1",
+          "title": "Solar system; stability of orbital motions; satellites (physics only)"
+        },
+        {
+          "spec_ref": "4.8.2",
+          "title": "Red-shift (physics only)"
+        }
+      ]
+    }
+  ]
+}

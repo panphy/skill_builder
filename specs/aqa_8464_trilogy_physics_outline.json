@@ -1,0 +1,136 @@
+{
+  "spec_code": "8464",
+  "qualification": "Combined Science: Trilogy",
+  "subject_area": "Physics subject content",
+  "board": "AQA",
+  "source_pdf": "AQA-8464-SP-2016.PDF",
+  "generated_utc": "2025-12-30T21:14:41Z",
+  "topics": [
+    {
+      "spec_ref": "6.1",
+      "title": "Energy",
+      "subtopics": [
+        {
+          "spec_ref": "6.1.1",
+          "title": "Energy changes in a system, and the ways energy is stored"
+        },
+        {
+          "spec_ref": "6.1.2",
+          "title": "Conservation and dissipation of energy"
+        },
+        {
+          "spec_ref": "6.1.3",
+          "title": "National and global energy resources"
+        }
+      ]
+    },
+    {
+      "spec_ref": "6.2",
+      "title": "Electricity",
+      "subtopics": [
+        {
+          "spec_ref": "6.2.1",
+          "title": "Current, potential difference and resistance"
+        },
+        {
+          "spec_ref": "6.2.2",
+          "title": "Series and parallel circuits"
+        },
+        {
+          "spec_ref": "6.2.3",
+          "title": "Domestic uses and safety"
+        },
+        {
+          "spec_ref": "6.2.4",
+          "title": "Energy transfers"
+        }
+      ]
+    },
+    {
+      "spec_ref": "6.3",
+      "title": "Particle model of matter",
+      "subtopics": [
+        {
+          "spec_ref": "6.3.1",
+          "title": "Changes of state and the particle model"
+        },
+        {
+          "spec_ref": "6.3.2",
+          "title": "Internal energy and energy transfers"
+        },
+        {
+          "spec_ref": "6.3.3",
+          "title": "Particle model and pressure"
+        }
+      ]
+    },
+    {
+      "spec_ref": "6.4",
+      "title": "Atomic structure",
+      "subtopics": [
+        {
+          "spec_ref": "6.4.1",
+          "title": "Atoms and isotopes"
+        },
+        {
+          "spec_ref": "6.4.2",
+          "title": "Atoms and nuclear radiation"
+        }
+      ]
+    },
+    {
+      "spec_ref": "6.5",
+      "title": "Forces",
+      "subtopics": [
+        {
+          "spec_ref": "6.5.1",
+          "title": "Forces and their interactions"
+        },
+        {
+          "spec_ref": "6.5.2",
+          "title": "Work done and energy transfer"
+        },
+        {
+          "spec_ref": "6.5.3",
+          "title": "Forces and elasticity"
+        },
+        {
+          "spec_ref": "6.5.4",
+          "title": "Forces and motion"
+        },
+        {
+          "spec_ref": "6.5.5",
+          "title": "Momentum (HT only)"
+        }
+      ]
+    },
+    {
+      "spec_ref": "6.6",
+      "title": "Waves",
+      "subtopics": [
+        {
+          "spec_ref": "6.6.1",
+          "title": "Waves in air, fluids and solids"
+        },
+        {
+          "spec_ref": "6.6.2",
+          "title": "Electromagnetic waves"
+        }
+      ]
+    },
+    {
+      "spec_ref": "6.7",
+      "title": "Magnetism and electromagnetism",
+      "subtopics": [
+        {
+          "spec_ref": "6.7.1",
+          "title": "Permanent and induced magnetism, magnetic forces and fields"
+        },
+        {
+          "spec_ref": "6.7.2",
+          "title": "The motor effect"
+        }
+      ]
+    }
+  ]
+}
