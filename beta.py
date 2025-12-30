@@ -1997,7 +1997,7 @@ with st.sidebar:
             st.badge("SEPARATE", color="primary")
         else:
             st.markdown(":blue-badge[SEPARATE]")
-    st.caption("Separate badge uses the app primary color. To make it turquoise, set theme.primaryColor in .streamlit/config.toml (e.g. #20C997).")
+    st.caption("The badge shows whether COMBINED or SEPARATED Physics selected.")
 
 header_left, header_mid, header_right = st.columns([3, 2, 1])
 
