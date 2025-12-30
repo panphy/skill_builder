@@ -1,50 +1,3058 @@
 {
-  "meta": {
-    "subject_key": "aqa_gcse_physics",
-    "display_name": "AQA GCSE Physics (Separate)",
-    "exam_board": "AQA",
-    "qualification": "GCSE",
-    "pathway": "separate",
-    "version_label": "v1",
-    "last_reviewed_utc": "2025-12-29T00:00:00Z",
-    "source_refs": []
+  "spec_version": "aqa_html_extract_v1",
+  "subject_key": "aqa_combined_chemistry",
+  "tier": "higher",
+  "generated_at_utc": "2025-12-29T15:55:53+00:00",
+  "source_urls": {
+    "subject_content": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content"
   },
-  "scope": {
-    "tier": "higher_only",
-    "calculator": "allowed",
-    "units_standard": "SI",
-    "equation_sheet": "gcse_aqa"
-  },
-  "topic_tree": [],
-  "allowed_topics": {
-    "tags": [],
-    "tag_to_topic_codes": {}
-  },
-  "must_avoid": {
-    "concepts": [],
-    "patterns_regex": [],
-    "notes": ""
-  },
-  "command_words": [
-    { "word": "describe", "expectation": "State key features; no extended reasoning needed." },
-    { "word": "explain", "expectation": "Use cause and effect, because/therefore, link ideas." },
-    { "word": "calculate", "expectation": "Show working; final answer with unit; sensible rounding." }
+  "topic_tree": [
+    {
+      "code": "5.0",
+      "title": "Chemistry subject content",
+      "ht_only": false,
+      "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+      "children": []
+    },
+    {
+      "code": "5.1",
+      "title": "Atomic structure and the periodic table",
+      "ht_only": false,
+      "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+      "children": [
+        {
+          "code": "5.1.1",
+          "title": "A simple model of the atom, symbols, relative atomic mass, electronic charge and isotopes",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.1.1.1",
+              "title": "Atoms, elements and compounds",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.1.1.2",
+              "title": "Mixtures",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.1.1.3",
+              "title": "The development of the model of the atom (common content with physics)",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.1.1.4",
+              "title": "Relative electrical charges of subatomic particles",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.1.1.5",
+              "title": "Size and mass of atoms",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.1.1.6",
+              "title": "Relative atomic mass",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.1.1.7",
+              "title": "Electronic structure",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        },
+        {
+          "code": "5.1.2",
+          "title": "The periodic table",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.1.2.1",
+              "title": "The periodic table",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.1.2.2",
+              "title": "Development of the periodic table",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.1.2.3",
+              "title": "Metals and non-metals",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.1.2.4",
+              "title": "Group 0",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.1.2.5",
+              "title": "Group 1",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.1.2.6",
+              "title": "Group 7",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "5.2",
+      "title": "Bonding, structure, and the properties of matter",
+      "ht_only": false,
+      "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+      "children": [
+        {
+          "code": "5.2.1",
+          "title": "Chemical bonds, ionic, covalent and metallic",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.2.1.1",
+              "title": "Chemical bonds",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.2.1.2",
+              "title": "Ionic bonding",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.2.1.3",
+              "title": "Ionic compounds",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.2.1.4",
+              "title": "Covalent bonding",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.2.1.5",
+              "title": "Metallic bonding",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        },
+        {
+          "code": "5.2.2",
+          "title": "How bonding and structure are related to the properties of substances",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.2.2.1",
+              "title": "The three states of matter",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.2.2.2",
+              "title": "State symbols",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.2.2.3",
+              "title": "Properties of ionic compounds",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.2.2.4",
+              "title": "Properties of small molecules",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.2.2.5",
+              "title": "Polymers",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.2.2.6",
+              "title": "Giant covalent structures",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.2.2.7",
+              "title": "Properties of metals and alloys",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.2.2.8",
+              "title": "Metals as conductors",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        },
+        {
+          "code": "5.2.3",
+          "title": "Structure and bonding of carbon",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.2.3.1",
+              "title": "Diamond",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.2.3.2",
+              "title": "Graphite",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.2.3.3",
+              "title": "Graphene and fullerenes",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "5.3",
+      "title": "Quantitative chemistry",
+      "ht_only": false,
+      "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+      "children": [
+        {
+          "code": "5.3.1",
+          "title": "Chemical measurements, conservation of mass and the quantitative interpretation of chemical equations",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.3.1.1",
+              "title": "Conservation of mass and balanced chemical equations",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.3.1.2",
+              "title": "Relative formula mass",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.3.1.3",
+              "title": "Mass changes when a reactant or product is a gas",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.3.1.4",
+              "title": "Chemical measurements",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        },
+        {
+          "code": "5.3.2",
+          "title": "Use of amount of substance in relation to masses of pure substances",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.3.2.1",
+              "title": "Moles",
+              "ht_only": true,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.3.2.2",
+              "title": "Amounts of substances in equations",
+              "ht_only": true,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.3.2.3",
+              "title": "Using moles to balance equations",
+              "ht_only": true,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.3.2.4",
+              "title": "Limiting reactants",
+              "ht_only": true,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.3.2.5",
+              "title": "Concentration of solutions",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "5.4",
+      "title": "Chemical changes",
+      "ht_only": false,
+      "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+      "children": [
+        {
+          "code": "5.4.1",
+          "title": "Reactivity of metals",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.4.1.1",
+              "title": "Metal oxides",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.4.1.2",
+              "title": "The reactivity series",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.4.1.3",
+              "title": "Extraction of metals and reduction",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.4.1.4",
+              "title": "Oxidation and reduction in terms of electrons",
+              "ht_only": true,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        },
+        {
+          "code": "5.4.2",
+          "title": "Reactions of acids",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.4.2.1",
+              "title": "Reactions of acids with metals",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.4.2.2",
+              "title": "Neutralisation of acids and salt production",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.4.2.3",
+              "title": "Soluble salts",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.4.2.4",
+              "title": "The pH scale and neutralisation",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.4.2.5",
+              "title": "Strong and weak acids",
+              "ht_only": true,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        },
+        {
+          "code": "5.4.3",
+          "title": "Electrolysis",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.4.3.1",
+              "title": "The process of electrolysis",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.4.3.2",
+              "title": "Electrolysis of molten ionic compounds",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.4.3.3",
+              "title": "Using electrolysis to extract metals",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.4.3.4",
+              "title": "Electrolysis of aqueous solutions",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.4.3.5",
+              "title": "Representation of reactions at electrodes as half equations",
+              "ht_only": true,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "5.5",
+      "title": "Energy changes",
+      "ht_only": false,
+      "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+      "children": [
+        {
+          "code": "5.5.1",
+          "title": "Exothermic and endothermic reactions",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.5.1.1",
+              "title": "Energy transfer during exothermic and endothermic reactions",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.5.1.2",
+              "title": "Reaction profiles",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.5.1.3",
+              "title": "The energy change of reactions",
+              "ht_only": true,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "5.6",
+      "title": "The rate and extent of chemical change",
+      "ht_only": false,
+      "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+      "children": [
+        {
+          "code": "5.6.1",
+          "title": "Rate of reaction",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.6.1.1",
+              "title": "Calculating rates of reactions",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.6.1.2",
+              "title": "Factors which affect the rates of chemical reactions",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.6.1.3",
+              "title": "Collision theory and activation energy",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.6.1.4",
+              "title": "Catalysts",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        },
+        {
+          "code": "5.6.2",
+          "title": "Reversible reactions and dynamic equilibrium",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.6.2.1",
+              "title": "Reversible reactions",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.6.2.2",
+              "title": "Energy changes and reversible reactions",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.6.2.3",
+              "title": "Equilibrium",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.6.2.4",
+              "title": "The effect of changing conditions on equilibrium",
+              "ht_only": true,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.6.2.5",
+              "title": "The effect of changing concentration",
+              "ht_only": true,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.6.2.6",
+              "title": "The effect of temperature changes on equilibrium",
+              "ht_only": true,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.6.2.7",
+              "title": "The effect of pressure changes on equilibrium",
+              "ht_only": true,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "5.7",
+      "title": "Organic chemistry",
+      "ht_only": false,
+      "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+      "children": [
+        {
+          "code": "5.7.1",
+          "title": "Carbon compounds as fuels and feedstock",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.7.1.1",
+              "title": "Crude oil, hydrocarbons and alkanes",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.7.1.2",
+              "title": "Fractional distillation and petrochemicals",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.7.1.3",
+              "title": "Properties of hydrocarbons",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.7.1.4",
+              "title": "Cracking and alkenes",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "5.8",
+      "title": "Chemical analysis",
+      "ht_only": false,
+      "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+      "children": [
+        {
+          "code": "5.8.1",
+          "title": "Purity, formulations and chromatography",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.8.1.1",
+              "title": "Pure substances",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.8.1.2",
+              "title": "Formulations",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.8.1.3",
+              "title": "Chromatography",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        },
+        {
+          "code": "5.8.2",
+          "title": "Identification of common gases",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.8.2.1",
+              "title": "Test for hydrogen",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.8.2.2",
+              "title": "Test for oxygen",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.8.2.3",
+              "title": "Test for carbon dioxide",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.8.2.4",
+              "title": "Test for chlorine",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "5.9",
+      "title": "Chemistry of the atmosphere",
+      "ht_only": false,
+      "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+      "children": [
+        {
+          "code": "5.9.1",
+          "title": "The composition and evolution of the Earth's atmosphere",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.9.1.1",
+              "title": "The proportions of different gases in the atmosphere",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.9.1.2",
+              "title": "The Earth's early atmosphere",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.9.1.3",
+              "title": "How oxygen increased",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.9.1.4",
+              "title": "How carbon dioxide decreased",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        },
+        {
+          "code": "5.9.2",
+          "title": "Carbon dioxide and methane as greenhouse gases",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.9.2.1",
+              "title": "Greenhouse gases",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.9.2.2",
+              "title": "Human activities which contribute to an increase in greenhouse gases in the atmosphere",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.9.2.3",
+              "title": "Global climate change",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.9.2.4",
+              "title": "The carbon footprint and its reduction",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        },
+        {
+          "code": "5.9.3",
+          "title": "Common atmospheric pollutants and their sources",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.9.3.1",
+              "title": "Atmospheric pollutants from fuels",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.9.3.2",
+              "title": "Properties and effects of atmospheric pollutants",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "5.10",
+      "title": "Using resources",
+      "ht_only": false,
+      "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+      "children": [
+        {
+          "code": "5.10.1",
+          "title": "Using the Earth's resources and obtaining potable water",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.10.1.1",
+              "title": "Using the Earth's resources and sustainable development",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.10.1.2",
+              "title": "Potable water",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.10.1.3",
+              "title": "Waste water treatment",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.10.1.4",
+              "title": "Alternative methods of extracting metals",
+              "ht_only": true,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        },
+        {
+          "code": "5.10.2",
+          "title": "Life cycle assessment and recycling",
+          "ht_only": false,
+          "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+          "children": [
+            {
+              "code": "5.10.2.1",
+              "title": "Life cycle assessment",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            },
+            {
+              "code": "5.10.2.2",
+              "title": "Ways of reducing the use of resources",
+              "ht_only": false,
+              "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "5.11",
+      "title": "Key ideas",
+      "ht_only": false,
+      "url": "https://www.aqa.org.uk/subjects/science/gcse/science-8464/specification/chemistry-subject-content",
+      "children": []
+    }
   ],
-  "question_style_rules": [
-    "Must be original (no copyrighted exam questions).",
-    "Use Markdown; LaTeX only inside $...$ or $$...$$.",
-    "GCSE-appropriate contexts and numbers."
+  "allowed_topics": [
+    {
+      "code": "5.0",
+      "title": "Chemistry subject content",
+      "ht_only": false
+    },
+    {
+      "code": "5.1",
+      "title": "Atomic structure and the periodic table",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.1",
+      "title": "A simple model of the atom, symbols, relative atomic mass, electronic charge and isotopes",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.1.1",
+      "title": "Atoms, elements and compounds",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.1.2",
+      "title": "Mixtures",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.1.3",
+      "title": "The development of the model of the atom (common content with physics)",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.1.4",
+      "title": "Relative electrical charges of subatomic particles",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.1.5",
+      "title": "Size and mass of atoms",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.1.6",
+      "title": "Relative atomic mass",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.1.7",
+      "title": "Electronic structure",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.2",
+      "title": "The periodic table",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.2.1",
+      "title": "The periodic table",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.2.2",
+      "title": "Development of the periodic table",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.2.3",
+      "title": "Metals and non-metals",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.2.4",
+      "title": "Group 0",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.2.5",
+      "title": "Group 1",
+      "ht_only": false
+    },
+    {
+      "code": "5.1.2.6",
+      "title": "Group 7",
+      "ht_only": false
+    },
+    {
+      "code": "5.2",
+      "title": "Bonding, structure, and the properties of matter",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.1",
+      "title": "Chemical bonds, ionic, covalent and metallic",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.1.1",
+      "title": "Chemical bonds",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.1.2",
+      "title": "Ionic bonding",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.1.3",
+      "title": "Ionic compounds",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.1.4",
+      "title": "Covalent bonding",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.1.5",
+      "title": "Metallic bonding",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.2",
+      "title": "How bonding and structure are related to the properties of substances",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.2.1",
+      "title": "The three states of matter",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.2.2",
+      "title": "State symbols",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.2.3",
+      "title": "Properties of ionic compounds",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.2.4",
+      "title": "Properties of small molecules",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.2.5",
+      "title": "Polymers",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.2.6",
+      "title": "Giant covalent structures",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.2.7",
+      "title": "Properties of metals and alloys",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.2.8",
+      "title": "Metals as conductors",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.3",
+      "title": "Structure and bonding of carbon",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.3.1",
+      "title": "Diamond",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.3.2",
+      "title": "Graphite",
+      "ht_only": false
+    },
+    {
+      "code": "5.2.3.3",
+      "title": "Graphene and fullerenes",
+      "ht_only": false
+    },
+    {
+      "code": "5.3",
+      "title": "Quantitative chemistry",
+      "ht_only": false
+    },
+    {
+      "code": "5.3.1",
+      "title": "Chemical measurements, conservation of mass and the quantitative interpretation of chemical equations",
+      "ht_only": false
+    },
+    {
+      "code": "5.3.1.1",
+      "title": "Conservation of mass and balanced chemical equations",
+      "ht_only": false
+    },
+    {
+      "code": "5.3.1.2",
+      "title": "Relative formula mass",
+      "ht_only": false
+    },
+    {
+      "code": "5.3.1.3",
+      "title": "Mass changes when a reactant or product is a gas",
+      "ht_only": false
+    },
+    {
+      "code": "5.3.1.4",
+      "title": "Chemical measurements",
+      "ht_only": false
+    },
+    {
+      "code": "5.3.2",
+      "title": "Use of amount of substance in relation to masses of pure substances",
+      "ht_only": false
+    },
+    {
+      "code": "5.3.2.1",
+      "title": "Moles",
+      "ht_only": true
+    },
+    {
+      "code": "5.3.2.2",
+      "title": "Amounts of substances in equations",
+      "ht_only": true
+    },
+    {
+      "code": "5.3.2.3",
+      "title": "Using moles to balance equations",
+      "ht_only": true
+    },
+    {
+      "code": "5.3.2.4",
+      "title": "Limiting reactants",
+      "ht_only": true
+    },
+    {
+      "code": "5.3.2.5",
+      "title": "Concentration of solutions",
+      "ht_only": false
+    },
+    {
+      "code": "5.4",
+      "title": "Chemical changes",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.1",
+      "title": "Reactivity of metals",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.1.1",
+      "title": "Metal oxides",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.1.2",
+      "title": "The reactivity series",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.1.3",
+      "title": "Extraction of metals and reduction",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.1.4",
+      "title": "Oxidation and reduction in terms of electrons",
+      "ht_only": true
+    },
+    {
+      "code": "5.4.2",
+      "title": "Reactions of acids",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.2.1",
+      "title": "Reactions of acids with metals",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.2.2",
+      "title": "Neutralisation of acids and salt production",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.2.3",
+      "title": "Soluble salts",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.2.4",
+      "title": "The pH scale and neutralisation",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.2.5",
+      "title": "Strong and weak acids",
+      "ht_only": true
+    },
+    {
+      "code": "5.4.3",
+      "title": "Electrolysis",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.3.1",
+      "title": "The process of electrolysis",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.3.2",
+      "title": "Electrolysis of molten ionic compounds",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.3.3",
+      "title": "Using electrolysis to extract metals",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.3.4",
+      "title": "Electrolysis of aqueous solutions",
+      "ht_only": false
+    },
+    {
+      "code": "5.4.3.5",
+      "title": "Representation of reactions at electrodes as half equations",
+      "ht_only": true
+    },
+    {
+      "code": "5.5",
+      "title": "Energy changes",
+      "ht_only": false
+    },
+    {
+      "code": "5.5.1",
+      "title": "Exothermic and endothermic reactions",
+      "ht_only": false
+    },
+    {
+      "code": "5.5.1.1",
+      "title": "Energy transfer during exothermic and endothermic reactions",
+      "ht_only": false
+    },
+    {
+      "code": "5.5.1.2",
+      "title": "Reaction profiles",
+      "ht_only": false
+    },
+    {
+      "code": "5.5.1.3",
+      "title": "The energy change of reactions",
+      "ht_only": true
+    },
+    {
+      "code": "5.6",
+      "title": "The rate and extent of chemical change",
+      "ht_only": false
+    },
+    {
+      "code": "5.6.1",
+      "title": "Rate of reaction",
+      "ht_only": false
+    },
+    {
+      "code": "5.6.1.1",
+      "title": "Calculating rates of reactions",
+      "ht_only": false
+    },
+    {
+      "code": "5.6.1.2",
+      "title": "Factors which affect the rates of chemical reactions",
+      "ht_only": false
+    },
+    {
+      "code": "5.6.1.3",
+      "title": "Collision theory and activation energy",
+      "ht_only": false
+    },
+    {
+      "code": "5.6.1.4",
+      "title": "Catalysts",
+      "ht_only": false
+    },
+    {
+      "code": "5.6.2",
+      "title": "Reversible reactions and dynamic equilibrium",
+      "ht_only": false
+    },
+    {
+      "code": "5.6.2.1",
+      "title": "Reversible reactions",
+      "ht_only": false
+    },
+    {
+      "code": "5.6.2.2",
+      "title": "Energy changes and reversible reactions",
+      "ht_only": false
+    },
+    {
+      "code": "5.6.2.3",
+      "title": "Equilibrium",
+      "ht_only": false
+    },
+    {
+      "code": "5.6.2.4",
+      "title": "The effect of changing conditions on equilibrium",
+      "ht_only": true
+    },
+    {
+      "code": "5.6.2.5",
+      "title": "The effect of changing concentration",
+      "ht_only": true
+    },
+    {
+      "code": "5.6.2.6",
+      "title": "The effect of temperature changes on equilibrium",
+      "ht_only": true
+    },
+    {
+      "code": "5.6.2.7",
+      "title": "The effect of pressure changes on equilibrium",
+      "ht_only": true
+    },
+    {
+      "code": "5.7",
+      "title": "Organic chemistry",
+      "ht_only": false
+    },
+    {
+      "code": "5.7.1",
+      "title": "Carbon compounds as fuels and feedstock",
+      "ht_only": false
+    },
+    {
+      "code": "5.7.1.1",
+      "title": "Crude oil, hydrocarbons and alkanes",
+      "ht_only": false
+    },
+    {
+      "code": "5.7.1.2",
+      "title": "Fractional distillation and petrochemicals",
+      "ht_only": false
+    },
+    {
+      "code": "5.7.1.3",
+      "title": "Properties of hydrocarbons",
+      "ht_only": false
+    },
+    {
+      "code": "5.7.1.4",
+      "title": "Cracking and alkenes",
+      "ht_only": false
+    },
+    {
+      "code": "5.8",
+      "title": "Chemical analysis",
+      "ht_only": false
+    },
+    {
+      "code": "5.8.1",
+      "title": "Purity, formulations and chromatography",
+      "ht_only": false
+    },
+    {
+      "code": "5.8.1.1",
+      "title": "Pure substances",
+      "ht_only": false
+    },
+    {
+      "code": "5.8.1.2",
+      "title": "Formulations",
+      "ht_only": false
+    },
+    {
+      "code": "5.8.1.3",
+      "title": "Chromatography",
+      "ht_only": false
+    },
+    {
+      "code": "5.8.2",
+      "title": "Identification of common gases",
+      "ht_only": false
+    },
+    {
+      "code": "5.8.2.1",
+      "title": "Test for hydrogen",
+      "ht_only": false
+    },
+    {
+      "code": "5.8.2.2",
+      "title": "Test for oxygen",
+      "ht_only": false
+    },
+    {
+      "code": "5.8.2.3",
+      "title": "Test for carbon dioxide",
+      "ht_only": false
+    },
+    {
+      "code": "5.8.2.4",
+      "title": "Test for chlorine",
+      "ht_only": false
+    },
+    {
+      "code": "5.9",
+      "title": "Chemistry of the atmosphere",
+      "ht_only": false
+    },
+    {
+      "code": "5.9.1",
+      "title": "The composition and evolution of the Earth's atmosphere",
+      "ht_only": false
+    },
+    {
+      "code": "5.9.1.1",
+      "title": "The proportions of different gases in the atmosphere",
+      "ht_only": false
+    },
+    {
+      "code": "5.9.1.2",
+      "title": "The Earth's early atmosphere",
+      "ht_only": false
+    },
+    {
+      "code": "5.9.1.3",
+      "title": "How oxygen increased",
+      "ht_only": false
+    },
+    {
+      "code": "5.9.1.4",
+      "title": "How carbon dioxide decreased",
+      "ht_only": false
+    },
+    {
+      "code": "5.9.2",
+      "title": "Carbon dioxide and methane as greenhouse gases",
+      "ht_only": false
+    },
+    {
+      "code": "5.9.2.1",
+      "title": "Greenhouse gases",
+      "ht_only": false
+    },
+    {
+      "code": "5.9.2.2",
+      "title": "Human activities which contribute to an increase in greenhouse gases in the atmosphere",
+      "ht_only": false
+    },
+    {
+      "code": "5.9.2.3",
+      "title": "Global climate change",
+      "ht_only": false
+    },
+    {
+      "code": "5.9.2.4",
+      "title": "The carbon footprint and its reduction",
+      "ht_only": false
+    },
+    {
+      "code": "5.9.3",
+      "title": "Common atmospheric pollutants and their sources",
+      "ht_only": false
+    },
+    {
+      "code": "5.9.3.1",
+      "title": "Atmospheric pollutants from fuels",
+      "ht_only": false
+    },
+    {
+      "code": "5.9.3.2",
+      "title": "Properties and effects of atmospheric pollutants",
+      "ht_only": false
+    },
+    {
+      "code": "5.10",
+      "title": "Using resources",
+      "ht_only": false
+    },
+    {
+      "code": "5.10.1",
+      "title": "Using the Earth's resources and obtaining potable water",
+      "ht_only": false
+    },
+    {
+      "code": "5.10.1.1",
+      "title": "Using the Earth's resources and sustainable development",
+      "ht_only": false
+    },
+    {
+      "code": "5.10.1.2",
+      "title": "Potable water",
+      "ht_only": false
+    },
+    {
+      "code": "5.10.1.3",
+      "title": "Waste water treatment",
+      "ht_only": false
+    },
+    {
+      "code": "5.10.1.4",
+      "title": "Alternative methods of extracting metals",
+      "ht_only": true
+    },
+    {
+      "code": "5.10.2",
+      "title": "Life cycle assessment and recycling",
+      "ht_only": false
+    },
+    {
+      "code": "5.10.2.1",
+      "title": "Life cycle assessment",
+      "ht_only": false
+    },
+    {
+      "code": "5.10.2.2",
+      "title": "Ways of reducing the use of resources",
+      "ht_only": false
+    },
+    {
+      "code": "5.11",
+      "title": "Key ideas",
+      "ht_only": false
+    }
+  ],
+  "command_words": [
+    "calculate",
+    "compare",
+    "complete",
+    "describe",
+    "determine",
+    "draw",
+    "estimate",
+    "evaluate",
+    "explain",
+    "give",
+    "identify",
+    "justify",
+    "label",
+    "measure",
+    "name",
+    "plot",
+    "predict",
+    "show",
+    "state",
+    "suggest"
   ],
   "mark_scheme_rules": [
-    "Part-by-part marks with explicit [n] per part.",
-    "If multi-step calculation, include method mark plus accuracy mark.",
-    "End with: TOTAL = <total_marks>."
+    "Part-by-part marks with [x] for each part",
+    "Total line must match max_marks exactly",
+    "Calculation questions: method mark plus accuracy/units where appropriate",
+    "No mark scheme text is ever shown to students"
   ],
-  "compliance_checks": {
-    "require_total_line": true,
-    "require_part_marks": true,
-    "max_marks_range": [1, 12],
-    "block_if_patterns_match": true,
-    "topic_tag_must_be_in_allowed_topics": true
+  "must_avoid": [
+    "Beyond-spec content",
+    "A-level/IB calculus, differentiation, integration",
+    "Unnecessary advanced constants and field equations unless explicitly in the spec section",
+    "Copyrighted past paper questions (must be original)"
+  ],
+  "content_map": {
+    "5.0": {
+      "content": [
+        "This specification is presented in a two column format.",
+        "The subject content is split into three sections for each of the subject areas: biology, chemistry and physics.",
+        "The left hand column contains the subject content that all students must cover, and that can be assessed in the written papers.",
+        "The right hand column exemplifies some of the key opportunities for the following skills to be developed throughout the course: WS refers to Working scientifically , MS refers to Mathematical requirements and AT refers to Use of apparatus and techniques . These are not the only opportunities. Teachers are encouraged to introduce all of these skills where appropriate throughout the course.",
+        "Each topic begins with an overview. The overview puts the topic into a broader context and is intended to encourage an overarching approach to both the teaching and learning of each of the topic areas. It is not directly assessed. Any assessable content in this overview is replicated in the left hand column.",
+        "It is good practice to teach and develop all of the mathematical skills throughout the course. Some mathematical skills will only be assessed in certain subject areas. These are detailed in Mathematical requirements .",
+        "Science is a practical subject. Details of the assessment of required practicals can be found in Required practical activities .",
+        "Working scientifically and Use of apparatus and techniques skills will be assessed across all papers.",
+        "Content that is only applicable to Higher Tier is indicated by (HT only) either next to the topic heading where it applies to the whole topic or immediately preceding each paragraph or bullet point as applicable.",
+        "The concepts and principles in sections 5.1, 5.2 and 5.3 are fundamental to an understanding of chemistry and underpin much of the content detailed in later sections of the specification.",
+        "Students will be directly examined on these fundamental concepts in Paper 1. Students should be able to apply these concepts in their answers to some questions in Paper 2."
+      ],
+      "skills": [],
+      "refs": []
+    },
+    "5.1": {
+      "content": [
+        "The periodic table provides chemists with a structured organisation of the known chemical elements from which they can make sense of their physical and chemical properties. The historical development of the periodic table and models of atomic structure provide good examples of how scientific ideas and explanations develop over time as new evidence emerges. The arrangement of elements in the modern periodic table can be explained in terms of atomic structure which provides evidence for the model of a nuclear atom with electrons in energy levels."
+      ],
+      "skills": [],
+      "refs": []
+    },
+    "5.1.1": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.1.1.1": {
+      "content": [],
+      "skills": [
+        "All substances are made of atoms. An atom is the smallest part of an element that can exist.",
+        "Atoms of each element are represented by a chemical symbol, eg O represents an atom of oxygen, Na represents an atom of sodium.",
+        "There are about 100 different elements. Elements are shown in the periodic table.",
+        "Compounds are formed from elements by chemical reactions. Chemical reactions always involve the formation of one or more new substances, and often involve a detectable energy change. Compounds contain two or more elements chemically combined in fixed proportions and can be represented by formulae using the symbols of the atoms from which they were formed. Compounds can only be separated into elements by chemical reactions.",
+        "Chemical reactions can be represented by word equations or equations using symbols and formulae.",
+        "Students will be supplied with a periodic table for the exam and should be able to:",
+        "use the names and symbols of the first 20 elements in the periodic table, the elements in Groups 1 and 7, and other elements in this specification",
+        "name compounds of these elements from given formulae or symbol equations",
+        "write word equations for the reactions in this specification",
+        "write formulae and balanced chemical equations for the reactions in this specification.",
+        "(HT only) write balanced half equations and ionic equations where appropriate."
+      ],
+      "refs": []
+    },
+    "5.1.1.2": {
+      "content": [],
+      "skills": [
+        "A mixture consists of two or more elements or compounds not chemically combined together. The chemical properties of each substance in the mixture are unchanged.",
+        "Mixtures can be separated by physical processes such as filtration, crystallisation, simple distillation, fractional distillation and chromatography. These physical processes do not involve chemical reactions and no new substances are made.",
+        "Students should be able to:",
+        "describe, explain and give examples of the specified processes of separation",
+        "suggest suitable separation and purification techniques for mixtures when given appropriate information.",
+        "Safe use of a range of equipment to separate chemical mixtures."
+      ],
+      "refs": [
+        "WS 2.2, 2.3",
+        "AT 4"
+      ]
+    },
+    "5.1.1.3": {
+      "content": [],
+      "skills": [
+        "New experimental evidence may lead to a scientific model being changed or replaced.",
+        "Before the discovery of the electron, atoms were thought to be tiny spheres that could not be divided.",
+        "The discovery of the electron led to the plum pudding model of the atom. The plum pudding model suggested that the atom is a ball of positive charge with negative electrons embedded in it.",
+        "The results from the alpha particle scattering experiment led to the conclusion that the mass of an atom was concentrated at the centre (nucleus) and that the nucleus was charged. This nuclear model replaced the plum pudding model.",
+        "Niels Bohr adapted the nuclear model by suggesting that electrons orbit the nucleus at specific distances. The theoretical calculations of Bohr agreed with experimental observations.",
+        "Later experiments led to the idea that the positive charge of any nucleus could be subdivided into a whole number of smaller particles, each particle having the same amount of positive charge. The name proton was given to these particles.",
+        "The experimental work of James Chadwick provided the evidence to show the existence of neutrons within the nucleus. This was about 20 years after the nucleus became an accepted scientific idea.",
+        "Students should be able to describe:",
+        "This historical context provides an opportunity for students to show an understanding of why and describe how scientific methods and theories develop over time.",
+        "why the new evidence from the scattering experiment led to a change in the atomic model",
+        "the difference between the plum pudding model of the atom and the nuclear model of the atom.",
+        "Details of experimental work supporting the Bohr model are not required.",
+        "Details of Chadwick’s experimental work are not required."
+      ],
+      "refs": [
+        "WS 1.1, 1.6",
+        "WS 1.2"
+      ]
+    },
+    "5.1.1.4": {
+      "content": [],
+      "skills": [
+        "The relative electrical charges of the particles in atoms are:",
+        "In an atom, the number of electrons is equal to the number of protons in the nucleus. Atoms have no overall electrical charge.",
+        "The number of protons in an atom of an element is its atomic number. All atoms of a particular element have the same number of protons. Atoms of different elements have different numbers of protons."
+      ],
+      "refs": []
+    },
+    "5.1.1.5": {
+      "content": [],
+      "skills": [
+        "Atoms are very small, having a radius of about 0.1 nm (1 x 10 -10 m).",
+        "The radius of a nucleus is less than 1/10 000 of that of the atom (about 1 x 10 -14 m).",
+        "Almost all of the mass of an atom is in the nucleus.",
+        "The relative masses of protons, neutrons and electrons are:",
+        "The sum of the protons and neutrons in an atom is its mass number.",
+        "Atoms of the same element can have different numbers of neutrons; these atoms are called isotopes of that element.",
+        "Atoms can be represented as shown in this example:",
+        "Students should be able to calculate the numbers of protons, neutrons and electrons in an atom or ion, given its atomic number and mass number.",
+        "Use SI units and the prefix nano.",
+        "Recognise expressions in standard form.",
+        "Students should be able to relate size and scale of atoms to objects in the physical world."
+      ],
+      "refs": [
+        "WS 4.3, 4",
+        "MS 1b"
+      ]
+    },
+    "5.1.1.6": {
+      "content": [],
+      "skills": [
+        "The relative atomic mass of an element is an average value that takes account of the abundance of the isotopes of the element.",
+        "Students should be able to calculate the relative atomic mass of an element given the percentage abundance of its isotopes."
+      ],
+      "refs": []
+    },
+    "5.1.1.7": {
+      "content": [],
+      "skills": [
+        "The electrons in an atom occupy the lowest available energy levels (innermost available shells). The electronic structure of an atom can be represented by numbers or by a diagram. For example, the electronic structure of sodium is 2,8,1 or",
+        "showing two electrons in the lowest energy level, eight in the second energy level and one in the third energy level.",
+        "Students may answer questions in terms of either energy levels or shells.",
+        "Students should be able to represent the electronic structures of the first twenty elements of the periodic table in both forms.",
+        "Visualise and represent 2D and 3D forms including two- dimensional representations of 3D objects."
+      ],
+      "refs": [
+        "WS 1.2",
+        "MS 5b"
+      ]
+    },
+    "5.1.2": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.1.2.1": {
+      "content": [],
+      "skills": [
+        "The elements in the periodic table are arranged in order of atomic (proton) number and so that elements with similar properties are in columns, known as groups. The table is called a periodic table because similar properties occur at regular intervals.",
+        "Elements in the same group in the periodic table have the same number of electrons in their outer shell (outer electrons) and this gives them similar chemical properties.",
+        "Students should be able to:",
+        "explain how the position of an element in the periodic table is related to the arrangement of electrons in its atoms and hence to its atomic number",
+        "predict possible reactions and probable reactivity of elements from their positions in the periodic table."
+      ],
+      "refs": []
+    },
+    "5.1.2.2": {
+      "content": [],
+      "skills": [
+        "Before the discovery of protons, neutrons and electrons, scientists attempted to classify the elements by arranging them in order of their atomic weights.",
+        "The early periodic tables were incomplete and some elements were placed in inappropriate groups if the strict order of atomic weights was followed.",
+        "Mendeleev overcame some of the problems by leaving gaps for elements that he thought had not been discovered and in some places changed the order based on atomic weights.",
+        "Elements with properties predicted by Mendeleev were discovered and filled the gaps. Knowledge of isotopes made it possible to explain why the order based on atomic weights was not always correct.",
+        "Students should be able to describe these steps in the development of the periodic table.",
+        "Explain how testing a prediction can support or refute a new scientific idea."
+      ],
+      "refs": [
+        "WS 1.1, 1.6"
+      ]
+    },
+    "5.1.2.3": {
+      "content": [],
+      "skills": [
+        "Elements that react to form positive ions are metals.",
+        "Elements that do not form positive ions are non-metals.",
+        "The majority of elements are metals. Metals are found to the left and towards the bottom of the periodic table. Non-metals are found towards the right and top of the periodic table.",
+        "Students should be able to:",
+        "explain the differences between metals and non-metals on the basis of their characteristic physical and chemical properties. This links to Group 0 , Group 1 , Group 7 and Bonding, structure and the properties of matter",
+        "explain how the atomic structure of metals and non-metals relates to their position in the periodic table",
+        "explain how the reactions of elements are related to the arrangement of electrons in their atoms and hence to their atomic number."
+      ],
+      "refs": []
+    },
+    "5.1.2.4": {
+      "content": [],
+      "skills": [
+        "The elements in Group 0 of the periodic table are called the noble gases. They are unreactive and do not easily form molecules because their atoms have stable arrangements of electrons. The noble gases have eight electrons in their outer shell, except for helium, which has only two electrons.",
+        "The boiling points of the noble gases increase with increasing relative atomic mass (going down the group).",
+        "Students should be able to:",
+        "explain how properties of the elements in Group 0 depend on the outer shell of electrons of the atoms",
+        "predict properties from given trends down the group."
+      ],
+      "refs": []
+    },
+    "5.1.2.5": {
+      "content": [],
+      "skills": [
+        "The elements in Group 1 of the periodic table are known as the alkali metals and have characteristic properties because of the single electron in their outer shell.",
+        "Students should be able to describe the reactions of the first three alkali metals with oxygen, chlorine and water.",
+        "In Group 1, the reactivity of the elements increases going down the group.",
+        "Students should be able to:",
+        "explain how properties of the elements in Group 1 depend on the outer shell of electrons of the atoms",
+        "predict properties from given trends down the group."
+      ],
+      "refs": []
+    },
+    "5.1.2.6": {
+      "content": [],
+      "skills": [
+        "The elements in Group 7 of the periodic table are known as the halogens and have similar reactions because they all have seven electrons in their outer shell. The halogens are non-metals and consist of molecules made of pairs of atoms.",
+        "Students should be able to describe the nature of the compounds formed when chlorine, bromine and iodine react with metals and non-metals.",
+        "In Group 7, the further down the group an element is the higher its relative molecular mass, melting point and boiling point.",
+        "In Group 7, the reactivity of the elements decreases going down the group.",
+        "A more reactive halogen can displace a less reactive halogen from an aqueous solution of its salt.",
+        "Offers an opportunity within displacement reactions of halogens.",
+        "Students should be able to:",
+        "explain how properties of the elements in Group 7 depend on the outer shell of electrons of the atoms",
+        "predict properties from given trends down the group."
+      ],
+      "refs": [
+        "AT 6"
+      ]
+    },
+    "5.2": {
+      "content": [
+        "Chemists use theories of structure and bonding to explain the physical and chemical properties of materials. Analysis of structures shows that atoms can be arranged in a variety of ways, some of which are molecular while others are giant structures. Theories of bonding explain how atoms are held together in these structures. Scientists use this knowledge of structure and bonding to engineer new materials with desirable properties. The properties of these materials may offer new applications in a range of different technologies."
+      ],
+      "skills": [],
+      "refs": []
+    },
+    "5.2.1": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.2.1.1": {
+      "content": [],
+      "skills": [
+        "There are three types of strong chemical bonds: ionic, covalent and metallic. For ionic bonding the particles are oppositely charged ions. For covalent bonding the particles are atoms which share pairs of electrons. For metallic bonding the particles are atoms which share delocalised electrons.",
+        "Ionic bonding occurs in compounds formed from metals combined with non-metals.",
+        "Covalent bonding occurs in most non-metallic elements and in compounds of non-metals.",
+        "Metallic bonding occurs in metallic elements and alloys.",
+        "Students should be able to explain chemical bonding in terms of electrostatic forces and the transfer or sharing of electrons."
+      ],
+      "refs": []
+    },
+    "5.2.1.2": {
+      "content": [],
+      "skills": [
+        "When a metal atom reacts with a non-metal atom electrons in the outer shell of the metal atom are transferred. Metal atoms lose electrons to become positively charged ions. Non-metal atoms gain electrons to become negatively charged ions. The ions produced by metals in Groups 1 and 2 and by non-metals in Groups 6 and 7 have the electronic structure of a noble gas (Group 0).",
+        "The electron transfer during the formation of an ionic compound can be represented by a dot and cross diagram, eg for sodium chloride",
+        "Visualise and represent 2D and 3D forms including two-dimensional representations of 3D objects.",
+        "Students should be able to draw dot and cross diagrams for ionic compounds formed by metals in Groups 1 and 2 with non-metals in Groups 6 and 7.",
+        "The charge on the ions produced by metals in Groups 1 and 2 and by non-metals in Groups 6 and 7 relates to the group number of the element in the periodic table.",
+        "Students should be able to work out the charge on the ions of metals and non-metals from the group number of the element, limited to the metals in Groups 1 and 2, and non-metals in Groups 6 and 7."
+      ],
+      "refs": [
+        "MS 5b"
+      ]
+    },
+    "5.2.1.3": {
+      "content": [],
+      "skills": [
+        "An ionic compound is a giant structure of ions. Ionic compounds are held together by strong electrostatic forces of attraction between oppositely charged ions. These forces act in all directions in the lattice and this is called ionic bonding.",
+        "The structure of sodium chloride can be represented in the following forms:",
+        "Visualise and represent 2D and 3D forms including two-dimensional representations of 3D objects.",
+        "Students should be able to:",
+        "deduce that a compound is ionic from a diagram of its structure in one of the specified forms",
+        "describe the limitations of using dot and cross, ball and stick, two and three-dimensional diagrams to represent a giant ionic structure",
+        "work out the empirical formula of an ionic compound from a given model or diagram that shows the ions in the structure.",
+        "Students should be familiar with the structure of sodium chloride but do not need to know the structures of other ionic compounds."
+      ],
+      "refs": [
+        "MS 5b",
+        "WS 1.2",
+        "MS 4a",
+        "MS 1a, 1c"
+      ]
+    },
+    "5.2.1.4": {
+      "content": [],
+      "skills": [
+        "When atoms share pairs of electrons, they form covalent bonds. These bonds between atoms are strong.",
+        "Covalently bonded substances may consist of small molecules.",
+        "Students should be able to recognise common substances that consist of small molecules from their chemical formula.",
+        "Some covalently bonded substances have very large molecules, such as polymers.",
+        "Some covalently bonded substances have giant covalent structures, such as diamond and silicon dioxide.",
+        "The covalent bonds in molecules and giant structures can be represented in the following forms:",
+        "Polymers can be represented in the form:",
+        "where n is a large number.",
+        "Recognise substances as small molecules, polymers or giant structures from diagrams showing their bonding.",
+        "Students should be able to:",
+        "draw dot and cross diagrams for the molecules of hydrogen, chlorine, oxygen, nitrogen, hydrogen chloride, water, ammonia and methane",
+        "represent the covalent bonds in small molecules, in the repeating units of polymers and in part of giant covalent structures, using a line to represent a single bond",
+        "describe the limitations of using dot and cross, ball and stick, two and three-dimensional diagrams to represent molecules or giant structures",
+        "deduce the molecular formula of a substance from a given model or diagram in these forms showing the atoms and bonds in the molecule."
+      ],
+      "refs": [
+        "WS 1.2"
+      ]
+    },
+    "5.2.1.5": {
+      "content": [],
+      "skills": [
+        "Metals consist of giant structures of atoms arranged in a regular pattern.",
+        "The electrons in the outer shell of metal atoms are delocalised and so are free to move through the whole structure. The sharing of delocalised electrons gives rise to strong metallic bonds. The bonding in metals may be represented in the following form:",
+        "Recognise substances as metallic giant structures from diagrams showing their bonding.",
+        "Visualise and represent 2D and 3D forms including two-dimensional representations of 3D objects."
+      ],
+      "refs": [
+        "WS 1.2",
+        "MS 5b"
+      ]
+    },
+    "5.2.2": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.2.2.1": {
+      "content": [],
+      "skills": [
+        "The three states of matter are solid, liquid and gas. Melting and freezing take place at the melting point, boiling and condensing take place at the boiling point.",
+        "The three states of matter can be represented by a simple model. In this model, particles are represented by small solid spheres. Particle theory can help to explain melting, boiling, freezing and condensing.",
+        "The amount of energy needed to change state from solid to liquid and from liquid to gas depends on the strength of the forces between the particles of the substance. The nature of the particles involved depends on the type of bonding and the structure of the substance. The stronger the forces between the particles the higher the melting point and boiling point of the substance.",
+        "(HT only) Limitations of the simple model above include that in the model there are no forces, that all particles are represented as spheres and that the spheres are solid.",
+        "Visualise and represent 2D and 3D forms including two-dimensional representations of 3D objects.",
+        "Students should be able to:",
+        "predict the states of substances at different temperatures given appropriate data",
+        "explain the different temperatures at which changes of state occur in terms of energy transfers and types of bonding",
+        "recognise that atoms themselves do not have the bulk properties of materials",
+        "(HT only) explain the limitations of the particle theory in relation to changes of state when particles are represented by solid inelastic spheres which have no forces between them."
+      ],
+      "refs": [
+        "MS 5b"
+      ]
+    },
+    "5.2.2.2": {
+      "content": [],
+      "skills": [
+        "In chemical equations, the three states of matter are shown as (s), (l) and (g), with (aq) for aqueous solutions.",
+        "Students should be able to include appropriate state symbols in chemical equations for the reactions in this specification."
+      ],
+      "refs": []
+    },
+    "5.2.2.3": {
+      "content": [],
+      "skills": [
+        "Ionic compounds have regular structures (giant ionic lattices) in which there are strong electrostatic forces of attraction in all directions between oppositely charged ions.",
+        "These compounds have high melting points and high boiling points because of the large amounts of energy needed to break the many strong bonds.",
+        "When melted or dissolved in water, ionic compounds conduct electricity because the ions are free to move and so charge can flow.",
+        "Knowledge of the structures of specific ionic compounds other than sodium chloride is not required."
+      ],
+      "refs": []
+    },
+    "5.2.2.4": {
+      "content": [],
+      "skills": [
+        "Substances that consist of small molecules are usually gases or liquids that have relatively low melting points and boiling points.",
+        "These substances have only weak forces between the molecules (intermolecular forces). It is these intermolecular forces that are overcome, not the covalent bonds, when the substance melts or boils.",
+        "The intermolecular forces increase with the size of the molecules, so larger molecules have higher melting and boiling points.",
+        "These substances do not conduct electricity because the molecules do not have an overall electric charge.",
+        "Students should be able to use the idea that intermolecular forces are weak compared with covalent bonds to explain the bulk properties of molecular substances."
+      ],
+      "refs": [
+        "WS 1.2"
+      ]
+    },
+    "5.2.2.5": {
+      "content": [],
+      "skills": [
+        "Polymers have very large molecules. The atoms in the polymer molecules are linked to other atoms by strong covalent bonds. The intermolecular forces between polymer molecules are relatively strong and so these substances are solids at room temperature.",
+        "Students should be able to recognise polymers from diagrams showing their bonding and structure."
+      ],
+      "refs": []
+    },
+    "5.2.2.6": {
+      "content": [],
+      "skills": [
+        "Substances that consist of giant covalent structures are solids with very high melting points. All of the atoms in these structures are linked to other atoms by strong covalent bonds. These bonds must be overcome to melt or boil these substances. Diamond and graphite (forms of carbon) and silicon dioxide (silica) are examples of giant covalent structures.",
+        "Students should be able to recognise giant covalent structures from diagrams showing their bonding and structure.",
+        "Visualise and represent 2D and 3D forms including two-dimensional representations of 3D objects."
+      ],
+      "refs": [
+        "MS 5b",
+        "WS 1.2"
+      ]
+    },
+    "5.2.2.7": {
+      "content": [],
+      "skills": [
+        "Metals have giant structures of atoms with strong metallic bonding. This means that most metals have high melting and boiling points.",
+        "In pure metals, atoms are arranged in layers, which allows metals to be bent and shaped. Pure metals are too soft for many uses and so are mixed with other metals to make alloys which are harder."
+      ],
+      "refs": [
+        "WS 1.2"
+      ]
+    },
+    "5.2.2.8": {
+      "content": [],
+      "skills": [
+        "Metals are good conductors of electricity because the delocalised electrons in the metal carry electrical charge through the metal. Metals are good conductors of thermal energy because energy is transferred by the delocalised electrons."
+      ],
+      "refs": []
+    },
+    "5.2.3": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.2.3.1": {
+      "content": [],
+      "skills": [
+        "In diamond, each carbon atom forms four covalent bonds with other carbon atoms in a giant covalent structure, so diamond is very hard, has a very high melting point and does not conduct electricity.",
+        "Visualise and represent 2D and 3D forms including two-dimensional representations of 3D objects.",
+        "Students should be able to explain the properties of diamond in terms of its structure and bonding."
+      ],
+      "refs": [
+        "MS 5b"
+      ]
+    },
+    "5.2.3.2": {
+      "content": [],
+      "skills": [
+        "In graphite, each carbon atom forms three covalent bonds with three other carbon atoms, forming layers of hexagonal rings which have no covalent bonds between the layers.",
+        "In graphite, one electron from each carbon atom is delocalised.",
+        "Students should be able to explain the properties of graphite in terms of its structure and bonding.",
+        "Students should know that graphite is similar to metals in that it has delocalised electrons."
+      ],
+      "refs": [
+        "WS 1.2"
+      ]
+    },
+    "5.2.3.3": {
+      "content": [],
+      "skills": [
+        "Graphene is a single layer of graphite and has properties that make it useful in electronics and composites.",
+        "Students should be able to explain the properties of graphene in terms of its structure and bonding.",
+        "Fullerenes are molecules of carbon atoms with hollow shapes. The structure of fullerenes is based on hexagonal rings of carbon atoms but they may also contain rings with five or seven carbon atoms. The first fullerene to be discovered was Buckminsterfullerene (C 60 ) which has a spherical shape.",
+        "Carbon nanotubes are cylindrical fullerenes with very high length to diameter ratios. Their properties make them useful for nanotechnology, electronics and materials.",
+        "recognise graphene and fullerenes from diagrams and descriptions of their bonding and structure",
+        "give examples of the uses of fullerenes, including carbon nanotubes.",
+        "Visualise and represent 2D and 3D forms including two-dimensional representations of 3D objects."
+      ],
+      "refs": [
+        "WS 1.2, 1.4",
+        "MS 5b"
+      ]
+    },
+    "5.3": {
+      "content": [
+        "Chemists use quantitative analysis to determine the formulae of compounds and the equations for reactions. Given this information, analysts can then use quantitative methods to determine the purity of chemical samples and to monitor the yield from chemical reactions.",
+        "Chemical reactions can be classified in various ways. Identifying different types of chemical reaction allows chemists to make sense of how different chemicals react together, to establish patterns and to make predictions about the behaviour of other chemicals. Chemical equations provide a means of representing chemical reactions and are a key way for chemists to communicate chemical ideas."
+      ],
+      "skills": [],
+      "refs": []
+    },
+    "5.3.1": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.3.1.1": {
+      "content": [],
+      "skills": [
+        "The law of conservation of mass states that no atoms are lost or made during a chemical reaction so the mass of the products equals the mass of the reactants.",
+        "This means that chemical reactions can be represented by symbol equations which are balanced in terms of the numbers of atoms of each element involved on both sides of the equation.",
+        "Students should understand the use of the multipliers in equations in normal script before a formula and in subscript within a formula."
+      ],
+      "refs": [
+        "WS 1.2"
+      ]
+    },
+    "5.3.1.2": {
+      "content": [],
+      "skills": [
+        "The relative formula mass ( M r ) of a compound is the sum of the relative atomic masses of the atoms in the numbers shown in the formula.",
+        "In a balanced chemical equation, the sum of the relative formula masses of the reactants in the quantities shown equals the sum of the relative formula masses of the products in the quantities shown.",
+        "Students should be able to calculate the percentage by mass in a compound given the relative formula mass and the relative atomic masses."
+      ],
+      "refs": []
+    },
+    "5.3.1.3": {
+      "content": [],
+      "skills": [
+        "Some reactions may appear to involve a change in mass but this can usually be explained because a reactant or product is a gas and its mass has not been taken into account. For example: when a metal reacts with oxygen the mass of the oxide produced is greater than the mass of the metal or in thermal decompositions of metal carbonates carbon dioxide is produced and escapes into the atmosphere leaving the metal oxide as the only solid product.",
+        "Students should be able to explain any observed changes in mass in non-enclosed systems during a chemical reaction given the balanced symbol equation for the reaction and explain these changes in terms of the particle model.",
+        "Opportunities within investigation of mass changes using various apparatus."
+      ],
+      "refs": [
+        "AT 1, 2,6"
+      ]
+    },
+    "5.3.1.4": {
+      "content": [],
+      "skills": [
+        "Whenever a measurement is made there is always some uncertainty about the result obtained.",
+        "represent the distribution of results and make estimations of uncertainty",
+        "use the range of a set of measurements about the mean as a measure of uncertainty."
+      ],
+      "refs": []
+    },
+    "5.3.2": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.3.2.1": {
+      "content": [],
+      "skills": [
+        "Chemical amounts are measured in moles. The symbol for the unit mole is mol.",
+        "The mass of one mole of a substance in grams is numerically equal to its relative formula mass.",
+        "One mole of a substance contains the same number of the stated particles, atoms, molecules or ions as one mole of any other substance.",
+        "The number of atoms, molecules or ions in a mole of a given substance is the Avogadro constant. The value of the Avogadro constant is 6.02 x 10 23 per mole.",
+        "Students should understand that the measurement of amounts in moles can apply to atoms, molecules, ions, electrons, formulae and equations, for example that in one mole of carbon (C) the number of atoms is the same as the number of molecules in one mole of carbon dioxide (CO 2 ).",
+        "Recognise and use expressions in decimal form.",
+        "Recognise and use expressions in standard form.",
+        "Use an appropriate number of significant figures.",
+        "Understand and use the symbols: =, <, <<, >>, >, ∝, ~",
+        "Change the subject of an equation.",
+        "Students should be able to use the relative formula mass of a substance to calculate the number of moles in a given mass of that substance and vice versa."
+      ],
+      "refs": [
+        "WS 4.1, 4.2, 4.3, 4.5, 4.6",
+        "MS 1a",
+        "MS 1b",
+        "MS 2a",
+        "MS 3a",
+        "MS 3b"
+      ]
+    },
+    "5.3.2.2": {
+      "content": [],
+      "skills": [
+        "The masses of reactants and products can be calculated from balanced symbol equations.",
+        "Chemical equations can be interpreted in terms of moles. For example:",
+        "M g + 2 H C I → M g C I 2 + H 2",
+        "shows that one mole of magnesium reacts with two moles of hydrochloric acid to produce one mole of magnesium chloride and one mole of hydrogen gas.",
+        "Students should be able to:",
+        "calculate the masses of substances shown in a balanced symbol equation",
+        "calculate the masses of reactants and products from the balanced symbol equation and the mass of a given reactant or product.",
+        "Recognise and use expressions in decimal form.",
+        "Use ratios, fractions and percentages.",
+        "Change the subject of an equation.",
+        "Substitute numerical values into algebraic equations using appropriate units for physical quantities."
+      ],
+      "refs": [
+        "MS 1a",
+        "MS 1c",
+        "MS 3b",
+        "MS 3c"
+      ]
+    },
+    "5.3.2.3": {
+      "content": [],
+      "skills": [
+        "The balancing numbers in a symbol equation can be calculated from the masses of reactants and products by converting the masses in grams to amounts in moles and converting the numbers of moles to simple whole number ratios.",
+        "Students should be able to balance an equation given the masses of reactants and products.",
+        "Students should be able to change the subject of a mathematical equation.",
+        "Change the subject of an equation.",
+        "Substitute numerical values into algebraic equations using appropriate units for physical quantities."
+      ],
+      "refs": [
+        "MS 3b",
+        "MS 3c"
+      ]
+    },
+    "5.3.2.4": {
+      "content": [],
+      "skills": [
+        "In a chemical reaction involving two reactants, it is common to use an excess of one of the reactants to ensure that all of the other reactant is used. The reactant that is completely used up is called the limiting reactant because it limits the amount of products.",
+        "Students should be able to explain the effect of a limiting quantity of a reactant on the amount of products it is possible to obtain in terms of amounts in moles or masses in grams."
+      ],
+      "refs": [
+        "WS 4.1"
+      ]
+    },
+    "5.3.2.5": {
+      "content": [],
+      "skills": [
+        "Many chemical reactions take place in solutions. The concentration of a solution can be measured in mass per given volume of solution, eg grams per dm 3 (g/dm 3 ).",
+        "Students should be able to:",
+        "calculate the mass of solute in a given volume of solution of known concentration in terms of mass per given volume of solution",
+        "(HT only) explain how the mass of a solute and the volume of a solution is related to the concentration of the solution.",
+        "Use ratios, fractions and percentages.",
+        "Change the subject of an equation."
+      ],
+      "refs": [
+        "MS 1c",
+        "MS 3b"
+      ]
+    },
+    "5.4": {
+      "content": [
+        "Understanding of chemical changes began when people began experimenting with chemical reactions in a systematic way and organizing their results logically. Knowing about these different chemical changes meant that scientists could begin to predict exactly what new substances would be formed and use this knowledge to develop a wide range of different materials and processes. It also helped biochemists to understand the complex reactions that take place in living organisms. The extraction of important resources from the earth makes use of the way that some elements and compounds react with each other and how easily they can be ‘pulled apart’."
+      ],
+      "skills": [],
+      "refs": []
+    },
+    "5.4.1": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.4.1.1": {
+      "content": [],
+      "skills": [
+        "Metals react with oxygen to produce metal oxides. The reactions are oxidation reactions because the metals gain oxygen.",
+        "Students should be able to explain reduction and oxidation in terms of loss or gain of oxygen."
+      ],
+      "refs": []
+    },
+    "5.4.1.2": {
+      "content": [],
+      "skills": [
+        "When metals react with other substances the metal atoms form positive ions. The reactivity of a metal is related to its tendency to form positive ions. Metals can be arranged in order of their reactivity in a reactivity series. The metals potassium, sodium, lithium, calcium, magnesium, zinc, iron and copper can be put in order of their reactivity from their reactions with water and dilute acids.",
+        "The non-metals hydrogen and carbon are often included in the reactivity series.",
+        "A more reactive metal can displace a less reactive metal from a compound.",
+        "Students should be able to:",
+        "recall and describe the reactions, if any, of potassium, sodium, lithium, calcium, magnesium, zinc, iron and copper with water or dilute acids and where appropriate, to place these metals in order of reactivity",
+        "explain how the reactivity of metals with water or dilute acids is related to the tendency of the metal to form its positive ion",
+        "deduce an order of reactivity of metals based on experimental results.",
+        "The reactions of metals with water and acids are limited to room temperature and do not include reactions with steam.",
+        "Mixing of reagents to explore chemical changes and/or products."
+      ],
+      "refs": [
+        "AT 6"
+      ]
+    },
+    "5.4.1.3": {
+      "content": [],
+      "skills": [
+        "Unreactive metals such as gold are found in the Earth as the metal itself but most metals are found as compounds that require chemical reactions to extract the metal.",
+        "Metals less reactive than carbon can be extracted from their oxides by reduction with carbon.",
+        "Reduction involves the loss of oxygen.",
+        "Knowledge and understanding are limited to the reduction of oxides using carbon.",
+        "Knowledge of the details of processes used in the extraction of metals is not required.",
+        "Students should be able to:",
+        "interpret or evaluate specific metal extraction processes when given appropriate information",
+        "identify the substances which are oxidised or reduced in terms of gain or loss of oxygen."
+      ],
+      "refs": []
+    },
+    "5.4.1.4": {
+      "content": [],
+      "skills": [
+        "Oxidation is the loss of electrons and reduction is the gain of electrons.",
+        "write ionic equations for displacement reactions",
+        "identify in a given reaction, symbol equation or half equation which species are oxidised and which are reduced."
+      ],
+      "refs": []
+    },
+    "5.4.2": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.4.2.1": {
+      "content": [],
+      "skills": [
+        "Acids react with some metals to produce salts and hydrogen.",
+        "(HT only) Students should be able to:",
+        "explain in terms of gain or loss of electrons, that these are redox reactions",
+        "identify which species are oxidised and which are reduced in given chemical equations. Knowledge of reactions limited to those of magnesium, zinc and iron with hydrochloric and sulfuric acids."
+      ],
+      "refs": []
+    },
+    "5.4.2.2": {
+      "content": [],
+      "skills": [
+        "Acids are neutralised by alkalis (eg soluble metal hydroxides) and bases (eg insoluble metal hydroxides and metal oxides) to produce salts and water, and by metal carbonates to produce salts, water and carbon dioxide.",
+        "The particular salt produced in any reaction between an acid and a base or alkali depends on:",
+        "the acid used (hydrochloric acid produces chlorides, nitric acid produces nitrates, sulfuric acid produces sulfates)",
+        "the positive ions in the base, alkali or carbonate.",
+        "Students should be able to:",
+        "predict products from given reactants",
+        "use the formulae of common ions to deduce the formulae of salts."
+      ],
+      "refs": []
+    },
+    "5.4.2.3": {
+      "content": [],
+      "skills": [
+        "Soluble salts can be made from acids by reacting them with solid insoluble substances, such as metals, metal oxides, hydroxides or carbonates. The solid is added to the acid until no more reacts and the excess solid is filtered off to produce a solution of the salt.",
+        "Salt solutions can be crystallised to produce solid salts.",
+        "Students should be able to describe how to make pure, dry samples of named soluble salts from information provided.",
+        "Required practical activity 8: preparation of a pure, dry sample of a soluble salt from an insoluble oxide or carbonate, using a Bunsen burner to heat dilute acid and a water bath or electric heater to evaporate the solution .",
+        "AT skills covered by this practical activity: chemistry AT 2, 3, 4 and 6.",
+        "This practical activity also provides opportunities to develop WS and MS. Details of all skills are given in Key opportunities for skills development ."
+      ],
+      "refs": []
+    },
+    "5.4.2.4": {
+      "content": [],
+      "skills": [
+        "Acids produce hydrogen ions (H + ) in aqueous solutions.",
+        "Aqueous solutions of alkalis contain hydroxide ions (OH – ).",
+        "The pH scale, from 0 to 14, is a measure of the acidity or alkalinity of a solution, and can be measured using universal indicator or a pH probe.",
+        "A solution with pH 7 is neutral. Aqueous solutions of acids have pH values of less than 7 and aqueous solutions of alkalis have pH values greater than 7.",
+        "In neutralisation reactions between an acid and an alkali, hydrogen ions react with hydroxide ions to produce water.",
+        "This reaction can be represented by the equation:",
+        "Students should be able to:",
+        "describe the use of universal indicator or a wide range indicator to measure the approximate pH of a solution",
+        "use the pH scale to identify acidic or alkaline solutions.",
+        "This is an opportunity to investigate pH changes when a strong acid neutralises a strong alkali."
+      ],
+      "refs": [
+        "AT 3"
+      ]
+    },
+    "5.4.2.5": {
+      "content": [],
+      "skills": [
+        "A strong acid is completely ionised in aqueous solution. Examples of strong acids are hydrochloric, nitric and sulfuric acids.",
+        "A weak acid is only partially ionised in aqueous solution. Examples of weak acids are ethanoic, citric and carbonic acids.",
+        "For a given concentration of aqueous solutions, the stronger an acid, the lower the pH.",
+        "As the pH decreases by one unit, the hydrogen ion concentration of the solution increases by a factor of 10.",
+        "Students should be able to:",
+        "use and explain the terms dilute and concentrated (in terms of amount of substance), and weak and strong (in terms of the degree of ionisation) in relation to acids",
+        "describe neutrality and relative acidity in terms of the effect on hydrogen ion concentration and the numerical value of pH (whole numbers only).",
+        "Make order of magnitude calculations."
+      ],
+      "refs": [
+        "MS 2h"
+      ]
+    },
+    "5.4.3": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.4.3.1": {
+      "content": [],
+      "skills": [
+        "When an ionic compound is melted or dissolved in water, the ions are free to move about within the liquid or solution. These liquids and solutions are able to conduct electricity and are called electrolytes.",
+        "Passing an electric current through electrolytes causes the ions to move to the electrodes. Positively charged ions move to the negative electrode (the cathode), and negatively charged ions move to the positive electrode (the anode). Ions are discharged at the electrodes producing elements. This process is called electrolysis.",
+        "(HT only) Throughout Section 4.4.3 Higher Tier students should be able to write half equations for the reactions occurring at the electrodes during electrolysis, and may be required to complete and balance supplied half equations."
+      ],
+      "refs": []
+    },
+    "5.4.3.2": {
+      "content": [],
+      "skills": [
+        "When a simple ionic compound (eg lead bromide) is electrolysed in the molten state using inert electrodes, the metal (lead) is produced at the cathode and the non-metal (bromine) is produced at the anode.",
+        "Students should be able to predict the products of the electrolysis of binary ionic compounds in the molten state.",
+        "A safer alternative for practical work is anhydrous zinc chloride."
+      ],
+      "refs": []
+    },
+    "5.4.3.3": {
+      "content": [],
+      "skills": [
+        "Metals can be extracted from molten compounds using electrolysis. Electrolysis is used if the metal is too reactive to be extracted by reduction with carbon or if the metal reacts with carbon. Large amounts of energy are used in the extraction process to melt the compounds and to produce the electrical current.",
+        "Aluminium is manufactured by the electrolysis of a molten mixture of aluminium oxide and cryolite using carbon as the positive electrode (anode).",
+        "explain why a mixture is used as the electrolyte",
+        "explain why the positive electrode must be continually replaced."
+      ],
+      "refs": []
+    },
+    "5.4.3.4": {
+      "content": [],
+      "skills": [
+        "The ions discharged when an aqueous solution is electrolysed using inert electrodes depend on the relative reactivity of the elements involved.",
+        "At the negative electrode (cathode), hydrogen is produced if the metal is more reactive than hydrogen.",
+        "At the positive electrode (anode), oxygen is produced unless the solution contains halide ions when the halogen is produced.",
+        "This happens because in the aqueous solution water molecules break down producing hydrogen ions and hydroxide ions that are discharged.",
+        "Required practical activity 9: investigate what happens when aqueous solutions are electrolysed using inert electrodes. This should be an investigation involving developing a hypothesis.",
+        "AT skills covered by this practical activity: chemistry AT 3 and 7.",
+        "This practical activity also provides opportunities to develop WS and MS. Details of all skills are given in Key opportunities for skills development ."
+      ],
+      "refs": []
+    },
+    "5.4.3.5": {
+      "content": [],
+      "skills": [
+        "During electrolysis, at the cathode (negative electrode), positively charged ions gain electrons and so the reactions are reductions.",
+        "At the anode (positive electrode), negatively charged ions lose electrons and so the reactions are oxidations.",
+        "Reactions at electrodes can be represented by half equations, for example:",
+        "2H + + 2e - → H 2",
+        "and",
+        "4OH - → O 2 + 2H 2 O + 4e -",
+        "or",
+        "4OH - – 4e - → O 2 + 2H 2 O"
+      ],
+      "refs": []
+    },
+    "5.5": {
+      "content": [
+        "Energy changes are an important part of chemical reactions. The interaction of particles often involves transfers of energy due to the breaking and formation of bonds. Reactions in which energy is released to the surroundings are exothermic reactions, while those that take in thermal energy are endothermic. These interactions between particles can produce heating or cooling effects that are used in a range of everyday applications. Some interactions between ions in an electrolyte result in the production of electricity. Cells and batteries use these chemical reactions to provide electricity. Electricity can also be used to decompose ionic substances and is a useful means of producing elements that are too expensive to extract any other way."
+      ],
+      "skills": [],
+      "refs": []
+    },
+    "5.5.1": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.5.1.1": {
+      "content": [],
+      "skills": [
+        "Energy is conserved in chemical reactions. The amount of energy in the universe at the end of a chemical reaction is the same as before the reaction takes place. If a reaction transfers energy to the surroundings the product molecules must have less energy than the reactants, by the amount transferred.",
+        "An exothermic reaction is one that transfers energy to the surroundings so the temperature of the surroundings increases.",
+        "Exothermic reactions include combustion, many oxidation reactions and neutralisation.",
+        "Everyday uses of exothermic reactions include self-heating cans and hand warmers.",
+        "An endothermic reaction is one that takes in energy from the surroundings so the temperature of the surroundings decreases.",
+        "Endothermic reactions include thermal decompositions and the reaction of citric acid and sodium hydrogencarbonate. Some sports injury packs are based on endothermic reactions.",
+        "Students should be able to:",
+        "distinguish between exothermic and endothermic reactions on the basis of the temperature change of the surroundings",
+        "evaluate uses and applications of exothermic and endothermic reactions given appropriate information.",
+        "Limited to measurement of temperature change. Calculation of energy changes or ΔH is not required.",
+        "An opportunity to measure temperature changes when substances react or dissolve in water .",
+        "Required practical activity 10: investigate the variables that affect temperature changes in reacting solutions such as, eg acid plus metals, acid plus carbonates, neutralisations, displacement of metals.",
+        "AT skills covered by this practical activity: chemistry AT 1, 3, 5 and 6.",
+        "This practical activity also provides opportunities to develop WS and MS. Details of all skills are given in Key opportunities for skills development ."
+      ],
+      "refs": [
+        "AT 5"
+      ]
+    },
+    "5.5.1.2": {
+      "content": [],
+      "skills": [
+        "Chemical reactions can occur only when reacting particles collide with each other and with sufficient energy. The minimum amount of energy that particles must have to react is called the activation energy.",
+        "Reaction profiles can be used to show the relative energies of reactants and products, the activation energy and the overall energy change of a reaction.",
+        "Students should be able to:",
+        "draw simple reaction profiles (energy level diagrams) for exothermic and endothermic reactions showing the relative energies of reactants and products, the activation energy and the overall energy change, with a curved line to show the energy as the reaction proceeds",
+        "use reaction profiles to identify reactions as exothermic or endothermic",
+        "explain that the activation energy is the energy needed for a reaction to occur."
+      ],
+      "refs": []
+    },
+    "5.5.1.3": {
+      "content": [],
+      "skills": [
+        "During a chemical reaction:",
+        "energy must be supplied to break bonds in the reactants",
+        "energy is released when bonds in the products are formed.",
+        "The energy needed to break bonds and the energy released when bonds are formed can be calculated from bond energies.",
+        "The difference between the sum of the energy needed to break bonds in the reactants and the sum of the energy released when bonds in the products are formed is the overall energy change of the reaction.",
+        "In an exothermic reaction, the energy released from forming new bonds is greater than the energy needed to break existing bonds.",
+        "In an endothermic reaction, the energy needed to break existing bonds is greater than the energy released from forming new bonds."
+      ],
+      "refs": []
+    },
+    "5.6": {
+      "content": [
+        "Chemical reactions can occur at vastly different rates. Whilst the reactivity of chemicals is a significant factor in how fast chemical reactions proceed, there are many variables that can be manipulated in order to speed them up or slow them down. Chemical reactions may also be reversible and therefore the effect of different variables needs to be established in order to identify how to maximise the yield of desired product. Understanding energy changes that accompany chemical reactions is important for this process. In industry, chemists and chemical engineers determine the effect of different variables on reaction rate and yield of product. Whilst there may be compromises to be made, they carry out optimisation processes to ensure that enough product is produced within a sufficient time, and in an energy-efficient way."
+      ],
+      "skills": [],
+      "refs": []
+    },
+    "5.6.1": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.6.1.1": {
+      "content": [],
+      "skills": [
+        "The rate of a chemical reaction can be found by measuring the quantity of a reactant used or the quantity of product formed over time:",
+        "m e a n r a t e o f r e a c t i o n = q u a n t i t y o f r e a c t a n t u s e d t i m e t a k e n",
+        "m e a n r a t e o f r e a c t i o n = q u a n t i t y o f p r o d u c t f o r m e d t i m e t a k e n",
+        "The quantity of reactant or product can be measured by the mass in grams or by a volume in cm 3 .",
+        "The units of rate of reaction may be given as g/s or cm 3 /s.",
+        "For the Higher Tier, students are also required to use quantity of reactants in terms of moles and units for rate of reaction in mol/s.",
+        "Students should be able to:",
+        "calculate the mean rate of a reaction from given information about the quantity of a reactant used or the quantity of a product formed and the time taken",
+        "draw, and interpret, graphs showing the quantity of product formed or quantity of reactant used up against time",
+        "draw tangents to the curves on these graphs and use the slope of the tangent as a measure of the rate of reaction",
+        "(HT only) calculate the gradient of a tangent to the curve on these graphs as a measure of rate of reaction at a specific time.",
+        "Recognise and use expressions in decimal form.",
+        "Use ratios, fractions and percentages.",
+        "Make estimates of the results of simple calculations.",
+        "Translate information between graphical and numeric form.",
+        "Drawing and interpreting appropriate graphs from data to determine rate of reaction.",
+        "Plot two variables from experimental or other data.",
+        "Determine the slope and intercept of a linear graph.",
+        "Draw and use the slope of a tangent to a curve as a measure of rate of change."
+      ],
+      "refs": [
+        "MS 1a",
+        "MS 1c",
+        "MS 1d",
+        "MS 4a",
+        "MS 4b",
+        "MS 4c",
+        "MS 4d",
+        "MS 4e"
+      ]
+    },
+    "5.6.1.2": {
+      "content": [
+        "Key o pportunities for skills development",
+        "Factors which affect the rates of chemical reactions include: the concentrations of reactants in solution, the pressure of reacting gases, the surface area of solid reactants, the temperature and the presence of catalysts.",
+        "Students should be able to recall how changing these factors affects the rate of chemical reactions.",
+        "This topic offers opportunities for practical work and investigations in addition to required practical 11.",
+        "Required practical activity 11: investigate how changes in concentration affect the rates of reactions by a method involving measuring the volume of a gas produced and a method involving a change in colour or turbidity.",
+        "This should be an investigation involving developing a hypothesis.",
+        "AT skills covered by this practical activity: chemistry AT 1, 3, 5 and 6.",
+        "This practical activity also provides opportunities to develop WS and MS. Details of all skills are given in Key opportunities for skills development"
+      ],
+      "skills": [],
+      "refs": []
+    },
+    "5.6.1.3": {
+      "content": [],
+      "skills": [
+        "Collision theory explains how various factors affect rates of reactions. According to this theory, chemical reactions can occur only when reacting particles collide with each other and with sufficient energy. The minimum amount of energy that particles must have to react is called the activation energy.",
+        "Increasing the concentration of reactants in solution, the pressure of reacting gases, and the surface area of solid reactants increases the frequency of collisions and so increases the rate of reaction.",
+        "Increasing the temperature increases the frequency of collisions and makes the collisions more energetic, and so increases the rate of reaction.",
+        "Students should be able to :",
+        "predict and explain using collision theory the effects of changing conditions of concentration, pressure and temperature on the rate of a reaction",
+        "predict and explain the effects of changes in the size of pieces of a reacting solid in terms of surface area to volume ratio",
+        "use simple ideas about proportionality when using collision theory to explain the effect of a factor on the rate of a reaction."
+      ],
+      "refs": [
+        "MS 5c",
+        "MS 1c"
+      ]
+    },
+    "5.6.1.4": {
+      "content": [],
+      "skills": [
+        "Catalysts change the rate of chemical reactions but are not used up during the reaction. Different reactions need different catalysts. Enzymes act as catalysts in biological systems.",
+        "Catalysts increase the rate of reaction by providing a different pathway for the reaction that has a lower activation energy.",
+        "A reaction profile for a catalysed reaction can be drawn in the following form:",
+        "Students should be able to identify catalysts in reactions from their effect on the rate of reaction and because they are not included in the chemical equation for the reaction.",
+        "Students should be able to explain catalytic action in terms of activation energy.",
+        "Students do not need to know the names of catalysts other than those specified in the subject content.",
+        "An opportunity to investigate the catalytic effect of adding different metal salts to a reaction such as the decomposition of hydrogen peroxide."
+      ],
+      "refs": [
+        "AT 5"
+      ]
+    },
+    "5.6.2": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.6.2.1": {
+      "content": [],
+      "skills": [
+        "In some chemical reactions, the products of the reaction can react to produce the original reactants. Such reactions are called reversible reactions and are represented:",
+        "A + B ⇌ C + D",
+        "The direction of reversible reactions can be changed by changing the conditions.",
+        "For example:"
+      ],
+      "refs": []
+    },
+    "5.6.2.2": {
+      "content": [],
+      "skills": [
+        "If a reversible reaction is exothermic in one direction, it is endothermic in the opposite direction. The same amount of energy is transferred in each case. For example:"
+      ],
+      "refs": []
+    },
+    "5.6.2.3": {
+      "content": [],
+      "skills": [
+        "When a reversible reaction occurs in apparatus which prevents the escape of reactants and products, equilibrium is reached when the forward and reverse reactions occur at exactly the same rate."
+      ],
+      "refs": [
+        "WS 1.2"
+      ]
+    },
+    "5.6.2.4": {
+      "content": [],
+      "skills": [
+        "The relative amounts of all the reactants and products at equilibrium depend on the conditions of the reaction.",
+        "If a system is at equilibrium and a change is made to any of the conditions, then the system responds to counteract the change.",
+        "The effects of changing conditions on a system at equilibrium can be predicted using Le Chatelier’s Principle.",
+        "Students should be able to make qualitative predictions about the effect of changes on systems at equilibrium when given appropriate information."
+      ],
+      "refs": []
+    },
+    "5.6.2.5": {
+      "content": [],
+      "skills": [
+        "If the concentration of one of the reactants or products is changed, the system is no longer at equilibrium and the concentrations of all the substances will change until equilibrium is reached again.",
+        "If the concentration of a reactant is increased, more products will be formed until equilibrium is reached again.",
+        "If the concentration of a product is decreased, more reactants will react until equilibrium is reached again.",
+        "Students should be able to interpret appropriate given data to predict the effect of a change in concentration of a reactant or product on given reactions at equilibrium."
+      ],
+      "refs": []
+    },
+    "5.6.2.6": {
+      "content": [],
+      "skills": [
+        "If the temperature of a system at equilibrium is increased:",
+        "the relative amount of products at equilibrium increases for an endothermic reaction",
+        "the relative amount of products at equilibrium decreases for an exothermic reaction.",
+        "If the temperature of a system at equilibrium is decreased:",
+        "the relative amount of products at equilibrium decreases for an endothermic reaction",
+        "the relative amount of products at equilibrium increases for an exothermic reaction.",
+        "Students should be able to interpret appropriate given data to predict the effect of a change in temperature on given reactions at equilibrium."
+      ],
+      "refs": []
+    },
+    "5.6.2.7": {
+      "content": [],
+      "skills": [
+        "For gaseous reactions at equilibrium:",
+        "an increase in pressure causes the equilibrium position to shift towards the side with the smaller number of molecules as shown by the symbol equation for that reaction",
+        "a decrease in pressure causes the equilibrium position to shift towards the side with the larger number of molecules as shown by the symbol equation for that reaction.",
+        "Students should be able to interpret appropriate given data to predict the effect of pressure changes on given reactions at equilibrium."
+      ],
+      "refs": []
+    },
+    "5.7": {
+      "content": [
+        "The chemistry of carbon compounds is so important that it forms a separate branch of chemistry. A great variety of carbon compounds is possible because carbon atoms can form chains and rings linked by C-C bonds. This branch of chemistry gets its name from the fact that the main sources of organic compounds are living, or once-living materials from plants and animals. These sources include fossil fuels which are a major source of feedstock for the petrochemical industry. Chemists are able to take organic molecules and modify them in many ways to make new and useful materials such as polymers, pharmaceuticals, perfumes and flavourings, dyes and detergents."
+      ],
+      "skills": [],
+      "refs": []
+    },
+    "5.7.1": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.7.1.1": {
+      "content": [],
+      "skills": [
+        "Crude oil is a finite resource found in rocks. Crude oil is the remains of an ancient biomass consisting mainly of plankton that was buried in mud.",
+        "Crude oil is a mixture of a very large number of compounds. Most of the compounds in crude oil are hydrocarbons, which are molecules made up of hydrogen and carbon atoms only.",
+        "Most of the hydrocarbons in crude oil are hydrocarbons called alkanes. The general formula for the homologous series of alkanes is C n H 2n+2",
+        "The first four members of the alkanes are methane, ethane, propane and butane.",
+        "Alkane molecules can be represented in the following forms:",
+        "C 2 H 6 or",
+        "Students should be able to recognise substances as alkanes given their formulae in these forms.",
+        "Students do not need to know the names of specific alkanes other than methane, ethane, propane and butane.",
+        "Make models of alkane molecules using the molecular modelling kits."
+      ],
+      "refs": [
+        "WS 1.2"
+      ]
+    },
+    "5.7.1.2": {
+      "content": [],
+      "skills": [
+        "The many hydrocarbons in crude oil may be separated into fractions, each of which contains molecules with a similar number of carbon atoms, by fractional distillation.",
+        "The fractions can be processed to produce fuels and feedstock for the petrochemical industry.",
+        "Many of the fuels on which we depend for our modern lifestyle, such as petrol, diesel oil, kerosene, heavy fuel oil and liquefied petroleum gases, are produced from crude oil.",
+        "Many useful materials on which modern life depends are produced by the petrochemical industry, such as solvents, lubricants, polymers, detergents.",
+        "The vast array of natural and synthetic carbon compounds occur due to the ability of carbon atoms to form families of similar compounds.",
+        "Students should be able to explain how fractional distillation works in terms of evaporation and condensation.",
+        "Knowledge of the names of other specific fractions or fuels is not required."
+      ],
+      "refs": [
+        "WS 1.2"
+      ]
+    },
+    "5.7.1.3": {
+      "content": [],
+      "skills": [
+        "Some properties of hydrocarbons depend on the size of their molecules, including boiling point, viscosity and flammability. These properties influence how hydrocarbons are used as fuels.",
+        "Students should be able to recall how boiling point, viscosity and flammability change with increasing molecular size.",
+        "The combustion of hydrocarbon fuels releases energy. During combustion, the carbon and hydrogen in the fuels are oxidised. The complete combustion of a hydrocarbon produces carbon dioxide and water.",
+        "Students should be able to write balanced equations for the complete combustion of hydrocarbons with a given formula.",
+        "Knowledge of trends in properties of hydrocarbons is limited to:",
+        "boiling points",
+        "viscosity",
+        "flammability.",
+        "Investigate the properties of different hydrocarbons."
+      ],
+      "refs": [
+        "WS 1.2, 4.1"
+      ]
+    },
+    "5.7.1.4": {
+      "content": [
+        "Key o pportunities for skills development",
+        "Hydrocarbons can be broken down (cracked) to produce smaller, more useful molecules.",
+        "Cracking can be done by various methods including catalytic cracking and steam cracking.",
+        "Students should be able to describe in general terms the conditions used for catalytic cracking and steam cracking.",
+        "The products of cracking include alkanes and another type of hydrocarbon called alkenes.",
+        "Alkenes are more reactive than alkanes and react with bromine water, which is used as a test for alkenes.",
+        "Students should be able to recall the colour change when bromine water reacts with an alkene .",
+        "There is a high demand for fuels with small molecules and so some of the products of cracking are useful as fuels.",
+        "Alkenes are used to produce polymers and as starting materials for the production of many other chemicals.",
+        "Students should be able to balance chemical equations as examples of cracking given the formulae of the reactants and products.",
+        "Students should be able to give examples to illustrate the usefulness of cracking. They should also be able to explain how modern life depends on the uses of hydrocarbons.",
+        "(Students do not need to know the formulae or names of individual alkenes.)"
+      ],
+      "skills": [],
+      "refs": [
+        "WS 1.2"
+      ]
+    },
+    "5.8": {
+      "content": [
+        "Analysts have developed a range of qualitative tests to detect specific chemicals. The tests are based on reactions that produce a gas with distinctive properties, or a colour change or an insoluble solid that appears as a precipitate.",
+        "Instrumental methods provide fast, sensitive and accurate means of analysing chemicals, and are particularly useful when the amount of chemical being analysed is small. Forensic scientists and drug control scientists rely on such instrumental methods in their work."
+      ],
+      "skills": [],
+      "refs": []
+    },
+    "5.8.1": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.8.1.1": {
+      "content": [],
+      "skills": [
+        "In chemistry, a pure substance is a single element or compound, not mixed with any other substance.",
+        "Pure elements and compounds melt and boil at specific temperatures. Melting point and boiling point data can be used to distinguish pure substances from mixtures.",
+        "In everyday language, a pure substance can mean a substance that has had nothing added to it, so it is unadulterated and in its natural state, eg pure milk.",
+        "Students should be able to use melting point and boiling point data to distinguish pure from impure substances."
+      ],
+      "refs": [
+        "WS 2.2, 4.1"
+      ]
+    },
+    "5.8.1.2": {
+      "content": [],
+      "skills": [
+        "A formulation is a mixture that has been designed as a useful product. Many products are complex mixtures in which each chemical has a particular purpose. Formulations are made by mixing the components in carefully measured quantities to ensure that the product has the required properties. Formulations include fuels, cleaning agents, paints, medicines, alloys, fertilisers and foods.",
+        "Students should be able to identify formulations given appropriate information.",
+        "Students do not need to know the names of components in proprietary products."
+      ],
+      "refs": [
+        "WS 1.4, 2.2"
+      ]
+    },
+    "5.8.1.3": {
+      "content": [
+        "Key o pportunities for skills development",
+        "Chromatography can be used to separate mixtures and can give information to help identify substances. Chromatography involves a stationary phase and a mobile phase. Separation depends on the distribution of substances between the phases.",
+        "The ratio of the distance moved by a compound (centre of spot from origin) to the distance moved by the solvent can be expressed as its R f value:",
+        "R f = d i s t a n c e m o v e d b y s u b s t a n c e d i s t a n c e m o v e d b y s o l v e n t",
+        "Different compounds have different R f values in different solvents, which can be used to help identify the compounds. The compounds in a mixture may separate into different spots depending on the solvent but a pure compound will produce a single spot in all solvents.",
+        "Students should be able to:",
+        "explain how paper chromatography separates mixtures",
+        "suggest how chromatographic methods can be used for distinguishing pure substances from impure substances",
+        "interpret chromatograms and determine R f values from chromatograms",
+        "Recognise and use expressions in decimal form.",
+        "Use ratios, fractions and percentages.",
+        "Make estimates of the results of simple calculations.",
+        "provide answers to an appropriate number of significant figures .",
+        "Required practical activity 12: investigate how paper chromatography can be used to separate and tell the difference between coloured substances. Students should calculate R f values.",
+        "AT skills covered by this practical activity: chemistry AT 1 and 4.",
+        "This practical activity also provides opportunities to develop WS and MS. Details of all skills are given in Key opportunities for skills development ."
+      ],
+      "skills": [],
+      "refs": [
+        "WS 2.2, 3.1, 2, 3",
+        "MS 1a",
+        "MS 1c",
+        "MS 1d"
+      ]
+    },
+    "5.8.2": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.8.2.1": {
+      "content": [],
+      "skills": [
+        "The test for hydrogen uses a burning splint held at the open end of a test tube of the gas. Hydrogen burns rapidly with a pop sound."
+      ],
+      "refs": []
+    },
+    "5.8.2.2": {
+      "content": [],
+      "skills": [
+        "The test for oxygen uses a glowing splint inserted into a test tube of the gas. The splint relights in oxygen."
+      ],
+      "refs": []
+    },
+    "5.8.2.3": {
+      "content": [],
+      "skills": [
+        "The test for carbon dioxide uses an aqueous solution of calcium hydroxide (lime water). When carbon dioxide is shaken with or bubbled through limewater the limewater turns milky (cloudy)."
+      ],
+      "refs": []
+    },
+    "5.8.2.4": {
+      "content": [],
+      "skills": [
+        "The test for chlorine uses litmus paper. When damp litmus paper is put into chlorine gas the litmus paper is bleached and turns white."
+      ],
+      "refs": []
+    },
+    "5.9": {
+      "content": [
+        "The Earth’s atmosphere is dynamic and forever changing. The causes of these changes are sometimes man-made and sometimes part of many natural cycles. Scientists use very complex software to predict weather and climate change as there are many variables that can influence this. The problems caused by increased levels of air pollutants require scientists and engineers to develop solutions that help to reduce the impact of human activity."
+      ],
+      "skills": [],
+      "refs": []
+    },
+    "5.9.1": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.9.1.1": {
+      "content": [],
+      "skills": [
+        "For 200 million years, the proportions of different gases in the atmosphere have been much the same as they are today:",
+        "about four-fifths (approximately 80%) nitrogen",
+        "about one-fifth (approximately 20%) oxygen",
+        "small proportions of various other gases, including carbon dioxide, water vapour and noble gases.",
+        "To use ratios, fractions and percentages."
+      ],
+      "refs": [
+        "MS 1c"
+      ]
+    },
+    "5.9.1.2": {
+      "content": [],
+      "skills": [
+        "Theories about what was in the Earth’s early atmosphere and how the atmosphere was formed have changed and developed over time. Evidence for the early atmosphere is limited because of the time scale of 4.6 billion years.",
+        "One theory suggests that during the first billion years of the Earth’s existence there was intense volcanic activity that released gases that formed the early atmosphere and water vapour that condensed to form the oceans. At the start of this period the Earth’s atmosphere may have been like the atmospheres of Mars and Venus today, consisting of mainly carbon dioxide with little or no oxygen gas.",
+        "Volcanoes also produced nitrogen which gradually built up in the atmosphere and there may have been small proportions of methane and ammonia.",
+        "When the oceans formed carbon dioxide dissolved in the water and carbonates were precipitated producing sediments, reducing the amount of carbon dioxide in the atmosphere. No knowledge of other theories is required.",
+        "Students should be able to, given appropriate information, interpret evidence and evaluate different theories about the Earth’s early atmosphere."
+      ],
+      "refs": [
+        "WS 1.1, 1.2, 1.3, 3.5, 3.6, 4.1"
+      ]
+    },
+    "5.9.1.3": {
+      "content": [],
+      "skills": [
+        "Algae and plants produced the oxygen that is now in the atmosphere by photosynthesis, which can be represented by the equation:",
+        "Algae first produced oxygen about 2.7 billion years ago and soon after this oxygen appeared in the atmosphere. Over the next billion years plants evolved and the percentage of oxygen gradually increased to a level that enabled animals to evolve.",
+        "An opportunity to show that aquatic plants produce oxygen in daylight."
+      ],
+      "refs": [
+        "WS 1.2"
+      ]
+    },
+    "5.9.1.4": {
+      "content": [],
+      "skills": [
+        "Algae and plants decreased the percentage of carbon dioxide in the atmosphere by photosynthesis.",
+        "Carbon dioxide was also decreased by the formation of sedimentary rocks and fossil fuels that contain carbon.",
+        "Students should be able to:",
+        "describe the main changes in the atmosphere over time and some of the likely causes of these changes",
+        "describe and explain the formation of deposits of limestone, coal, crude oil and natural gas."
+      ],
+      "refs": []
+    },
+    "5.9.2": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.9.2.1": {
+      "content": [],
+      "skills": [
+        "Greenhouse gases in the atmosphere maintain temperatures on Earth high enough to support life. Water vapour, carbon dioxide and methane are greenhouse gases.",
+        "Students should be able to describe the greenhouse effect in terms of the interaction of short and long wavelength radiation with matter."
+      ],
+      "refs": [
+        "WS 1.2"
+      ]
+    },
+    "5.9.2.2": {
+      "content": [],
+      "skills": [
+        "Some human activities increase the amounts of greenhouse gases in the atmosphere. These include:",
+        "carbon dioxide",
+        "methane.",
+        "Students should be able to recall two human activities that increase the amounts of each of the greenhouse gases carbon dioxide and methane.",
+        "Based on peer-reviewed evidence, many scientists believe that human activities will cause the temperature of the Earth’s atmosphere to increase at the surface and that this will result in global climate change.",
+        "However, it is difficult to model such complex systems as global climate change. This leads to simplified models, speculation and opinions presented in the media that may be based on only parts of the evidence and which may be biased.",
+        "Students should be able to:",
+        "evaluate the quality of evidence in a report about global climate change given appropriate information",
+        "describe uncertainties in the evidence base",
+        "recognise the importance of peer review of results and of communicating results to a wide range of audiences."
+      ],
+      "refs": []
+    },
+    "5.9.2.3": {
+      "content": [],
+      "skills": [
+        "An increase in average global temperature is a major cause of climate change.",
+        "There are several potential effects of global climate change.",
+        "Students should be able to:",
+        "describe briefly four potential effects of global climate change",
+        "discuss the scale, risk and environmental implications of global climate change."
+      ],
+      "refs": [
+        "WS 1.5"
+      ]
+    },
+    "5.9.2.4": {
+      "content": [],
+      "skills": [
+        "The carbon footprint is the total amount of carbon dioxide and other greenhouse gases emitted over the full life cycle of a product, service or event.",
+        "The carbon footprint can be reduced by reducing emissions of carbon dioxide and methane.",
+        "Students should be able to:",
+        "describe actions to reduce emissions of carbon dioxide and methane",
+        "give reasons why actions may be limited."
+      ],
+      "refs": [
+        "WS 1.3"
+      ]
+    },
+    "5.9.3": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.9.3.1": {
+      "content": [],
+      "skills": [
+        "The combustion of fuels is a major source of atmospheric pollutants.",
+        "Most fuels, including coal, contain carbon and/or hydrogen and may also contain some sulfur.",
+        "The gases released into the atmosphere when a fuel is burned may include carbon dioxide, water vapour, carbon monoxide, sulfur dioxide and oxides of nitrogen. Solid particles and unburned hydrocarbons may also be released that form particulates in the atmosphere.",
+        "Students should be able to:",
+        "describe how carbon monoxide, soot (carbon particles), sulfur dioxide and oxides of nitrogen are produced by burning fuels",
+        "predict the products of combustion of a fuel given appropriate information about the composition of the fuel and the conditions in which it is used."
+      ],
+      "refs": []
+    },
+    "5.9.3.2": {
+      "content": [],
+      "skills": [
+        "Carbon monoxide is a toxic gas. It is colourless and odourless and so is not easily detected.",
+        "Sulfur dioxide and oxides of nitrogen cause respiratory problems in humans and cause acid rain.",
+        "Particulates cause global dimming and health problems for humans."
+      ],
+      "refs": []
+    },
+    "5.10": {
+      "content": [
+        "Industries use the Earth’s natural resources to manufacture useful products. In order to operate sustainably, chemists seek to minimise the use of limited resources, use of energy, waste and environmental impact in the manufacture of these products. Chemists also aim to develop ways of disposing of products at the end of their useful life in ways that ensure that materials and stored energy are utilised. Pollution, disposal of waste products and changing land use has a significant effect on the environment, and environmental chemists study how human activity has affected the Earth’s natural cycles, and how damaging effects can be minimised."
+      ],
+      "skills": [],
+      "refs": []
+    },
+    "5.10.1": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.10.1.1": {
+      "content": [],
+      "skills": [
+        "Humans use the Earth’s resources to provide warmth, shelter, food and transport.",
+        "Natural resources, supplemented by agriculture, provide food, timber, clothing and fuels.",
+        "Finite resources from the Earth, oceans and atmosphere are processed to provide energy and materials.",
+        "Chemistry plays an important role in improving agricultural and industrial processes to provide new products and in sustainable development, which is development that meets the needs of current generations without compromising the ability of future generations to meet their own needs.",
+        "Students should be able to:",
+        "state examples of natural products that are supplemented or replaced by agricultural and synthetic products",
+        "distinguish between finite and renewable resources given appropriate information.",
+        "extract and interpret information about resources from charts, graphs and tables",
+        "use orders of magnitude to evaluate the significance of data.",
+        "Translate information between graphical and numeric form."
+      ],
+      "refs": [
+        "WS 3.2",
+        "MS 2c, 4a",
+        "MS 2h"
+      ]
+    },
+    "5.10.1.2": {
+      "content": [
+        "Key o pportunities for skills development",
+        "Water of appropriate quality is essential for life. For humans, drinking water should have sufficiently low levels of dissolved salts and microbes. Water that is safe to drink is called potable water. Potable water is not pure water in the chemical sense because it contains dissolved substances.",
+        "The methods used to produce potable water depend on available supplies of water and local conditions.",
+        "In the United Kingdom (UK), rain provides water with low levels of dissolved substances (fresh water) that collects in the ground and in lakes and rivers, and most potable water is produced by:",
+        "choosing an appropriate source of fresh water",
+        "passing the water through filter beds",
+        "sterilising.",
+        "Sterilising agents used for potable water include chlorine, ozone or ultraviolet light.",
+        "If supplies of fresh water are limited, desalination of salty water or sea water may be required. Desalination can be done by distillation or by processes that use membranes such as reverse osmosis. These processes require large amounts of energy.",
+        "Students should be able to:",
+        "distinguish between potable water and pure water",
+        "describe the differences in treatment of ground water and salty water",
+        "give reasons for the steps used to produce potable water.",
+        "Required practical activity 13: analysis and purification of water samples from different sources, including pH, dissolved solids and distillation.",
+        "AT skills covered by this practical activity: chemistry AT 2, 3 and 4.",
+        "This practical activity also provides opportunities to develop WS and MS. Details of all skills are given in Key opportunities for skills development ."
+      ],
+      "skills": [],
+      "refs": []
+    },
+    "5.10.1.3": {
+      "content": [],
+      "skills": [
+        "Urban lifestyles and industrial processes produce large amounts of waste water that require treatment before being released into the environment. Sewage and agricultural waste water require removal of organic matter and harmful microbes. Industrial waste water may require removal of organic matter and harmful chemicals.",
+        "Sewage treatment includes:",
+        "screening and grit removal",
+        "sedimentation to produce sewage sludge and effluent",
+        "anaerobic digestion of sewage sludge",
+        "aerobic biological treatment of effluent.",
+        "Students should be able to comment on the relative ease of obtaining potable water from waste, ground and salt water."
+      ],
+      "refs": []
+    },
+    "5.10.1.4": {
+      "content": [],
+      "skills": [
+        "The Earth’s resources of metal ores are limited.",
+        "Copper ores are becoming scarce and new ways of extracting copper from low-grade ores include phytomining, and bioleaching. These methods avoid traditional mining methods of digging, moving and disposing of large amounts of rock.",
+        "Phytomining uses plants to absorb metal compounds. The plants are harvested and then burned to produce ash that contains metal compounds.",
+        "Bioleaching uses bacteria to produce leachate solutions that contain metal compounds.",
+        "The metal compounds can be processed to obtain the metal. For example, copper can be obtained from solutions of copper compounds by displacement using scrap iron or by electrolysis.",
+        "Students should be able to evaluate alternative biological methods of metal extraction, given appropriate information."
+      ],
+      "refs": []
+    },
+    "5.10.2": {
+      "content": [],
+      "skills": [],
+      "refs": []
+    },
+    "5.10.2.1": {
+      "content": [],
+      "skills": [
+        "Life cycle assessments (LCAs) are carried out to assess the environmental impact of products in each of these stages:",
+        "extracting and processing raw materials",
+        "manufacturing and packaging",
+        "use and operation during its lifetime",
+        "disposal at the end of its useful life, including transport and distribution at each stage.",
+        "Use of water, resources, energy sources and production of some wastes can be fairly easily quantified. Allocating numerical values to pollutant effects is less straightforward and requires value judgements, so LCA is not a purely objective process.",
+        "Selective or abbreviated LCAs can be devised to evaluate a product but these can be misused to reach pre-determined conclusions, eg in support of claims for advertising purposes.",
+        "Students should be able to carry out simple comparative LCAs for shopping bags made from plastic and paper.",
+        "LCAs should be done as a comparison of the impact on the environment of the stages in the life of a product, and only quantified where data is readily available for energy, water, resources and wastes.",
+        "Interpret LCAs of materials or products given appropriate information.",
+        "Recognise and use expressions in decimal form.",
+        "Use ratios, fractions and percentages.",
+        "Make estimates of the results of simple calculations.",
+        "Use an appropriate number of significant figures.",
+        "Translate information between graphical and numeric form."
+      ],
+      "refs": [
+        "WS 1.3, 4, 5",
+        "MS 1a",
+        "MS 1c",
+        "MS 1d",
+        "MS 2a",
+        "MS 4a"
+      ]
+    },
+    "5.10.2.2": {
+      "content": [],
+      "skills": [
+        "The reduction in use, reuse and recycling of materials by end users reduces the use of limited resources, use of energy sources, waste and environmental impacts.",
+        "Metals, glass, building materials, clay ceramics and most plastics are produced from limited raw materials. Much of the energy for the processes comes from limited resources. Obtaining raw materials from the Earth by quarrying and mining causes environmental impacts.",
+        "Some products, such as glass bottles, can be reused. Glass bottles can be crushed and melted to make different glass products. Other products cannot be reused and so are recycled for a different use.",
+        "Metals can be recycled by melting and recasting or reforming into different products. The amount of separation required for recycling depends on the material and the properties required of the final product. For example, some scrap steel can be added to iron from a blast furnace to reduce the amount of iron that needs to be extracted from iron ore.",
+        "Students should be able to evaluate ways of reducing the use of limited resources, given appropriate information."
+      ],
+      "refs": []
+    },
+    "5.11": {
+      "content": [
+        "The complex and diverse phenomena of the natural world can be described in terms of a small number of key ideas in chemistry.",
+        "These key ideas are of universal application, and we have embedded them throughout the subject content. They underpin many aspects of the science assessment and will therefore be assessed across all papers.",
+        "matter is composed of tiny particles called atoms and there are about 100 different naturally occurring types of atoms called elements",
+        "elements show periodic relationships in their chemical and physical properties",
+        "these periodic properties can be explained in terms of the atomic structure of the elements",
+        "atoms bond by either transferring electrons from one atom to another or by sharing electrons",
+        "the shapes of molecules (groups of atoms bonded together) and the way giant structures are arranged is of great importance in terms of the way they behave",
+        "there are barriers to reaction so reactions occur at different rates",
+        "chemical reactions take place in only three different ways: proton transfer electron transfer electron sharing",
+        "proton transfer",
+        "electron transfer",
+        "electron sharing",
+        "energy is conserved in chemical reactions so can therefore be neither created or destroyed."
+      ],
+      "skills": [],
+      "refs": []
+    }
   }
 }
