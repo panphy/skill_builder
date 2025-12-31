@@ -19,6 +19,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 import time
+import traceback
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
@@ -478,6 +479,10 @@ _ss_init("journey_json_cache", None)       # parsed journey JSON for current sel
 
 # Topic Journey draft (teacher)
 _ss_init("journey_draft", None)
+
+_ss_init("journey_topics_selected", [])
+_ss_init("journey_gen_error_details", None)
+_ss_init("journey_show_error", False)
 
 
 # =========================
@@ -1221,15 +1226,14 @@ def render_md_box(title: str, md_text: str, caption: str = "", empty_text: str =
 def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: float) -> dict:
     """Run a blocking task while showing a full-page overlay to prevent mid-run interaction.
 
-    Streamlit remains responsive on the client while Python is executing. Students can keep drawing
-    or changing selections after pressing Submit, which makes the UX confusing because the feedback
-    corresponds to the *submitted* state, not the later edits. This overlay blocks pointer interaction
-    until the task finishes.
+    IMPORTANT: Do NOT show a numeric ETA/percent as it can be misleading on variable model latency.
+    Instead, show an indeterminate progress indicator plus an elapsed timer.
     """
     overlay = st.empty()
+    start_t = time.monotonic()
 
-    def _render_overlay(pct: int, subtitle: str):
-        pct = int(max(0, min(100, pct)))
+    def _render_overlay(subtitle: str, elapsed_s: float):
+        # Render a full-page blocker with an indeterminate bar.
         overlay.markdown(
             f"""
 <style>
@@ -1249,101 +1253,106 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
 .pp-overlay-card {{
   width: min(560px, 92vw);
   background: rgba(255,255,255,0.96);
-  border-radius: 18px;
-  padding: 20px 22px;
-  box-shadow: 0 14px 42px rgba(0,0,0,0.28);
-  /* IMPORTANT: Streamlit dark-mode sets default text to light.
-     Our card is light, so we must force a dark text color here. */
-  color: rgba(0,0,0,0.88);
+  border-radius: 16px;
+  padding: 18px 18px 16px 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+  border: 1px solid rgba(0,0,0,0.12);
 }}
 .pp-row {{
   display: flex;
   gap: 14px;
-  align-items: center;
-}}
-.pp-title {{
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin: 0;
-  padding: 0;
-}}
-.pp-sub {{
-  font-size: 0.92rem;
-  opacity: 0.85;
-  margin-top: 2px;
-  line-height: 1.25rem;
-  color: rgba(0,0,0,0.72);
+  align-items: flex-start;
 }}
 .pp-spinner {{
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
   border: 4px solid rgba(0,0,0,0.15);
   border-top-color: rgba(0,0,0,0.55);
   animation: pp-spin 0.9s linear infinite;
   flex: 0 0 auto;
+  margin-top: 2px;
 }}
 @keyframes pp-spin {{
   from {{ transform: rotate(0deg); }}
   to   {{ transform: rotate(360deg); }}
 }}
-.pp-bar {{
+.pp-title {{
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(0,0,0,0.85);
+  margin: 0;
+  line-height: 1.2;
+}}
+.pp-subtitle {{
+  font-size: 13px;
+  color: rgba(0,0,0,0.72);
+  margin-top: 4px;
+  line-height: 1.35;
+}}
+.pp-meta {{
+  font-size: 12px;
+  color: rgba(0,0,0,0.58);
+  margin-top: 6px;
+}}
+.pp-indeterminate {{
+  margin-top: 14px;
   width: 100%;
   height: 10px;
-  background: rgba(0,0,0,0.12);
+  background: rgba(0,0,0,0.10);
   border-radius: 999px;
   overflow: hidden;
-  margin-top: 16px;
+  position: relative;
 }}
-.pp-bar-inner {{
+.pp-indeterminate::before {{
+  content: "";
+  position: absolute;
+  left: -35%;
+  top: 0;
   height: 100%;
-  width: {pct}%;
-  background: rgba(0,0,0,0.55);
+  width: 35%;
+  background: rgba(0,0,0,0.25);
   border-radius: 999px;
-  transition: width 120ms linear;
+  animation: pp-sweep 1.1s ease-in-out infinite;
 }}
-.pp-pct {{
-  font-size: 0.85rem;
-  opacity: 0.75;
-  margin-top: 8px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  color: rgba(0,0,0,0.72);
+@keyframes pp-sweep {{
+  0%   {{ left: -35%; }}
+  50%  {{ left: 100%; }}
+  100% {{ left: 100%; }}
 }}
 </style>
 
-<div class="pp-overlay" role="status" aria-live="polite">
+<div class="pp-overlay">
   <div class="pp-overlay-card">
     <div class="pp-row">
       <div class="pp-spinner"></div>
       <div>
-        <div class="pp-title">Processing…</div>
-        <div class="pp-sub">{subtitle}</div>
+        <div class="pp-title">Working…</div>
+        <div class="pp-subtitle">{subtitle}</div>
+        <div class="pp-meta">Elapsed: {int(elapsed_s)}s • Typical: {typical_range}</div>
       </div>
     </div>
-    <div class="pp-bar"><div class="pp-bar-inner"></div></div>
-    <div class="pp-pct">{pct}%</div>
+    <div class="pp-indeterminate"></div>
   </div>
 </div>
 """,
             unsafe_allow_html=True,
         )
 
-    start = time.monotonic()
-    _render_overlay(2, f"AI is working (typically {typical_range}). Please wait.")
+    _render_overlay("AI is working. Please wait.", 0)
 
     try:
         with ThreadPoolExecutor(max_workers=1) as ex:
             fut = ex.submit(task_fn)
+            # Update the elapsed timer a few times per second.
             while not fut.done():
-                elapsed = time.monotonic() - start
-                frac = min(0.95, max(0.02, elapsed / max(1e-6, est_seconds)))
-                _render_overlay(int(frac * 100), f"AI is working (typically {typical_range}). Please wait.")
-                time.sleep(0.12)
+                elapsed = time.monotonic() - start_t
+                _render_overlay("AI is working. Please wait.", elapsed)
+                time.sleep(0.35)
 
             report = fut.result()
 
-        _render_overlay(100, "Done. Updating your feedback…")
+        _render_overlay("Done. Updating the page…", time.monotonic() - start_t)
         time.sleep(0.08)
         return report
     finally:
@@ -1351,9 +1360,7 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
         overlay.empty()
 
 
-# ============================================================
-# DB OPERATIONS (attempts + question bank)
-# ============================================================
+
 def insert_attempt(student_id: str, question_key: str, report: dict, mode: str, question_bank_id: Optional[int] = None, step_index: Optional[int] = None):
     eng = get_db_engine()
     if eng is None:
@@ -3270,20 +3277,20 @@ else:
 
                     gen_c1, gen_c2 = st.columns([2, 1])
                     with gen_c1:
-                        topic_mode = st.radio("Topic input", ["Choose from AQA list", "Describe a topic"], horizontal=True, key="topic_mode")
-                        if topic_mode == "Choose from AQA list":
-                            topic_choice = st.selectbox("AQA GCSE Physics topic", get_topic_names_for_track(st.session_state.get("track", TRACK_DEFAULT)), key="topic_choice", help="Topics shown depend on Combined/Separate selection.")
-                            topic_text = topic_choice
+                        topic_choice = st.selectbox(
+                            "AQA GCSE Physics topic",
+                            options=get_topic_names_for_track(st.session_state.get("track", TRACK_DEFAULT)),
+                            key="topic_choice",
+                            help="Topics shown depend on Combined/Separate selection.",
+                        )
+                        topic_text = topic_choice
+                        topic_tok = get_topic_track_ok(topic_choice)
+                        if topic_tok == "separate_only":
+                            st.caption("Eligibility: Separate-only (hidden in Combined).")
                         else:
-                            topic_text = st.text_input("Describe the topic", placeholder="e.g. stopping distance with thinking vs braking distance", key="topic_text")
-                            free_text_separate_only = st.checkbox(
-                                "Separate-only (not for Combined)",
-                                value=False,
-                                key="gen_free_text_separate_only",
-                                help="Tick this if the topic/question you are describing includes Separate-only content. If unticked, it will be saved as eligible for both Combined + Separate.",
-                            )
+                            st.caption("Eligibility: Combined + Separate.")
 
-                        qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
+qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
                         difficulty = st.selectbox("Difficulty", DIFFICULTIES, key="gen_difficulty")
                         marks_req = st.number_input("Max marks (target)", min_value=1, max_value=12, value=4, step=1, key="gen_marks")
 
@@ -3343,10 +3350,7 @@ else:
                                     token = pysecrets.token_hex(3)
                                     default_label = f"AI-{slugify(topic_text)[:24]}-{token}"
                                     # Track eligibility for this draft
-                                    if topic_mode == "Choose from AQA list":
-                                        draft_track_ok = get_topic_track_ok(topic_text)
-                                    else:
-                                        draft_track_ok = "separate_only" if st.session_state.get("gen_free_text_separate_only") else "both"
+                                    draft_track_ok = get_topic_track_ok(topic_text)
 
                                     st.session_state["ai_draft"] = {
                                         "assignment_name": (assignment_name_ai or "").strip() or "AI Practice",
@@ -3426,18 +3430,36 @@ else:
 
                     jc1, jc2 = st.columns([2, 1])
                     with jc1:
-                        j_topic = st.text_input(
-                            "Topic in plain English",
-                            placeholder="e.g. Resistance and I-V characteristics (including filament lamp)",
-                            key="jour_topic"
+                                                st.write("### Journey topics")
+                        topic_pick = st.selectbox(
+                            "Choose a topic to add",
+                            options=get_topic_names_for_track(st.session_state.get("track", TRACK_DEFAULT)),
+                            key="jour_topic_pick",
+                            help="Add one or more topics from the official list. The journey will blend these topics into 5 steps (about 10 minutes).",
                         )
-                        journey_free_text_separate_only = st.checkbox(
-                            "Separate-only journey (not for Combined)",
-                            value=False,
-                            key="jour_free_text_separate_only",
-                            help="Tick this if the journey includes Separate-only content (e.g. Space physics). Unticked means eligible for both Combined + Separate.",
-                        )
-                        j_duration = 10
+                        b1, b2 = st.columns([1, 1])
+                        with b1:
+                            if st.button("Add topic", key="jour_add_topic", use_container_width=True):
+                                current = list(st.session_state.get("journey_topics_selected", []) or [])
+                                if topic_pick and topic_pick not in current:
+                                    current.append(topic_pick)
+                                    st.session_state["journey_topics_selected"] = current
+                                st.session_state["journey_show_error"] = False
+                                st.rerun()
+                        with b2:
+                            if st.button("Clear topics", key="jour_clear_topics", use_container_width=True):
+                                st.session_state["journey_topics_selected"] = []
+                                st.session_state["journey_show_error"] = False
+                                st.rerun()
+
+                        sel_topics = list(st.session_state.get("journey_topics_selected", []) or [])
+                        if sel_topics:
+                            st.markdown("**Selected topics:**")
+                            st.markdown("\n".join([f"- {t}" for t in sel_topics]))
+                        else:
+                            st.info("Add at least one topic to build a journey.")
+
+j_duration = 10
                         st.caption("Journey length is fixed: 10 minutes, 5 steps.")
                         st.caption("Focus sliders: 0 = none, 1 = light, 2 = medium, 3 = heavy. This adjusts the mix of step types in the journey.")
                         e1, e2, e3, e4 = st.columns(4)
@@ -3479,42 +3501,70 @@ else:
                             st.session_state["journey_draft"] = None
                             st.rerun()
 
-                    if gen_j:
-                        if not (j_topic or "").strip():
-                            st.warning("Please enter a topic first.")
+                                        if gen_j:
+                        # Clear previous error state for this run
+                        st.session_state["journey_gen_error_details"] = None
+                        st.session_state["journey_show_error"] = False
+
+                        sel_topics = list(st.session_state.get("journey_topics_selected", []) or [])
+                        if not sel_topics:
+                            st.warning("Please add at least one topic first.")
                         else:
+                            topic_plain = " | ".join(sel_topics)
                             emph = {"calculation": emph_calc, "explanation": emph_expl, "graph": emph_graph, "practical": emph_prac}
 
                             def task_journey():
                                 return generate_topic_journey_with_ai(
-                                    topic_plain_english=j_topic.strip(),
+                                    topic_plain_english=topic_plain,
                                     duration_minutes=int(j_duration),
                                     emphasis=emph,
                                 )
 
-                            data = _run_ai_with_progress(
-                                task_fn=task_journey,
-                                ctx={"teacher": True, "mode": "topic_journey"},
-                                typical_range="8-20 seconds",
-                                est_seconds=16.0
-                            )
+                            try:
+                                data = _run_ai_with_progress(
+                                    task_fn=task_journey,
+                                    ctx={"teacher": True, "mode": "topic_journey"},
+                                    typical_range="8-25 seconds",
+                                    est_seconds=18.0
+                                )
 
-                            if not isinstance(data, dict) or not data.get("steps"):
-                                st.error("AI did not return a valid journey. Please try again.")
-                            else:
-                                token = pysecrets.token_hex(3)
-                                default_label = f"JOURNEY-{slugify(j_topic)[:24]}-{token}"
-                                draft_track_ok = "separate_only" if st.session_state.get("jour_free_text_separate_only") else "both"
-                                st.session_state["journey_draft"] = {
-                                    "assignment_name": (j_assignment or "").strip() or "Topic Journey",
-                                    "question_label": default_label,
-                                    "track_ok": draft_track_ok,
-                                    "tags": [t.strip() for t in (j_tags or "").split(",") if t.strip()],
-                                    "journey": data,
-                                }
-                                st.success("Journey draft generated. Vet/edit below, then save as one assignment.")
+                                if not isinstance(data, dict) or not data.get("steps"):
+                                    st.error("AI did not return a valid journey. Please try again.")
+                                    try:
+                                        st.session_state["journey_gen_error_details"] = json.dumps(data, indent=2, ensure_ascii=False)
+                                    except Exception:
+                                        st.session_state["journey_gen_error_details"] = repr(data)
+                                else:
+                                    token = pysecrets.token_hex(3)
+                                    default_label = f"JOURNEY-{slugify(topic_plain)[:24]}-{token}"
 
-                    if st.session_state.get("journey_draft"):
+                                    # Track eligibility: if any chosen topic is separate_only, the whole journey is separate_only.
+                                    toks = [get_topic_track_ok(t) for t in sel_topics]
+                                    draft_track_ok = "separate_only" if any(tok == "separate_only" for tok in toks) else "both"
+
+                                    st.session_state["journey_draft"] = {
+                                        "assignment_name": (j_assignment or "").strip() or "Topic Journey",
+                                        "question_label": default_label,
+                                        "track_ok": draft_track_ok,
+                                        "tags": [t.strip() for t in (j_tags or "").split(",") if t.strip()],
+                                        "journey": data,
+                                    }
+                                    st.success("Journey draft generated. Vet/edit below, then save as one assignment.")
+                            except Exception:
+                                st.error("Journey generation failed. Try again, or click Explain error for details.")
+                                st.session_state["journey_gen_error_details"] = traceback.format_exc()
+
+                    # Optional: reveal raw error details if the user wants them
+                    if st.session_state.get("journey_gen_error_details"):
+                        if st.button("Explain error", key="jour_explain_error", use_container_width=True):
+                            st.session_state["journey_show_error"] = True
+
+                    if st.session_state.get("journey_show_error") and st.session_state.get("journey_gen_error_details"):
+                        with st.expander("Error details", expanded=True):
+                            st.code(st.session_state.get("journey_gen_error_details", ""))
+                            st.caption("These details help diagnose failures (model output shape, JSON errors, timeouts).")
+
+if st.session_state.get("journey_draft"):
                         d = st.session_state["journey_draft"]
                         journey = d.get("journey", {}) if isinstance(d, dict) else {}
                         steps = journey.get("steps", []) if isinstance(journey, dict) else []
@@ -3589,7 +3639,7 @@ else:
                                     tags = tags[:20]
 
                                     journey_json = {
-                                        "topic": str(journey.get("topic", "") or j_topic).strip(),
+                                        "topic": str(journey.get("topic", "")).strip(),
                                         "duration_minutes": 10,
                                         "checkpoint_every": int(journey.get("checkpoint_every", JOURNEY_CHECKPOINT_EVERY) or JOURNEY_CHECKPOINT_EVERY),
                                         "plan_markdown": str(plan_md or "").strip(),
