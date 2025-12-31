@@ -577,55 +577,75 @@ def _canvas_store_key_journey(qid: Optional[int], step_i: int) -> str:
     return f"{qid or 'none'}::step{int(step_i)}"
 
 
-def get_stored_canvas_data_url_single(qid: Optional[int]) -> Optional[str]:
+def get_stored_canvas_snapshot_single(qid: Optional[int]) -> Dict[str, Any]:
+    """Return a dict: {data_url, w, h}. Backwards-compatible with older string-only stores."""
     store = st.session_state.get("canvas_store_single", {}) or {}
     if not isinstance(store, dict):
         store = {}
-    return store.get(_canvas_store_key_single(qid)) or st.session_state.get("last_canvas_data_url_single")
+    key = _canvas_store_key_single(qid)
+    val = store.get(key)
+
+    if isinstance(val, dict) and val.get("data_url"):
+        return {"data_url": val.get("data_url"), "w": val.get("w"), "h": val.get("h")}
+    if isinstance(val, str) and val.strip():
+        return {"data_url": val.strip(), "w": None, "h": None}
+
+    last = st.session_state.get("last_canvas_data_url_single")
+    if isinstance(last, str) and last.strip():
+        return {"data_url": last.strip(), "w": None, "h": None}
+
+    return {"data_url": None, "w": None, "h": None}
 
 
-def set_stored_canvas_data_url_single(qid: Optional[int], data_url: Optional[str]) -> None:
+def set_stored_canvas_snapshot_single(qid: Optional[int], data_url: Optional[str], w: Optional[int], h: Optional[int]) -> None:
     store = st.session_state.get("canvas_store_single", {}) or {}
     if not isinstance(store, dict):
         store = {}
     key = _canvas_store_key_single(qid)
     if data_url:
-        store[key] = data_url
+        store[key] = {"data_url": data_url, "w": int(w) if w else None, "h": int(h) if h else None}
+        st.session_state["canvas_store_single"] = store
         st.session_state["last_canvas_data_url_single"] = data_url
     else:
         store.pop(key, None)
-        if st.session_state.get("last_canvas_data_url_single") == data_url:
-            st.session_state["last_canvas_data_url_single"] = None
-    st.session_state["canvas_store_single"] = store
+        st.session_state["canvas_store_single"] = store
+        st.session_state["last_canvas_data_url_single"] = None
 
 
-def get_stored_canvas_data_url_journey(qid: Optional[int], step_i: int) -> Optional[str]:
+def get_stored_canvas_snapshot_journey(qid: Optional[int], step_i: int) -> Dict[str, Any]:
+    """Return a dict: {data_url, w, h} for a specific journey step."""
     store = st.session_state.get("canvas_store_journey", {}) or {}
     if not isinstance(store, dict):
         store = {}
-    return store.get(_canvas_store_key_journey(qid, step_i)) or get_stored_canvas_data_url_journey(qid, step_i)
+    key = _canvas_store_key_journey(qid, step_i)
+    val = store.get(key)
+
+    if isinstance(val, dict) and val.get("data_url"):
+        return {"data_url": val.get("data_url"), "w": val.get("w"), "h": val.get("h")}
+    if isinstance(val, str) and val.strip():
+        return {"data_url": val.strip(), "w": None, "h": None}
+
+    last = st.session_state.get("last_canvas_data_url_journey")
+    if isinstance(last, str) and last.strip():
+        return {"data_url": last.strip(), "w": None, "h": None}
+
+    return {"data_url": None, "w": None, "h": None}
 
 
-def set_stored_canvas_data_url_journey(qid: Optional[int], step_i: int, data_url: Optional[str]) -> None:
+def set_stored_canvas_snapshot_journey(qid: Optional[int], step_i: int, data_url: Optional[str], w: Optional[int], h: Optional[int]) -> None:
     store = st.session_state.get("canvas_store_journey", {}) or {}
     if not isinstance(store, dict):
         store = {}
     key = _canvas_store_key_journey(qid, step_i)
     if data_url:
-        store[key] = data_url
+        store[key] = {"data_url": data_url, "w": int(w) if w else None, "h": int(h) if h else None}
+        st.session_state["canvas_store_journey"] = store
         st.session_state["last_canvas_data_url_journey"] = data_url
     else:
         store.pop(key, None)
-        if get_stored_canvas_data_url_journey(qid, step_i) == data_url:
-            st.session_state["last_canvas_data_url_journey"] = None
-    st.session_state["canvas_store_journey"] = store
+        st.session_state["canvas_store_journey"] = store
+        st.session_state["last_canvas_data_url_journey"] = None
 
-def _stylus_canvas_available() -> bool:
-    return stylus_canvas is not None
-
-# ============================================================
-#  ROBUST DATABASE LAYER
-# ============================================================
 def get_db_driver_type():
     try:
         import psycopg  # noqa: F401
@@ -2033,9 +2053,9 @@ JOURNEY_CHECKPOINT_EVERY = 3
 
 def generate_topic_journey_with_ai(
     topic_plain_english: str,
-    duration_minutes: int,
-    emphasis: Dict[str, int],
     track: Optional[str] = None,
+    duration_minutes: int = 20,
+    emphasis: Optional[Dict[str, int]] = None,
 ) -> Dict[str, Any]:
     """
     Strategy 2: Two-phase Topic Journey generation.
@@ -2046,7 +2066,7 @@ def generate_topic_journey_with_ai(
     """
     topic_plain_english = (topic_plain_english or "").strip()
     duration_minutes = int(duration_minutes)
-    steps_n = int(DURATION_TO_STEPS.get(duration_minutes, 8))
+    steps_n = 5  # fixed: always 5 steps
     track = (track or TRACK_DEFAULT or "combined").strip()
 
     # Small deterministic fixes for AQA notation. Keep narrow and safe.
@@ -2196,7 +2216,7 @@ def generate_topic_journey_with_ai(
     # ----------------------------
     # Phase 1: Plan
     # ----------------------------
-    emph_txt = ", ".join([f"{k}={int(v)}" for k, v in (emphasis or {}).items()])
+    emph_txt = "(focus sliders disabled)"
     plan_user = _render_template(JOURNEY_PLAN_USER_TPL, {
         "TOPIC_PLAIN": topic_plain_english,
         "DURATION_MIN": duration_minutes,
@@ -2251,7 +2271,7 @@ def generate_topic_journey_with_ai(
     steps_out: List[Dict[str, Any]] = []
     warnings: List[str] = []
 
-    chunk_size = 2  # tuned for reliability
+    chunk_size = 1  # max reliability (one step per call)
     for start_i in range(0, steps_n, chunk_size):
         chunk_plan = step_plan[start_i:start_i + chunk_size]
         expected_len = len(chunk_plan)
@@ -2689,7 +2709,7 @@ if nav == "🧑‍🎓 Student":
                         cmd = "undo"
                     if clear_clicked:
                         st.session_state["feedback"] = None
-                        set_stored_canvas_data_url_single(qid, None)
+                        set_stored_canvas_snapshot_single(qid, None, None, None)
                         st.session_state["last_canvas_image_data_single"] = None
                         st.session_state["canvas_cmd_nonce_single"] = int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0) + 1
                         cmd = "clear"
@@ -2697,6 +2717,7 @@ if nav == "🧑‍🎓 Student":
                     stroke_width = 2 if tool == "Pen" else 30
                     stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
 
+                    _snap = get_stored_canvas_snapshot_single(qid)
                     canvas_value = stylus_canvas(
                         stroke_width=stroke_width,
                         stroke_color=stroke_color,
@@ -2707,11 +2728,13 @@ if nav == "🧑‍🎓 Student":
                         tool=("pen" if tool == "Pen" else "eraser"),
                         command=cmd,
                         command_nonce=int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0),
-                        initial_data_url=get_stored_canvas_data_url_single(qid),
+                        initial_data_url=_snap.get("data_url"),
+                        initial_draw_width=_snap.get("w"),
+                        initial_draw_height=_snap.get("h"),
                         key=f"stylus_canvas_single_{qid or 'none'}_{st.session_state['canvas_key']}",
                     )
                     if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
-                        set_stored_canvas_data_url_single(qid, canvas_value.get("data_url"))
+                        set_stored_canvas_snapshot_single(qid, canvas_value.get("data_url"), canvas_value.get("w"), canvas_value.get("h"))
                 else:
                     tool_row = st.columns([2, 1])
                     with tool_row[0]:
@@ -2772,7 +2795,7 @@ if nav == "🧑‍🎓 Student":
                         except Exception:
                             data_url = None
                         if not data_url:
-                            data_url = get_stored_canvas_data_url_single(qid)
+                            data_url = get_stored_canvas_snapshot_single(qid)
                         if data_url:
                             try:
                                 img_data = data_url_to_image_data(data_url)
@@ -3031,7 +3054,7 @@ if nav == "🧑‍🎓 Student":
                                 cmd = "undo"
                             if clear_clicked:
                                 st.session_state["feedback"] = None
-                                set_stored_canvas_data_url_journey(qid, step_i, None)
+                                set_stored_canvas_snapshot_journey(qid, step_i, None, None, None)
                                 st.session_state["last_canvas_image_data_journey"] = None
                                 st.session_state["canvas_cmd_nonce_journey"] = int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0) + 1
                                 cmd = "clear"
@@ -3039,6 +3062,7 @@ if nav == "🧑‍🎓 Student":
                             stroke_width = 2 if tool == "Pen" else 30
                             stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
 
+                            _snapj = get_stored_canvas_snapshot_journey(qid, step_i)
                             canvas_value = stylus_canvas(
                                 stroke_width=stroke_width,
                                 stroke_color=stroke_color,
@@ -3049,11 +3073,13 @@ if nav == "🧑‍🎓 Student":
                                 tool=("pen" if tool == "Pen" else "eraser"),
                                 command=cmd,
                                 command_nonce=int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0),
-                                initial_data_url=get_stored_canvas_data_url_journey(qid, step_i),
+                                initial_data_url=_snapj.get("data_url"),
+                                initial_draw_width=_snapj.get("w"),
+                                initial_draw_height=_snapj.get("h"),
                                 key=f"stylus_canvas_journey_{qid or 'none'}_{step_i}_{st.session_state['canvas_key']}",
                             )
                             if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
-                                set_stored_canvas_data_url_journey(qid, step_i, canvas_value.get("data_url"))
+                                set_stored_canvas_snapshot_journey(qid, step_i, canvas_value.get("data_url"), canvas_value.get("w"), canvas_value.get("h"))
                         else:
                             tool_row = st.columns([2, 1])
                             with tool_row[0]:
@@ -3113,7 +3139,7 @@ if nav == "🧑‍🎓 Student":
                                 except Exception:
                                     data_url = None
                                 if not data_url:
-                                    data_url = get_stored_canvas_data_url_journey(qid, step_i)
+                                    data_url = get_stored_canvas_snapshot_journey(qid, step_i)
                                 if data_url:
                                     try:
                                         img_data = data_url_to_image_data(data_url)
@@ -3835,44 +3861,9 @@ else:
 
                         # Track eligibility for this journey derived from topic entries
                         jour_draft_track_ok = "separate_only" if any(get_topic_track_ok(t) == "separate_only" for t in selected_topics) else "both"
-                        j_duration = st.selectbox(
-                            "Journey length (minutes)",
-                            [10, 20, 30],
-                            index=1,
-                            key="jour_duration",
-                            help="How long (in minutes) this Topic Journey is designed to take. This controls how many steps are generated.",
-                        )
-                        st.caption(f"Will generate {DURATION_TO_STEPS.get(int(j_duration), 8)} steps.")
-                        st.caption("Focus sliders: 0 = none, 1 = light, 2 = medium, 3 = heavy. This adjusts the mix of step types in the journey.")
-                        e1, e2, e3, e4 = st.columns(4)
-                        with e1:
-                            emph_calc = st.slider(
-                                "Calculation focus",
-                                0, 3, 2,
-                                key="jour_emph_calc",
-                                help="How much of the journey should involve calculation practice.",
-                            )
-                        with e2:
-                            emph_expl = st.slider(
-                                "Explanation focus",
-                                0, 3, 2,
-                                key="jour_emph_expl",
-                                help="How much of the journey should involve written explanations and reasoning.",
-                            )
-                        with e3:
-                            emph_graph = st.slider(
-                                "Graph focus",
-                                0, 3, 1,
-                                key="jour_emph_graph",
-                                help="How much of the journey should involve interpreting or sketching graphs, or analysing data.",
-                            )
-                        with e4:
-                            emph_prac = st.slider(
-                                "Practical focus",
-                                0, 3, 1,
-                                key="jour_emph_prac",
-                                help="How much of the journey should involve practical methods, required apparatus, variables, and analysis.",
-                            )
+                        # Fixed journey settings (no length/focus sliders)
+                        j_duration = 20
+                        st.caption("This Topic Journey will generate **5 steps** with a guided progression: definition → concept → calculation (if appropriate) → explanation → application (graph/practical/exam-style as appropriate).")
 
                         j_assignment = st.text_input("Assignment name for saving", value="Topic Journey", key="jour_assignment")
                         j_tags = st.text_input("Tags (comma separated)", value="", key="jour_tags")
@@ -3887,13 +3878,9 @@ else:
                         if not (j_topic or "").strip():
                             st.warning("Please enter a topic first.")
                         else:
-                            emph = {"calculation": emph_calc, "explanation": emph_expl, "graph": emph_graph, "practical": emph_prac}
-
                             def task_journey():
                                 return generate_topic_journey_with_ai(
                                     topic_plain_english=j_topic.strip(),
-                                    duration_minutes=int(j_duration),
-                                    emphasis=emph,
                                     track=st.session_state.get("track", TRACK_DEFAULT),
                                 )
 
@@ -3901,7 +3888,7 @@ else:
                                 task_fn=task_journey,
                                 ctx={"teacher": True, "mode": "topic_journey"},
                                 typical_range="45-120 seconds",
-                                est_seconds=float(min(140.0, 30.0 + DURATION_TO_STEPS.get(int(j_duration), 8) * 10.0))
+                                est_seconds=70.0
                             )
 
                             if not isinstance(data, dict) or not data.get("steps"):
