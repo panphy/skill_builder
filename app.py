@@ -81,8 +81,8 @@ st.set_page_config(
 # --- CONSTANTS ---
 # =========================
 MODEL_NAME = "gpt-5-mini"
-CANVAS_BG_HEX = "#f8f9fa"
-CANVAS_BG_RGB = (248, 249, 250)
+CANVAS_BG_HEX = "#ffffff"
+CANVAS_BG_RGB = (255, 255, 255)
 MAX_IMAGE_WIDTH = 1024
 
 STORAGE_BUCKET = "physics-bank"
@@ -1881,7 +1881,7 @@ def generate_practice_question_with_ai(
 # ============================================================
 # TOPIC JOURNEY GENERATOR (teacher-only)
 # ============================================================
-DURATION_TO_STEPS = {10: 5, 20: 8, 30: 12}
+DURATION_TO_STEPS = {10: 5}
 JOURNEY_CHECKPOINT_EVERY = 3
 
 def generate_topic_journey_with_ai(
@@ -3437,14 +3437,8 @@ else:
                             key="jour_free_text_separate_only",
                             help="Tick this if the journey includes Separate-only content (e.g. Space physics). Unticked means eligible for both Combined + Separate.",
                         )
-                        j_duration = st.selectbox(
-                            "Journey length (minutes)",
-                            [10, 20, 30],
-                            index=1,
-                            key="jour_duration",
-                            help="How long (in minutes) this Topic Journey is designed to take. This controls how many steps are generated.",
-                        )
-                        st.caption(f"Will generate {DURATION_TO_STEPS.get(int(j_duration), 8)} steps.")
+                        j_duration = 10
+                        st.caption("Journey length is fixed: 10 minutes, 5 steps.")
                         st.caption("Focus sliders: 0 = none, 1 = light, 2 = medium, 3 = heavy. This adjusts the mix of step types in the journey.")
                         e1, e2, e3, e4 = st.columns(4)
                         with e1:
@@ -3596,7 +3590,7 @@ else:
 
                                     journey_json = {
                                         "topic": str(journey.get("topic", "") or j_topic).strip(),
-                                        "duration_minutes": int(journey.get("duration_minutes", j_duration) or j_duration),
+                                        "duration_minutes": 10,
                                         "checkpoint_every": int(journey.get("checkpoint_every", JOURNEY_CHECKPOINT_EVERY) or JOURNEY_CHECKPOINT_EVERY),
                                         "plan_markdown": str(plan_md or "").strip(),
                                         "spec_alignment": [str(x).strip() for x in (journey.get("spec_alignment", []) or []) if str(x).strip()][:20],
