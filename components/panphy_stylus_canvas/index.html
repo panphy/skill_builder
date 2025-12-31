@@ -197,7 +197,7 @@ function drawImageDataUrl(dataUrl, drawW, drawH, opts) {
 
   function emitValue() {
     const url = canvas.toDataURL("image/png");
-    sendDataToPython({ data_url: url, is_empty: isEmpty });
+    sendDataToPython({ data_url: url, is_empty: isEmpty, draw_width: lastCssW, draw_height: lastCssH });
   }
 
   function allowedPointer(e) {

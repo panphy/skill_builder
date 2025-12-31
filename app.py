@@ -415,6 +415,8 @@ _ss_init("last_canvas_image_data_single", None)
 _ss_init("last_canvas_image_data_journey", None)
 _ss_init("last_canvas_data_url_single", None)
 _ss_init("last_canvas_data_url_journey", None)
+_ss_init("last_canvas_draw_size_single", None)
+_ss_init("last_canvas_draw_size_journey", None)
 _ss_init("stylus_only_enabled", True)
 _ss_init("canvas_cmd_nonce_single", 0)
 _ss_init("canvas_cmd_nonce_journey", 0)
@@ -1864,11 +1866,11 @@ def generate_topic_journey_with_ai(
         if not isinstance(d, dict):
             return False, ["Output is not a JSON object."]
         sp = d.get("step_plan", [])
-        if not isinstance(sp, list) or len(sp) != steps_n:
-            reasons.append(f"step_plan must be a list with exactly {steps_n} items.")
+        if not isinstance(sp, list) or len(sp) < steps_n:
+            reasons.append(f"step_plan must be a list with at least {steps_n} items.")
             return False, reasons
 
-        for i, it in enumerate(sp):
+        for i, it in enumerate(sp[:steps_n]):
             if not isinstance(it, dict):
                 reasons.append(f"step_plan[{i+1}] is not an object.")
                 continue
@@ -1892,11 +1894,11 @@ def generate_topic_journey_with_ai(
         if not isinstance(d, dict):
             return False, ["Output is not a JSON object."]
         steps = d.get("steps", [])
-        if not isinstance(steps, list) or len(steps) != int(expected_len):
-            reasons.append(f"steps must be a list with exactly {int(expected_len)} steps.")
+        if not isinstance(steps, list) or len(steps) < int(expected_len):
+            reasons.append(f"steps must be a list with at least {int(expected_len)} steps.")
             return False, reasons
 
-        for i, stp in enumerate(steps):
+        for i, stp in enumerate(steps[:int(expected_len)]):
             if not isinstance(stp, dict):
                 reasons.append(f"Step {i+1} is not an object.")
                 continue
@@ -1913,7 +1915,7 @@ def generate_topic_journey_with_ai(
 
             ms_step = str(stp.get("markscheme_text", "") or "")
             if mm > 0:
-                total_ok = bool(re.search(rf"TOTAL\s*=\s*{mm}\b", ms_step, flags=re.IGNORECASE))
+                total_ok = bool(re.search(rf"TOTAL\s*[:=]\s*{mm}\b", ms_step, flags=re.IGNORECASE))
                 if not total_ok:
                     reasons.append(f"Step {i+1}: markscheme_text must include a TOTAL line like 'TOTAL = {mm}'.")
 
@@ -1990,6 +1992,10 @@ def generate_topic_journey_with_ai(
     steps_out: List[Dict[str, Any]] = []
     warnings: List[str] = []
 
+    if isinstance(step_plan, list) and len(step_plan) > steps_n:
+        warnings.append(f"Plan returned {len(step_plan)} steps; using the first {steps_n}.")
+    step_plan = list(step_plan)[:steps_n] if isinstance(step_plan, list) else []
+
     chunk_size = 1
     for start_i in range(0, steps_n, chunk_size):
         chunk_plan = step_plan[start_i:start_i + chunk_size]
@@ -2032,6 +2038,11 @@ def generate_topic_journey_with_ai(
             break
 
         chunk_steps = chunk_data.get("steps", []) or []
+        if isinstance(chunk_steps, list) and len(chunk_steps) > expected_len:
+            warnings.append(
+                f"Chunk {start_i+1}-{start_i+expected_len} returned {len(chunk_steps)} steps; using the first {expected_len}."
+            )
+        chunk_steps = chunk_steps[:expected_len] if isinstance(chunk_steps, list) else []
         for stp in chunk_steps:
             if not isinstance(stp, dict):
                 continue
@@ -2256,6 +2267,8 @@ if nav == "🧑‍🎓 Student":
                                 st.session_state["last_canvas_image_data"] = None  # legacy
                                 st.session_state["last_canvas_image_data_single"] = None
                                 st.session_state["last_canvas_image_data_journey"] = None
+                                st.session_state["last_canvas_draw_size_single"] = None
+                                st.session_state["last_canvas_draw_size_journey"] = None
                                 st.session_state["last_canvas_data_url_journey"] = None
 
                                 # Reset Topic Journey state (if applicable)
@@ -2427,12 +2440,14 @@ if nav == "🧑‍🎓 Student":
                         st.session_state["feedback"] = None
                         st.session_state["last_canvas_data_url_single"] = None
                         st.session_state["last_canvas_image_data_single"] = None
+                        st.session_state["last_canvas_draw_size_single"] = None
                         st.session_state["canvas_cmd_nonce_single"] = int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0) + 1
                         cmd = "clear"
 
                     stroke_width = 2 if tool == "Pen" else 30
                     stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
 
+                    initial_draw_single = st.session_state.get("last_canvas_draw_size_single") or {}
                     canvas_value = stylus_canvas(
                         stroke_width=stroke_width,
                         stroke_color=stroke_color,
@@ -2441,12 +2456,19 @@ if nav == "🧑‍🎓 Student":
                         width=600,
                         pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
                         tool=("pen" if tool == "Pen" else "eraser"),
+                        initial_data_url=st.session_state.get("last_canvas_data_url_single"),
+                        initial_draw_width=initial_draw_single.get("width"),
+                        initial_draw_height=initial_draw_single.get("height"),
                         command=cmd,
                         command_nonce=int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0),
                         key=f"stylus_canvas_single_{qid or 'none'}_{st.session_state['canvas_key']}",
                     )
                     if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
                         st.session_state["last_canvas_data_url_single"] = canvas_value.get("data_url")
+                        draw_w = canvas_value.get("draw_width")
+                        draw_h = canvas_value.get("draw_height")
+                        if isinstance(draw_w, (int, float)) and isinstance(draw_h, (int, float)):
+                            st.session_state["last_canvas_draw_size_single"] = {"width": int(draw_w), "height": int(draw_h)}
                 else:
                     tool_row = st.columns([2, 1])
                     with tool_row[0]:
@@ -2768,12 +2790,14 @@ if nav == "🧑‍🎓 Student":
                                 st.session_state["feedback"] = None
                                 st.session_state["last_canvas_data_url_journey"] = None
                                 st.session_state["last_canvas_image_data_journey"] = None
+                                st.session_state["last_canvas_draw_size_journey"] = None
                                 st.session_state["canvas_cmd_nonce_journey"] = int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0) + 1
                                 cmd = "clear"
 
                             stroke_width = 2 if tool == "Pen" else 30
                             stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
 
+                            initial_draw_journey = st.session_state.get("last_canvas_draw_size_journey") or {}
                             canvas_value = stylus_canvas(
                                 stroke_width=stroke_width,
                                 stroke_color=stroke_color,
@@ -2782,12 +2806,19 @@ if nav == "🧑‍🎓 Student":
                                 width=600,
                                 pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
                                 tool=("pen" if tool == "Pen" else "eraser"),
+                                initial_data_url=st.session_state.get("last_canvas_data_url_journey"),
+                                initial_draw_width=initial_draw_journey.get("width"),
+                                initial_draw_height=initial_draw_journey.get("height"),
                                 command=cmd,
                                 command_nonce=int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0),
                                 key=f"stylus_canvas_journey_{qid or 'none'}_{step_i}_{st.session_state['canvas_key']}",
                             )
                             if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
                                 st.session_state["last_canvas_data_url_journey"] = canvas_value.get("data_url")
+                                draw_w = canvas_value.get("draw_width")
+                                draw_h = canvas_value.get("draw_height")
+                                if isinstance(draw_w, (int, float)) and isinstance(draw_h, (int, float)):
+                                    st.session_state["last_canvas_draw_size_journey"] = {"width": int(draw_w), "height": int(draw_h)}
                         else:
                             tool_row = st.columns([2, 1])
                             with tool_row[0]:
@@ -2958,6 +2989,7 @@ if nav == "🧑‍🎓 Student":
                     def _reset_answer_inputs_for_step():
                         st.session_state["last_canvas_image_data"] = None  # legacy
                         st.session_state["last_canvas_image_data_journey"] = None
+                        st.session_state["last_canvas_draw_size_journey"] = None
                         st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
                         st.session_state["student_answer_text_journey"] = ""
 
@@ -2992,6 +3024,7 @@ if nav == "🧑‍🎓 Student":
                         st.session_state["feedback"] = None
                         st.session_state["last_canvas_image_data"] = None  # legacy
                         st.session_state["last_canvas_image_data_single"] = None
+                        st.session_state["last_canvas_draw_size_single"] = None
                         st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
                         st.session_state["student_answer_text_single"] = ""
 
