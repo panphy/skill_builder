@@ -4,10 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    html, body { margin:0; padding:0; background: transparent; overflow:hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
 
-    /* Outer wrapper keeps Streamlit-looking rounded border */
-    #resizer {
+    html, body { margin:0; padding:0; background: transparent; }
+    #resizer{
       width: 100%;
       min-height: 260px;
       height: 420px;
@@ -18,22 +17,54 @@
       border-radius: 14px;
       border: 1px solid rgba(49, 51, 63, 0.2);
     }
-
     canvas#c{
       display:block;
       width: 100%;
       height: 100%;
       background: var(--canvas-bg, #F0F2F6);
       border-radius: 14px;
-      touch-action: none; /* prevent page scroll while drawing */
     }
+
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    #wrap {
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #ffffff;
+      border: 1px solid rgba(128,128,128,0.35);
+    }
+    canvas {
+      touch-action: none; /* prevents scrolling while drawing */
+      display: block;
+      width: 100%;
+      height: 100%;
+      border-radius: 0;
+      box-sizing: border-box;
+      border: 0;
+    }
+
   </style>
 </head>
 <body>
-  <div id="resizer"><canvas id="c"></canvas></div>
+  <div id="wrap">
+    <div id="resizer"><canvas id="c"></canvas></div>
+  </div>
 
   <script>
-  // Streamlit component plumbing
+  // Minimal Streamlit bi-directional component plumbing (no React/tooling).
+  // Based on Streamlit community snippet (tvst) + variations:
+  // - streamlit:componentReady
+  // - streamlit:setFrameHeight
+  // - streamlit:setComponentValue
   const RENDER = "streamlit:render";
   const COMPONENT_READY = "streamlit:componentReady";
   const SET_COMPONENT_VALUE = "streamlit:setComponentValue";
@@ -53,14 +84,15 @@
     sendMessageToStreamlitClient(COMPONENT_READY, { apiVersion: 1 });
   }
 
-  const resizer = document.getElementById("resizer");
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d", { willReadFrequently: false });
 
   let args = {
+    width: 600,
+    height: 400,
     stroke_width: 2,
     stroke_color: "#000000",
-    background_color: "#F0F2F6",
+    background_color: "#ffffff",
     pen_only: false,
     tool: "pen",
     command: null,
@@ -77,25 +109,8 @@
   let history = [];
   let lastCommandNonce = -1;
 
-  function currentCssSize() {
-    return {
-      w: Math.max(1, resizer.clientWidth || 600),
-      h: Math.max(1, resizer.clientHeight || 420),
-    };
-  }
-
-  function setBg() {
-    const bg = args.background_color || "#F0F2F6";
-    canvas.style.setProperty("--canvas-bg", bg);
-    ctx.fillStyle = bg;
-  }
-
-  function resizeCanvasPreserve() {
-    const { w, h } = currentCssSize();
-
-    // preserve current image BEFORE resize (CSS pixel space)
-    const prevUrl = (!isEmpty) ? canvas.toDataURL("image/png") : null;
-
+  function resizeAndReset(w, h) {
+    // handle device pixel ratio for sharpness
     const dpr = window.devicePixelRatio || 1;
     canvas.style.width = w + "px";
     canvas.style.height = h + "px";
@@ -103,21 +118,33 @@
     canvas.height = Math.floor(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    setBg();
+    // fill background
+    canvas.style.setProperty('--canvas-bg', args.background_color || '#F0F2F6');
+    ctx.fillStyle = args.background_color || '#F0F2F6';
     ctx.fillRect(0, 0, w, h);
 
-    if (prevUrl) {
+    isEmpty = true;
+    history = [];
+  }
+
+  function drawImageDataUrl(dataUrl) {
+    return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        ctx.drawImage(img, 0, 0, w, h);
+        // Fill bg then draw image at 1x CSS pixels (transform already set)
+        canvas.style.setProperty('--canvas-bg', args.background_color || '#F0F2F6');
+    ctx.fillStyle = args.background_color || '#F0F2F6';
+        ctx.fillRect(0, 0, args.width, args.height);
+        ctx.drawImage(img, 0, 0, args.width, args.height);
+        resolve(true);
       };
-      img.src = prevUrl;
-    }
-
-    setFrameHeight(h + 6);
+      img.onerror = () => resolve(false);
+      img.src = dataUrl;
+    });
   }
 
   function snapshotToHistory() {
+    // Keep at most 30 snapshots to bound memory
     const url = canvas.toDataURL("image/png");
     history.push(url);
     if (history.length > 30) history.shift();
@@ -134,16 +161,21 @@
   }
 
   function isHover(e) {
+    // On devices that support hover (incl. some stylus), pressure==0 and buttons==0 indicates hover.
+    // Also guard against move events without contact.
     return (e.pressure === 0 && e.buttons === 0);
   }
 
   function pointerDown(e) {
     if (!allowedPointer(e)) return;
     if (isHover(e)) return;
+
     drawing = true;
     const rect = canvas.getBoundingClientRect();
     lastX = e.clientX - rect.left;
     lastY = e.clientY - rect.top;
+
+    // Capture pointer so we keep receiving move/up
     try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
   }
 
@@ -161,9 +193,9 @@
     ctx.lineWidth = args.stroke_width;
 
     if (args.tool === "eraser") {
-      ctx.strokeStyle = args.background_color || "#F0F2F6";
+      ctx.strokeStyle = args.background_color;
     } else {
-      ctx.strokeStyle = args.stroke_color || "#000000";
+      ctx.strokeStyle = args.stroke_color;
     }
 
     ctx.beginPath();
@@ -180,6 +212,8 @@
   function pointerUp(e) {
     if (!drawing) return;
     drawing = false;
+
+    // Save snapshot for undo and emit value (only after stroke end)
     snapshotToHistory();
     emitValue();
   }
@@ -188,54 +222,42 @@
   canvas.addEventListener("pointermove", pointerMove);
   canvas.addEventListener("pointerup", pointerUp);
   canvas.addEventListener("pointercancel", pointerUp);
-
-  function drawImageDataUrl(dataUrl) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const { w, h } = currentCssSize();
-        setBg();
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(true);
-      };
-      img.onerror = () => resolve(false);
-      img.src = dataUrl;
-    });
-  }
+  canvas.addEventListener("pointerleave", (e) => { /* do nothing */ });
 
   async function applyCommand(cmd) {
     if (!cmd) return;
-    const { w, h } = currentCssSize();
-
     if (cmd === "clear") {
-      setBg();
-      ctx.fillRect(0, 0, w, h);
+      canvas.style.setProperty('--canvas-bg', args.background_color || '#F0F2F6');
+    ctx.fillStyle = args.background_color || '#F0F2F6';
+      ctx.fillRect(0, 0, args.width, args.height);
       isEmpty = true;
       history = [];
       emitValue();
       return;
     }
-
     if (cmd === "undo") {
+      // Undo: pop current snapshot, then restore previous
       if (history.length === 0) {
-        setBg();
-        ctx.fillRect(0, 0, w, h);
+        // nothing to undo
+        canvas.style.setProperty('--canvas-bg', args.background_color || '#F0F2F6');
+    ctx.fillStyle = args.background_color || '#F0F2F6';
+        ctx.fillRect(0, 0, args.width, args.height);
         isEmpty = true;
         emitValue();
         return;
       }
-      history.pop();
+      history.pop(); // remove latest
       const prev = history.length ? history[history.length - 1] : null;
       if (!prev) {
-        setBg();
-        ctx.fillRect(0, 0, w, h);
+        canvas.style.setProperty('--canvas-bg', args.background_color || '#F0F2F6');
+    ctx.fillStyle = args.background_color || '#F0F2F6';
+        ctx.fillRect(0, 0, args.width, args.height);
         isEmpty = true;
         emitValue();
         return;
       }
       const ok = await drawImageDataUrl(prev);
-      isEmpty = !ok;
+      isEmpty = !ok ? true : false;
       emitValue();
       return;
     }
@@ -245,17 +267,27 @@
     if (event.data.type !== RENDER) return;
     const a = event.data.args || {};
 
+    // Update args (with defaults)
+    args.width = a.width ?? args.width;
+    args.height = a.height ?? args.height;
     args.stroke_width = a.stroke_width ?? args.stroke_width;
     args.stroke_color = a.stroke_color ?? args.stroke_color;
     args.background_color = a.background_color ?? args.background_color;
     args.pen_only = a.pen_only ?? args.pen_only;
     args.tool = a.tool ?? args.tool;
 
-    // keep size in sync (preserve drawing)
-    resizeCanvasPreserve();
+    // Resize only if needed (keeps drawing stable)
+    const w = (resizer ? resizer.clientWidth : Number(args.width)) || 600;
+    const h = (resizer ? resizer.clientHeight : Number(args.height)) || 400;
 
-    // Optional restore (e.g., after Streamlit reruns when sidebar toggles)
+    const needResize = (canvas.style.width !== (w + "px")) || (canvas.style.height !== (h + "px"));
+    if (needResize) {
+      resizeAndReset(w, h);
+    }
+
+    // Initial restore (optional)
     if (a.initial_data_url && typeof a.initial_data_url === "string") {
+      // only restore if blank
       if (isEmpty) {
         const ok = await drawImageDataUrl(a.initial_data_url);
         if (ok) {
@@ -266,25 +298,26 @@
       }
     }
 
+    // Commands are gated by command_nonce so they don't repeat on reruns
     const nonce = Number(a.command_nonce ?? 0);
     if (nonce !== lastCommandNonce) {
       lastCommandNonce = nonce;
       const cmd = a.command ?? null;
       await applyCommand(cmd);
     }
+
+    // adjust frame height
+    setFrameHeight(h + 6);
   }
 
   window.addEventListener("message", onDataFromPython);
 
-  // Resize observer to keep iframe height correct when user drags resizer
-  const ro = new ResizeObserver(() => {
-    resizeCanvasPreserve();
-  });
-  ro.observe(resizer);
-
+  // Initialize
   initComponent();
+
+  // In case Streamlit doesn't immediately size the iframe
   window.addEventListener("load", () => {
-    setTimeout(() => resizeCanvasPreserve(), 0);
+    setTimeout(() => setFrameHeight((args.height || 400) + 6), 0);
   });
   </script>
 </body>
