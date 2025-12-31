@@ -1,5 +1,3 @@
-# Testing new features and fixing bugs for app.py
-
 import streamlit as st
 from pathlib import Path
 from openai import OpenAI
@@ -83,8 +81,8 @@ st.set_page_config(
 # --- CONSTANTS ---
 # =========================
 MODEL_NAME = "gpt-5-mini"
-CANVAS_BG_HEX = "#F0F2F6"
-CANVAS_BG_RGB = (240, 242, 246)
+CANVAS_BG_HEX = "#f8f9fa"
+CANVAS_BG_RGB = (248, 249, 250)
 MAX_IMAGE_WIDTH = 1024
 
 STORAGE_BUCKET = "physics-bank"
@@ -176,9 +174,6 @@ def _persist_track_to_browser(track_value: str):
 """,
         unsafe_allow_html=True
     )
-def _inject_track_theme_css(track_value: str):
-    """No-op: dynamic theme switching disabled (keep default Streamlit theme)."""
-    return
 
 def init_track_state():
     # Run restore script first so first load picks up localStorage
@@ -205,7 +200,6 @@ def _load_subject_pack(subject_site: str) -> dict:
     topics_path = subj_dir / "topics.json"
     prompts_path = subj_dir / "prompts.json"
     settings_path = subj_dir / "settings.json"
-    equations_path = subj_dir / "equations.json"
 
     if not topics_path.exists():
         raise FileNotFoundError(f"Missing topics file: {topics_path}")
@@ -215,9 +209,8 @@ def _load_subject_pack(subject_site: str) -> dict:
     topics = json.loads(topics_path.read_text(encoding="utf-8"))
     prompts = json.loads(prompts_path.read_text(encoding="utf-8"))
     settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.exists() else {}
-    equations = json.loads(equations_path.read_text(encoding="utf-8")) if equations_path.exists() else {}
 
-    return {"topics": topics, "prompts": prompts, "settings": settings, "equations": equations}
+    return {"topics": topics, "prompts": prompts, "settings": settings}
 
 def _render_template(tpl: str, mapping: Dict[str, Any]) -> str:
     # Simple token replacement. Tokens look like: <<TOKEN_NAME>>
@@ -235,7 +228,6 @@ except Exception as _e:
 SUBJECT_SETTINGS = SUBJECT_PACK.get("settings", {}) or {}
 SUBJECT_TOPICS_RAW = SUBJECT_PACK.get("topics", {}) or {}
 SUBJECT_PROMPTS = SUBJECT_PACK.get("prompts", {}) or {}
-SUBJECT_EQUATIONS_RAW = SUBJECT_PACK.get("equations", {}) or {}
 
 # Topics for dropdowns (student + teacher)
 TOPICS_CATALOG = SUBJECT_TOPICS_RAW.get("topics", [])
@@ -271,109 +263,6 @@ QUESTION_TYPES = SUBJECT_SETTINGS.get("question_types") or ["Calculation", "Expl
 DIFFICULTIES = SUBJECT_SETTINGS.get("difficulties") or ["Easy", "Medium", "Hard"]
 
 # Prompt components (loaded from prompts.json)
-
-def _build_equation_guardrails(equations_pack: dict) -> tuple[str, list[tuple[str, str]], list[tuple[str, str]]]:
-    """
-    Return (equation_sheet_text, banned_patterns, allowed_calc_patterns) from optional equations.json.
-
-    - equation_sheet_text: human-readable bullet list injected into prompts
-    - banned_patterns: list[(regex, reason)] used for validation/repair
-    - allowed_calc_patterns: list[(regex, label)] used to ensure calculation questions only use allowed equations/relations
-    """
-    if not isinstance(equations_pack, dict):
-        return ("", [], [])
-
-    eqs = equations_pack.get("preferred_equations", []) or []
-    banned = equations_pack.get("banned_concepts", []) or []
-    allowed_rel = equations_pack.get("allowed_relations", []) or []
-    calc_policy = str(equations_pack.get("calculation_policy", "") or "").strip()
-
-    # Build display text for prompts
-    lines: list[str] = []
-    for item in eqs:
-        if not isinstance(item, dict):
-            continue
-        name = str(item.get("name", "") or "").strip()
-        latex = str(item.get("latex", "") or "").strip()
-        notes = str(item.get("notes", "") or "").strip()
-        if not latex:
-            continue
-        if name and notes:
-            lines.append(f"- {name}: ${latex}$ ({notes})")
-        elif name:
-            lines.append(f"- {name}: ${latex}$")
-        else:
-            lines.append(f"- ${latex}$")
-
-    rel_lines: list[str] = []
-    for item in allowed_rel:
-        if not isinstance(item, dict):
-            continue
-        name = str(item.get("name", "") or "").strip()
-        latex = str(item.get("latex", "") or "").strip()
-        notes = str(item.get("notes", "") or "").strip()
-        if latex and name and notes:
-            rel_lines.append(f"- {name}: ${latex}$ ({notes})")
-        elif latex and name:
-            rel_lines.append(f"- {name}: ${latex}$")
-        elif latex:
-            rel_lines.append(f"- ${latex}$")
-
-    sheet_text = ""
-    if lines or rel_lines or calc_policy:
-        parts: list[str] = []
-        if calc_policy:
-            parts.append("CALCULATION POLICY (CRITICAL): " + calc_policy)
-        if lines:
-            parts.append(
-                "AQA equation/notation guardrails (use EXACT symbols shown below; do not invent alternate notation):\n"
-                + "\n".join(lines)
-            )
-        if rel_lines:
-            parts.append(
-                "Allowed GCSE derived relations (OK to use in addition to the AQA equations above):\n"
-                + "\n".join(rel_lines)
-            )
-        sheet_text = "\n\n".join(parts)
-
-    banned_patterns: list[tuple[str, str]] = []
-    for b in banned:
-        if not isinstance(b, dict):
-            continue
-        pat = str(b.get("pattern", "") or "").strip()
-        reason = str(b.get("reason", "") or "").strip() or "Out-of-scope / disallowed content."
-        if pat:
-            banned_patterns.append((pat, reason))
-
-    # Allowed calc patterns: equations + allowed relations
-    allowed_calc_patterns: list[tuple[str, str]] = []
-    for item in eqs:
-        if not isinstance(item, dict):
-            continue
-        pat = str(item.get("pattern", "") or "").strip()
-        latex = str(item.get("latex", "") or "").strip()
-        name = str(item.get("name", "") or "").strip() or latex
-        if pat:
-            allowed_calc_patterns.append((pat, name))
-        elif latex:
-            # fallback: look for the latex string (relaxed whitespace)
-            esc = re.escape(latex)
-            esc = esc.replace(r"\ ", r"\s*")
-            allowed_calc_patterns.append((esc, name))
-
-    for item in allowed_rel:
-        if not isinstance(item, dict):
-            continue
-        pat = str(item.get("pattern", "") or "").strip()
-        name = str(item.get("name", "") or "").strip() or pat
-        if pat:
-            allowed_calc_patterns.append((pat, name))
-
-    return sheet_text.strip(), banned_patterns, allowed_calc_patterns
-
-
-EQUATION_SHEET_TEXT, EQUATION_BANNED_PATTERNS, EQUATION_ALLOWED_CALC_PATTERNS = _build_equation_guardrails(SUBJECT_EQUATIONS_RAW)
-
 GCSE_ONLY_GUARDRAILS = str(SUBJECT_PROMPTS.get("gcse_only_guardrails", "") or "").strip()
 MARKDOWN_LATEX_RULES = str(SUBJECT_PROMPTS.get("markdown_latex_rules", "") or "").strip()
 
@@ -385,15 +274,6 @@ QGEN_REPAIR_PREFIX_TPL = str(SUBJECT_PROMPTS.get("qgen_repair_prefix", "") or ""
 JOURNEY_SYSTEM_TPL = str(SUBJECT_PROMPTS.get("journey_system", "") or "")
 JOURNEY_USER_TPL = str(SUBJECT_PROMPTS.get("journey_user", "") or "")
 JOURNEY_REPAIR_PREFIX_TPL = str(SUBJECT_PROMPTS.get("journey_repair_prefix", "") or "")
-
-# Strategy 2 (two-phase Topic Journey): plan first, then generate steps in chunks.
-JOURNEY_PLAN_SYSTEM_TPL = str(SUBJECT_PROMPTS.get("journey_plan_system", "") or JOURNEY_SYSTEM_TPL)
-JOURNEY_PLAN_USER_TPL = str(SUBJECT_PROMPTS.get("journey_plan_user", "") or JOURNEY_USER_TPL)
-JOURNEY_PLAN_REPAIR_PREFIX_TPL = str(SUBJECT_PROMPTS.get("journey_plan_repair_prefix", "") or JOURNEY_REPAIR_PREFIX_TPL)
-
-JOURNEY_STEPS_SYSTEM_TPL = str(SUBJECT_PROMPTS.get("journey_steps_system", "") or JOURNEY_SYSTEM_TPL)
-JOURNEY_STEPS_USER_TPL = str(SUBJECT_PROMPTS.get("journey_steps_user", "") or JOURNEY_USER_TPL)
-JOURNEY_STEPS_REPAIR_PREFIX_TPL = str(SUBJECT_PROMPTS.get("journey_steps_repair_prefix", "") or JOURNEY_REPAIR_PREFIX_TPL)
 
 FEEDBACK_SYSTEM_TPL = str(SUBJECT_PROMPTS.get("feedback_system", "") or "")
 
@@ -528,8 +408,6 @@ _ss_init("last_canvas_image_data_single", None)
 _ss_init("last_canvas_image_data_journey", None)
 _ss_init("last_canvas_data_url_single", None)
 _ss_init("last_canvas_data_url_journey", None)
-_ss_init("canvas_store_single", {})   # qid -> data_url
-_ss_init("canvas_store_journey", {})  # (qid, step_i) -> data_url
 _ss_init("stylus_only_enabled", True)
 _ss_init("canvas_cmd_nonce_single", 0)
 _ss_init("canvas_cmd_nonce_journey", 0)
@@ -570,84 +448,12 @@ def data_url_to_image_data(data_url: str) -> np.ndarray:
     img = Image.open(io.BytesIO(raw)).convert("RGBA")
     return np.array(img)
 
+def _stylus_canvas_available() -> bool:
+    return stylus_canvas is not None
 
-def _canvas_store_key_single(qid: Optional[int]) -> str:
-    return str(qid or "none")
-
-
-def _canvas_store_key_journey(qid: Optional[int], step_i: int) -> str:
-    return f"{qid or 'none'}::step{int(step_i)}"
-
-
-def get_stored_canvas_snapshot_single(qid: Optional[int]) -> Dict[str, Any]:
-    """Return a dict: {data_url, w, h}. Backwards-compatible with older string-only stores."""
-    store = st.session_state.get("canvas_store_single", {}) or {}
-    if not isinstance(store, dict):
-        store = {}
-    key = _canvas_store_key_single(qid)
-    val = store.get(key)
-
-    if isinstance(val, dict) and val.get("data_url"):
-        return {"data_url": val.get("data_url"), "w": val.get("w"), "h": val.get("h")}
-    if isinstance(val, str) and val.strip():
-        return {"data_url": val.strip(), "w": None, "h": None}
-
-    last = st.session_state.get("last_canvas_data_url_single")
-    if isinstance(last, str) and last.strip():
-        return {"data_url": last.strip(), "w": None, "h": None}
-
-    return {"data_url": None, "w": None, "h": None}
-
-
-def set_stored_canvas_snapshot_single(qid: Optional[int], data_url: Optional[str], w: Optional[int], h: Optional[int]) -> None:
-    store = st.session_state.get("canvas_store_single", {}) or {}
-    if not isinstance(store, dict):
-        store = {}
-    key = _canvas_store_key_single(qid)
-    if data_url:
-        store[key] = {"data_url": data_url, "w": int(w) if w else None, "h": int(h) if h else None}
-        st.session_state["canvas_store_single"] = store
-        st.session_state["last_canvas_data_url_single"] = data_url
-    else:
-        store.pop(key, None)
-        st.session_state["canvas_store_single"] = store
-        st.session_state["last_canvas_data_url_single"] = None
-
-
-def get_stored_canvas_snapshot_journey(qid: Optional[int], step_i: int) -> Dict[str, Any]:
-    """Return a dict: {data_url, w, h} for a specific journey step."""
-    store = st.session_state.get("canvas_store_journey", {}) or {}
-    if not isinstance(store, dict):
-        store = {}
-    key = _canvas_store_key_journey(qid, step_i)
-    val = store.get(key)
-
-    if isinstance(val, dict) and val.get("data_url"):
-        return {"data_url": val.get("data_url"), "w": val.get("w"), "h": val.get("h")}
-    if isinstance(val, str) and val.strip():
-        return {"data_url": val.strip(), "w": None, "h": None}
-
-    last = st.session_state.get("last_canvas_data_url_journey")
-    if isinstance(last, str) and last.strip():
-        return {"data_url": last.strip(), "w": None, "h": None}
-
-    return {"data_url": None, "w": None, "h": None}
-
-
-def set_stored_canvas_snapshot_journey(qid: Optional[int], step_i: int, data_url: Optional[str], w: Optional[int], h: Optional[int]) -> None:
-    store = st.session_state.get("canvas_store_journey", {}) or {}
-    if not isinstance(store, dict):
-        store = {}
-    key = _canvas_store_key_journey(qid, step_i)
-    if data_url:
-        store[key] = {"data_url": data_url, "w": int(w) if w else None, "h": int(h) if h else None}
-        st.session_state["canvas_store_journey"] = store
-        st.session_state["last_canvas_data_url_journey"] = data_url
-    else:
-        store.pop(key, None)
-        st.session_state["canvas_store_journey"] = store
-        st.session_state["last_canvas_data_url_journey"] = None
-
+# ============================================================
+#  ROBUST DATABASE LAYER
+# ============================================================
 def get_db_driver_type():
     try:
         import psycopg  # noqa: F401
@@ -1889,43 +1695,16 @@ def generate_practice_question_with_ai(
             (r"\bflux\b|\bflux linkage\b|\binductance\b", "Uses flux/inductance language (not GCSE here)"),
             (r"\bFaraday\b|\bLenz\b", "Uses Faraday/Lenz law (not GCSE equation form here)"),
             (r"\bcalculus\b|\bdifferentiat|\bintegrat", "Uses calculus (not GCSE)"),
-            # Space physics: GCSE does NOT require redshift calculation with z = Δλ/λ
-            (r"\bz\s*=\s*(?:\\Delta|Δ)\s*\\?lambda\s*/\s*\\?lambda\b|\bΔ\s*λ\s*/\s*λ\b", "Uses redshift calculation z=Δλ/λ (not required for AQA GCSE)"),
-            (r"\b(lambda_obs|lambda_emit|λ_obs|λ_emit)\b", "Uses λ_obs/λ_emit style redshift symbols (not required for AQA GCSE)"),
-            (r"\bHubble\b|\bH_0\b|\bH0\b|\bHubble\s*constant\b|\bv\s*=\s*H\s*0?\s*d\b", "Uses Hubble\'s law / Hubble constant calculations (not AQA GCSE). Keep space/redshift qualitative."),
-            # Springs: use AQA notation e for extension (not x)
-            (r"\bF\s*=\s*k\s*x\b", "Uses F=kx notation; AQA GCSE equation sheet uses F = k e"),
-            (r"\bE\s*=\s*\(?\s*1\s*/\s*2\s*\)?\s*k\s*x\s*\^\s*2\b|\\frac\{1\}\{2\}\s*k\s*x\^2", "Uses elastic energy with x; AQA GCSE uses e: E = 1/2 k e^2"),
         ]
         for pat, label in patterns:
             if re.search(pat, t, flags=re.IGNORECASE):
                 bad.append(label)
-        # subject-pack bans (equations.json)
-        for pat, label in EQUATION_BANNED_PATTERNS:
-            if re.search(pat, t, flags=re.IGNORECASE):
-                bad.append(label)
         return bad
 
-
-    def _apply_notation_fixes(text: str) -> str:
-        """Small deterministic fixes for AQA notation. Keep narrow and safe."""
-        s = text or ""
-        # Elastic energy store: use e for extension (AQA sheet)
-        s = re.sub(r"\\frac\{1\}\{2\}\s*k\s*x\^2\b", r"\\frac{1}{2} k e^2", s)
-        s = re.sub(r"\b1\s*/\s*2\s*k\s*x\s*\^\s*2\b", "1/2 k e^2", s)
-        # Hooke's law: use e for extension (AQA sheet)
-        s = re.sub(r"\bF\s*=\s*k\s*x\b", "F = k e", s)
-        return s
     def _validate(d: Dict[str, Any]) -> Tuple[bool, List[str]]:
         reasons: List[str] = []
         qtxt = str(d.get("question_text", "") or "").strip()
         mstxt = str(d.get("markscheme_text", "") or "").strip()
-
-        # Apply narrow deterministic notation fixes (AQA symbols)
-        qtxt = _apply_notation_fixes(qtxt)
-        mstxt = _apply_notation_fixes(mstxt)
-        d["question_text"] = qtxt
-        d["markscheme_text"] = mstxt
 
         if not qtxt:
             reasons.append("Missing question_text.")
@@ -1950,37 +1729,15 @@ def generate_practice_question_with_ai(
         bad = _forbidden_found(qtxt, mstxt)
         reasons.extend(bad)
 
-        # If this is a calculation-style question, enforce equation whitelist:
-        # Any required numerical calculation must be solvable using ONLY the AQA equations (plus allowed derived relations)
-        # listed in equations.json (basic arithmetic/rearrangement is fine).
-        calc_requested = bool(re.search(r"\bcalculate\b|\bwork\s*out\b|\bdetermine\b|\bcalculate\s+the\b", qtxt, flags=re.IGNORECASE))
-        if calc_requested and EQUATION_ALLOWED_CALC_PATTERNS:
-            combined_text = qtxt + "\n" + mstxt
-            ok_equation = False
-            for pat, _label in EQUATION_ALLOWED_CALC_PATTERNS:
-                try:
-                    if re.search(pat, combined_text, flags=re.IGNORECASE):
-                        ok_equation = True
-                        break
-                except re.error:
-                    continue
-            if not ok_equation:
-                reasons.append(
-                    "WARN: Calculation requested but no allowed AQA equation/derived relation was detected. "
-                    "Include an equation from the AQA sheet or allowed relations; teacher may need to edit."
-                )
-
         if "$" in qtxt and "\\(" in qtxt:
             reasons.append("Use $...$ for LaTeX, avoid \\(...\\).")
 
-        hard = [r for r in reasons if not str(r).startswith("WARN:")]
-        return (len(hard) == 0), reasons
+        return (len(reasons) == 0), reasons
 
     def _call_model(repair: bool, reasons: Optional[List[str]] = None) -> Dict[str, Any]:
         system = _render_template(QGEN_SYSTEM_TPL, {
             "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
             "MARKDOWN_LATEX_RULES": MARKDOWN_LATEX_RULES,
-            "EQUATION_SHEET": EQUATION_SHEET_TEXT,
             "TRACK": st.session_state.get("track", TRACK_DEFAULT),
         })
         system = (system or "").strip()
@@ -2055,76 +1812,20 @@ JOURNEY_CHECKPOINT_EVERY = 3
 
 def generate_topic_journey_with_ai(
     topic_plain_english: str,
-    track: Optional[str] = None,
-    duration_minutes: int = 20,
-    emphasis: Optional[Dict[str, int]] = None,
+    duration_minutes: int,
+    emphasis: Dict[str, int],
 ) -> Dict[str, Any]:
-    """
-    Strategy 2: Two-phase Topic Journey generation.
-    Phase 1: Create a step plan (objectives, step types, marks, spec refs) for the full journey.
-    Phase 2: Generate steps in small chunks that strictly follow the plan.
-
-    Returns a dict compatible with the app's journey_json shape.
-    """
+    steps_n = DURATION_TO_STEPS.get(int(duration_minutes), 8)
     topic_plain_english = (topic_plain_english or "").strip()
-    duration_minutes = int(duration_minutes)
-    steps_n = 5  # fixed: always 5 steps
-    track = (track or TRACK_DEFAULT or "combined").strip()
-
-    # Small deterministic fixes for AQA notation. Keep narrow and safe.
-    def _apply_notation_fixes(text: str) -> str:
-        s = text or ""
-        # Elastic energy store: use e for extension (AQA sheet)
-        s = re.sub(r"\\frac\{1\}\{2\}\s*k\s*x\^2\b", r"\\frac{1}{2} k e^2", s)
-        s = re.sub(r"\b1\s*/\s*2\s*k\s*x\s*\^\s*2\b", "1/2 k e^2", s)
-        # Hooke's law: use e for extension (AQA sheet)
-        s = re.sub(r"\bF\s*=\s*k\s*x\b", "F = k e", s)
-        return s
-
-    def _json_from_model(system: str, user: str, max_tokens: int) -> Dict[str, Any]:
-        resp = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": (system or "").strip()},
-                {"role": "user", "content": (user or "").strip()},
-            ],
-            max_completion_tokens=int(max_tokens),
-            response_format={"type": "json_object"},
-        )
-        raw = ""
-        try:
-            raw = resp.choices[0].message.content or ""
-        except Exception:
-            raw = ""
-        raw = (raw or "").strip()
-        try:
-            return json.loads(raw) if raw else {}
-        except Exception:
-            # Last resort: extract the first JSON object
-            try:
-                m = re.search(r"\{.*\}", raw, flags=re.DOTALL)
-                return json.loads(m.group(0)) if m else {}
-            except Exception:
-                return {}
-
-    def _render_system(tpl: str) -> str:
-        return _render_template(tpl, {
-            "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
-            "MARKDOWN_LATEX_RULES": MARKDOWN_LATEX_RULES,
-            "EQUATION_SHEET": EQUATION_SHEET_TEXT,
-            "TRACK": track,
-        }).strip()
-
-    def _calc_requested(q: str) -> bool:
-        return bool(re.search(r"\bcalculate\b|\bwork\s+out\b|\bdetermine\b|\bfind\b", q or "", flags=re.IGNORECASE))
-
-    def _validate_steps_chunk(d: Dict[str, Any], expected_len: int) -> Tuple[bool, List[str]]:
+    def _validate(d: Dict[str, Any]) -> Tuple[bool, List[str]]:
         reasons: List[str] = []
         if not isinstance(d, dict):
             return False, ["Output is not a JSON object."]
+        if str(d.get("topic", "")).strip() == "":
+            reasons.append("Missing topic.")
         steps = d.get("steps", [])
-        if not isinstance(steps, list) or len(steps) != int(expected_len):
-            reasons.append(f"steps must be a list with exactly {int(expected_len)} steps.")
+        if not isinstance(steps, list) or len(steps) != steps_n:
+            reasons.append(f"steps must be a list of length {steps_n}.")
             return False, reasons
 
         for i, stp in enumerate(steps):
@@ -2143,215 +1844,97 @@ def generate_topic_journey_with_ai(
                 mm = 0
             if mm <= 0 or mm > 12:
                 reasons.append(f"Step {i+1}: max_marks must be 1-12.")
-
-            # AQA notation + GCSE scope bans
-            q_step = str(stp.get("question_text", "") or "")
-            ms_step = str(stp.get("markscheme_text", "") or "")
-            bad = _forbidden_found(q_step, ms_step)
-            for b in bad:
-                reasons.append(f"Step {i+1}: {b}")
-
-            # Calculation whitelist per step (equation sheet)
-            if _calc_requested(q_step) and EQUATION_ALLOWED_CALC_PATTERNS:
-                combined_text = q_step + "\n" + ms_step
-                ok_equation = False
-                for pat, _label in EQUATION_ALLOWED_CALC_PATTERNS:
-                    try:
-                        if re.search(pat, combined_text, flags=re.IGNORECASE):
-                            ok_equation = True
-                            break
-                    except re.error:
-                        continue
-                if not ok_equation:
-                    reasons.append(
-                        f"WARN: Step {i+1}: Calculation requested but no allowed AQA equation/derived relation detected. Teacher may need to edit."
-                    )
-
-            # TOTAL line
-            if mm > 0:
-                total_ok = bool(re.search(rf"TOTAL\s*=\s*{mm}\b", ms_step, flags=re.IGNORECASE))
-                if not total_ok:
-                    reasons.append(f"Step {i+1}: markscheme_text must include a TOTAL line like 'TOTAL = {mm}'.")
-
-        hard = [r for r in reasons if not str(r).startswith("WARN:")]
-        return (len(hard) == 0), reasons
-
-    def _validate_plan(d: Dict[str, Any]) -> Tuple[bool, List[str]]:
-        reasons: List[str] = []
-        if not isinstance(d, dict):
-            return False, ["Output is not a JSON object."]
-        sp = d.get("step_plan", [])
-        if not isinstance(sp, list) or len(sp) != steps_n:
-            reasons.append(f"step_plan must be a list with exactly {steps_n} items.")
-            return False, reasons
-
-        for i, it in enumerate(sp):
-            if not isinstance(it, dict):
-                reasons.append(f"step_plan[{i+1}] is not an object.")
-                continue
-            if not str(it.get("objective", "")).strip():
-                reasons.append(f"step_plan[{i+1}]: missing objective.")
-            if not str(it.get("step_type", "")).strip():
-                reasons.append(f"step_plan[{i+1}]: missing step_type.")
-            try:
-                mm = int(it.get("max_marks", 0))
-            except Exception:
-                mm = 0
-            if mm <= 0 or mm > 12:
-                reasons.append(f"step_plan[{i+1}]: max_marks must be 1-12.")
-            refs = it.get("spec_refs", [])
-            if refs is not None and (not isinstance(refs, list)):
-                reasons.append(f"step_plan[{i+1}]: spec_refs must be a list.")
+            ms = str(stp.get("markscheme_text", "") or "")
+            if f"TOTAL = {mm}" not in ms:
+                reasons.append(f"Step {i+1}: markscheme_text must end with 'TOTAL = {mm}'.")
         return (len(reasons) == 0), reasons
 
-    def _repair_call(system_tpl: str, base_user: str, repair_prefix_tpl: str, reasons: List[str], extra: Dict[str, Any], max_tokens: int) -> Dict[str, Any]:
-        bullet_reasons = "\n".join([f"- {r}" for r in (reasons or [])]) or "- (unspecified)"
-        prefix = _render_template(repair_prefix_tpl, {
-            "BULLET_REASONS": bullet_reasons,
-            "STEPS_N": steps_n,
-            **(extra or {}),
-        }).strip()
-        user = (prefix + "\n\n" + (base_user or "").strip()).strip()
-        system = _render_system(system_tpl)
-        return _json_from_model(system, user, max_tokens=max_tokens)
+    def _call_model(repair: bool, reasons: Optional[List[str]] = None) -> Dict[str, Any]:
+        system = _render_template(JOURNEY_SYSTEM_TPL, {
+            "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
+            "MARKDOWN_LATEX_RULES": MARKDOWN_LATEX_RULES,
+            "TRACK": st.session_state.get("track", TRACK_DEFAULT),
+        })
+        system = (system or "").strip()
 
-    # ----------------------------
-    # Phase 1: Plan
-    # ----------------------------
-    emph_txt = "(focus sliders disabled)"
-    plan_user = _render_template(JOURNEY_PLAN_USER_TPL, {
-        "TOPIC_PLAIN": topic_plain_english,
-        "DURATION_MIN": duration_minutes,
-        "STEPS_N": steps_n,
-        "EMPHASIS_TXT": emph_txt,
-        "CHECKPOINT_EVERY": JOURNEY_CHECKPOINT_EVERY,
-        "TRACK": track,
-    }).strip()
-    plan_system = _render_system(JOURNEY_PLAN_SYSTEM_TPL)
+        emph_txt = ", ".join([f"{k}={int(v)}" for k, v in (emphasis or {}).items()])
 
-    plan_data: Dict[str, Any] = _json_from_model(plan_system, plan_user, max_tokens=1400)
-    ok_plan, plan_reasons = _validate_plan(plan_data)
-    if (not ok_plan) and JOURNEY_PLAN_REPAIR_PREFIX_TPL:
-        # Try up to 2 repairs
-        for _ in range(2):
-            plan_data = _repair_call(
-                system_tpl=JOURNEY_PLAN_SYSTEM_TPL,
-                base_user=plan_user,
-                repair_prefix_tpl=JOURNEY_PLAN_REPAIR_PREFIX_TPL,
-                reasons=plan_reasons,
-                extra={"STEPS_N": steps_n},
-                max_tokens=1400,
-            )
-            ok_plan, plan_reasons = _validate_plan(plan_data)
-            if ok_plan:
-                break
+        base_user = _render_template(JOURNEY_USER_TPL, {
+            "TOPIC_PLAIN": (topic_plain_english or "").strip(),
+            "DURATION_MIN": int(duration_minutes),
+            "STEPS_N": int(steps_n),
+            "EMPHASIS_TXT": emph_txt,
+        })
+        base_user = (base_user or "").strip()
 
-    if not ok_plan:
-        return {
-            "topic": topic_plain_english,
-            "duration_minutes": duration_minutes,
-            "checkpoint_every": int(JOURNEY_CHECKPOINT_EVERY),
-            "plan_markdown": "",
-            "spec_alignment": [],
-            "steps": [],
-            "warnings": ["AI did not return a valid plan."] + (plan_reasons[:10] if plan_reasons else []),
-        }
+        if not repair:
+            user = base_user
+        else:
+            bullet_reasons = "\n".join([f"- {r}" for r in (reasons or [])]) or "- (unspecified)"
+            user = _render_template(JOURNEY_REPAIR_PREFIX_TPL, {
+                "BULLET_REASONS": bullet_reasons,
+                "STEPS_N": int(steps_n),
+            })
+            user = (user or "").strip() + "\n\n" + base_user
 
-    # Normalize plan fields
-    plan_topic = str(plan_data.get("topic", "") or topic_plain_english).strip()
-    plan_markdown = str(plan_data.get("plan_markdown", "") or "").strip()
-    spec_alignment = plan_data.get("spec_alignment", []) or []
-    if not isinstance(spec_alignment, list):
-        spec_alignment = []
-    spec_alignment = [str(x).strip() for x in spec_alignment if str(x).strip()][:20]
-    checkpoint_every = int(plan_data.get("checkpoint_every", JOURNEY_CHECKPOINT_EVERY) or JOURNEY_CHECKPOINT_EVERY)
 
-    step_plan = plan_data.get("step_plan", []) or []
-    # ----------------------------
-    # Phase 2: Steps (chunked)
-    # ----------------------------
-    steps_out: List[Dict[str, Any]] = []
-    warnings: List[str] = []
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            max_completion_tokens=4000,
+            response_format={"type": "json_object"},
+        )
+        raw = response.choices[0].message.content or ""
+        return safe_parse_json(raw) or {}
 
-    chunk_size = 1  # max reliability (one step per call)
-    for start_i in range(0, steps_n, chunk_size):
-        chunk_plan = step_plan[start_i:start_i + chunk_size]
-        expected_len = len(chunk_plan)
+    data = _call_model(repair=False)
+    ok, reasons = _validate(data)
+    if not ok:
+        data2 = _call_model(repair=True, reasons=reasons)
+        ok2, reasons2 = _validate(data2)
+        if ok2:
+            data = data2
+        else:
+            data = data2 if isinstance(data2, dict) and data2 else data
+            data["warnings"] = reasons2[:12]
 
-        steps_user = _render_template(JOURNEY_STEPS_USER_TPL, {
-            "TOPIC_PLAIN": plan_topic,
-            "DURATION_MIN": duration_minutes,
-            "STEPS_N": steps_n,
-            "CHECKPOINT_EVERY": checkpoint_every,
-            "PLAN_MARKDOWN": plan_markdown,
-            "SPEC_ALIGNMENT": "\n".join([f"- {x}" for x in spec_alignment]) or "",
-            "STEP_PLAN_JSON": json.dumps(chunk_plan, ensure_ascii=False),
-            "STEP_INDEX_START": int(start_i + 1),
-            "STEP_INDEX_END": int(start_i + expected_len),
-            "TRACK": track,
-        }).strip()
-        steps_system = _render_system(JOURNEY_STEPS_SYSTEM_TPL)
-
-        chunk_data: Dict[str, Any] = _json_from_model(steps_system, steps_user, max_tokens=2200)
-        ok_chunk, chunk_reasons = _validate_steps_chunk(chunk_data, expected_len=expected_len)
-
-        if (not ok_chunk) and JOURNEY_STEPS_REPAIR_PREFIX_TPL:
-            for _ in range(2):
-                chunk_data = _repair_call(
-                    system_tpl=JOURNEY_STEPS_SYSTEM_TPL,
-                    base_user=steps_user,
-                    repair_prefix_tpl=JOURNEY_STEPS_REPAIR_PREFIX_TPL,
-                    reasons=chunk_reasons,
-                    extra={"EXPECTED_LEN": expected_len, "STEP_INDEX_START": start_i + 1, "STEP_INDEX_END": start_i + expected_len},
-                    max_tokens=2200,
-                )
-                ok_chunk, chunk_reasons = _validate_steps_chunk(chunk_data, expected_len=expected_len)
-                if ok_chunk:
-                    break
-
-        if not ok_chunk:
-            warnings.append(f"Chunk {start_i+1}-{start_i+expected_len} invalid.")
-            warnings.extend(chunk_reasons[:8] if chunk_reasons else [])
-            # Fail-fast: return a partial journey rather than an invalid one
-            break
-
-        chunk_steps = chunk_data.get("steps", []) or []
-        # Apply deterministic notation fixes + normalize small fields
-        for stp in chunk_steps:
-            if not isinstance(stp, dict):
-                continue
-            stp["question_text"] = _apply_notation_fixes(str(stp.get("question_text", "") or ""))
-            stp["markscheme_text"] = _apply_notation_fixes(str(stp.get("markscheme_text", "") or ""))
-
+    # Final clean-up / normalization (display-time normalization will still run)
+    steps = data.get("steps", [])
+    if not isinstance(steps, list):
+        steps = []
+    steps = steps[:steps_n]
+    for stp in steps:
+        if isinstance(stp, dict):
+            stp["objective"] = str(stp.get("objective", "") or "").strip()
+            stp["question_text"] = str(stp.get("question_text", "") or "").strip()
+            stp["markscheme_text"] = str(stp.get("markscheme_text", "") or "").strip()
             try:
                 stp["max_marks"] = int(stp.get("max_marks", 1))
             except Exception:
                 stp["max_marks"] = 1
-
             if not isinstance(stp.get("misconceptions", []), list):
                 stp["misconceptions"] = []
-            stp["misconceptions"] = [str(x).strip() for x in (stp.get("misconceptions", []) or []) if str(x).strip()][:6]
-
+            stp["misconceptions"] = [str(x).strip() for x in stp.get("misconceptions", []) if str(x).strip()][:6]
             if not isinstance(stp.get("spec_refs", []), list):
                 stp["spec_refs"] = []
-            stp["spec_refs"] = [str(x).strip() for x in (stp.get("spec_refs", []) or []) if str(x).strip()][:6]
-
-        steps_out.extend(chunk_steps)
-
-    # Final sanity: enforce exact length
-    if len(steps_out) != steps_n:
-        warnings.append(f"Generated {len(steps_out)} / {steps_n} steps. Journey may be incomplete.")
+            stp["spec_refs"] = [str(x).strip() for x in stp.get("spec_refs", []) if str(x).strip()][:6]
 
     return {
-        "topic": plan_topic,
-        "duration_minutes": duration_minutes,
-        "checkpoint_every": checkpoint_every,
-        "plan_markdown": plan_markdown,
-        "spec_alignment": spec_alignment,
-        "steps": steps_out[:steps_n],
-        "warnings": [str(x) for x in warnings][:12],
+        "topic": str(data.get("topic", "") or topic_plain_english).strip(),
+        "duration_minutes": int(duration_minutes),
+        "checkpoint_every": int(data.get("checkpoint_every", JOURNEY_CHECKPOINT_EVERY) or JOURNEY_CHECKPOINT_EVERY),
+        "plan_markdown": str(data.get("plan_markdown", "") or "").strip(),
+        "spec_alignment": [str(x).strip() for x in (data.get("spec_alignment", []) or []) if str(x).strip()][:20],
+        "steps": steps,
+        "warnings": [str(x) for x in (data.get("warnings", []) or [])][:12],
     }
 
+# ============================================================
+# REPORT RENDERER
+# ============================================================
 def render_report(report: dict):
     readback_md = (report.get("readback_markdown") or "").strip()
     if readback_md:
@@ -2402,7 +1985,6 @@ if _sb_track != st.session_state.get("track", TRACK_DEFAULT):
     st.session_state["track"] = _sb_track
     _set_query_param(**{TRACK_PARAM: _sb_track})
 _persist_track_to_browser(st.session_state.get("track", TRACK_DEFAULT))
-_inject_track_theme_css(st.session_state.get("track", TRACK_DEFAULT))
 
 with st.sidebar:
     if st.session_state.get("track", TRACK_DEFAULT) == "combined":
@@ -2711,7 +2293,7 @@ if nav == "🧑‍🎓 Student":
                         cmd = "undo"
                     if clear_clicked:
                         st.session_state["feedback"] = None
-                        set_stored_canvas_snapshot_single(qid, None, None, None)
+                        st.session_state["last_canvas_data_url_single"] = None
                         st.session_state["last_canvas_image_data_single"] = None
                         st.session_state["canvas_cmd_nonce_single"] = int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0) + 1
                         cmd = "clear"
@@ -2719,24 +2301,20 @@ if nav == "🧑‍🎓 Student":
                     stroke_width = 2 if tool == "Pen" else 30
                     stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
 
-                    _snap = get_stored_canvas_snapshot_single(qid)
                     canvas_value = stylus_canvas(
                         stroke_width=stroke_width,
                         stroke_color=stroke_color,
-                        background_color="#F0F2F6",
-                        height=520,
+                        background_color=CANVAS_BG_HEX,
+                        height=400,
                         width=600,
                         pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
                         tool=("pen" if tool == "Pen" else "eraser"),
                         command=cmd,
                         command_nonce=int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0),
-                        initial_data_url=_snap.get("data_url"),
-                        initial_draw_width=_snap.get("w"),
-                        initial_draw_height=_snap.get("h"),
                         key=f"stylus_canvas_single_{qid or 'none'}_{st.session_state['canvas_key']}",
                     )
                     if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
-                        set_stored_canvas_snapshot_single(qid, canvas_value.get("data_url"), canvas_value.get("w"), canvas_value.get("h"))
+                        st.session_state["last_canvas_data_url_single"] = canvas_value.get("data_url")
                 else:
                     tool_row = st.columns([2, 1])
                     with tool_row[0]:
@@ -2767,7 +2345,7 @@ if nav == "🧑‍🎓 Student":
                         canvas_result = _st_canvas(
                             stroke_width=stroke_width,
                             stroke_color=stroke_color,
-                            background_color="#F0F2F6",
+                            background_color=CANVAS_BG_HEX,
                             height=400,
                             width=600,
                             drawing_mode="freedraw",
@@ -2797,7 +2375,7 @@ if nav == "🧑‍🎓 Student":
                         except Exception:
                             data_url = None
                         if not data_url:
-                            data_url = get_stored_canvas_snapshot_single(qid)
+                            data_url = st.session_state.get("last_canvas_data_url_single")
                         if data_url:
                             try:
                                 img_data = data_url_to_image_data(data_url)
@@ -3056,7 +2634,7 @@ if nav == "🧑‍🎓 Student":
                                 cmd = "undo"
                             if clear_clicked:
                                 st.session_state["feedback"] = None
-                                set_stored_canvas_snapshot_journey(qid, step_i, None, None, None)
+                                st.session_state["last_canvas_data_url_journey"] = None
                                 st.session_state["last_canvas_image_data_journey"] = None
                                 st.session_state["canvas_cmd_nonce_journey"] = int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0) + 1
                                 cmd = "clear"
@@ -3064,24 +2642,20 @@ if nav == "🧑‍🎓 Student":
                             stroke_width = 2 if tool == "Pen" else 30
                             stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
 
-                            _snapj = get_stored_canvas_snapshot_journey(qid, step_i)
                             canvas_value = stylus_canvas(
                                 stroke_width=stroke_width,
                                 stroke_color=stroke_color,
-                                background_color="#F0F2F6",
+                                background_color=CANVAS_BG_HEX,
                                 height=400,
                                 width=600,
                                 pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
                                 tool=("pen" if tool == "Pen" else "eraser"),
                                 command=cmd,
                                 command_nonce=int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0),
-                                initial_data_url=_snapj.get("data_url"),
-                                initial_draw_width=_snapj.get("w"),
-                                initial_draw_height=_snapj.get("h"),
                                 key=f"stylus_canvas_journey_{qid or 'none'}_{step_i}_{st.session_state['canvas_key']}",
                             )
                             if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
-                                set_stored_canvas_snapshot_journey(qid, step_i, canvas_value.get("data_url"), canvas_value.get("w"), canvas_value.get("h"))
+                                st.session_state["last_canvas_data_url_journey"] = canvas_value.get("data_url")
                         else:
                             tool_row = st.columns([2, 1])
                             with tool_row[0]:
@@ -3111,7 +2685,7 @@ if nav == "🧑‍🎓 Student":
                                 canvas_result = _st_canvas(
                                     stroke_width=stroke_width,
                                     stroke_color=stroke_color,
-                                    background_color="#F0F2F6",
+                                    background_color=CANVAS_BG_HEX,
                                     height=400,
                                     width=600,
                                     drawing_mode="freedraw",
@@ -3141,7 +2715,7 @@ if nav == "🧑‍🎓 Student":
                                 except Exception:
                                     data_url = None
                                 if not data_url:
-                                    data_url = get_stored_canvas_snapshot_journey(qid, step_i)
+                                    data_url = st.session_state.get("last_canvas_data_url_journey")
                                 if data_url:
                                     try:
                                         img_data = data_url_to_image_data(data_url)
@@ -3618,63 +3192,19 @@ else:
 
                     gen_c1, gen_c2 = st.columns([2, 1])
                     with gen_c1:
-                        # Topic selection (curated only, no free-text).
-                        if "gen_topic_count" not in st.session_state:
-                            st.session_state["gen_topic_count"] = 1
-
-                        available_topics = get_topic_names_for_track(st.session_state.get('track', TRACK_DEFAULT))
-                        if not available_topics:
-                            st.error("No topics available for the selected Track. Check topics.json.")
-                            st.stop()
-
-                        topic_rows = []
-                        for i in range(int(st.session_state["gen_topic_count"])):
-                            key = f"gen_topic_{i}"
-                            default_idx = 0
-                            if st.session_state.get(key) in available_topics:
-                                default_idx = available_topics.index(st.session_state.get(key))
-                            topic_rows.append(
-                                st.selectbox(
-                                    f"Topic {i+1}",
-                                    available_topics,
-                                    index=default_idx,
-                                    key=key,
-                                    help="Topics shown depend on Combined/Separate selection.",
-                                )
+                        topic_mode = st.radio("Topic input", ["Choose from AQA list", "Describe a topic"], horizontal=True, key="topic_mode")
+                        if topic_mode == "Choose from AQA list":
+                            topic_choice = st.selectbox("AQA GCSE Physics topic", get_topic_names_for_track(st.session_state.get("track", TRACK_DEFAULT)), key="topic_choice", help="Topics shown depend on Combined/Separate selection.")
+                            topic_text = topic_choice
+                        else:
+                            topic_text = st.text_input("Describe the topic", placeholder="e.g. stopping distance with thinking vs braking distance", key="topic_text")
+                            free_text_separate_only = st.checkbox(
+                                "Separate-only (not for Combined)",
+                                value=False,
+                                key="gen_free_text_separate_only",
+                                help="Tick this if the topic/question you are describing includes Separate-only content. If unticked, it will be saved as eligible for both Combined + Separate.",
                             )
 
-                        btn_c1, btn_c2 = st.columns([1, 1])
-                        with btn_c1:
-                            if st.button("Add a topic", use_container_width=True, key="gen_add_topic_btn"):
-                                st.session_state["gen_topic_count"] = min(int(st.session_state["gen_topic_count"]) + 1, 5)
-                                st.rerun()
-                        with btn_c2:
-                            if st.button(
-                                "Remove last topic",
-                                use_container_width=True,
-                                disabled=int(st.session_state["gen_topic_count"]) <= 1,
-                                key="gen_remove_topic_btn",
-                            ):
-                                removed_idx = int(st.session_state["gen_topic_count"]) - 1
-                                st.session_state["gen_topic_count"] = max(1, int(st.session_state["gen_topic_count"]) - 1)
-                                dead_key = f"gen_topic_{removed_idx}"
-                                if dead_key in st.session_state:
-                                    del st.session_state[dead_key]
-                                st.rerun()
-
-                        selected_topics = [t for t in topic_rows if t]
-                        topic_text = " + ".join(selected_topics)
-                        # Track eligibility derived from selected topics:
-                        # if any selected topic is separate_only, treat the whole generated item as separate_only.
-                        draft_track_ok = "both"
-                        for _t in selected_topics:
-                            if get_topic_track_ok(_t) == "separate_only":
-                                draft_track_ok = "separate_only"
-                                break
-
-
-
-                        # Track eligibility derived from topic entries (if any selected topic is separate_only, treat the whole item as separate_only)
                         qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
                         difficulty = st.selectbox("Difficulty", DIFFICULTIES, key="gen_difficulty")
                         marks_req = st.number_input("Max marks (target)", min_value=1, max_value=12, value=4, step=1, key="gen_marks")
@@ -3734,7 +3264,11 @@ else:
                                 else:
                                     token = pysecrets.token_hex(3)
                                     default_label = f"AI-{slugify(topic_text)[:24]}-{token}"
-                                    # Track eligibility for this draft is derived from the selected topic(s) above (draft_track_ok).
+                                    # Track eligibility for this draft
+                                    if topic_mode == "Choose from AQA list":
+                                        draft_track_ok = get_topic_track_ok(topic_text)
+                                    else:
+                                        draft_track_ok = "separate_only" if st.session_state.get("gen_free_text_separate_only") else "both"
 
                                     st.session_state["ai_draft"] = {
                                         "assignment_name": (assignment_name_ai or "").strip() or "AI Practice",
@@ -3814,58 +3348,55 @@ else:
 
                     jc1, jc2 = st.columns([2, 1])
                     with jc1:
-                        # Topic selection (curated only, no free-text).
-                        if "jour_topic_count" not in st.session_state:
-                            st.session_state["jour_topic_count"] = 1
-
-                        available_topics = get_topic_names_for_track(st.session_state.get('track', TRACK_DEFAULT))
-                        if not available_topics:
-                            st.error("No topics available for the selected Track. Check topics.json.")
-                            st.stop()
-
-                        jour_topic_rows = []
-                        for i in range(int(st.session_state["jour_topic_count"])):
-                            key = f"jour_topic_{i}"
-                            default_idx = 0
-                            if st.session_state.get(key) in available_topics:
-                                default_idx = available_topics.index(st.session_state.get(key))
-                            jour_topic_rows.append(
-                                st.selectbox(
-                                    f"Topic {i+1}",
-                                    available_topics,
-                                    index=default_idx,
-                                    key=key,
-                                    help="Topics shown depend on Combined/Separate selection.",
-                                )
+                        j_topic = st.text_input(
+                            "Topic in plain English",
+                            placeholder="e.g. Resistance and I-V characteristics (including filament lamp)",
+                            key="jour_topic"
+                        )
+                        journey_free_text_separate_only = st.checkbox(
+                            "Separate-only journey (not for Combined)",
+                            value=False,
+                            key="jour_free_text_separate_only",
+                            help="Tick this if the journey includes Separate-only content (e.g. Space physics). Unticked means eligible for both Combined + Separate.",
+                        )
+                        j_duration = st.selectbox(
+                            "Journey length (minutes)",
+                            [10, 20, 30],
+                            index=1,
+                            key="jour_duration",
+                            help="How long (in minutes) this Topic Journey is designed to take. This controls how many steps are generated.",
+                        )
+                        st.caption(f"Will generate {DURATION_TO_STEPS.get(int(j_duration), 8)} steps.")
+                        st.caption("Focus sliders: 0 = none, 1 = light, 2 = medium, 3 = heavy. This adjusts the mix of step types in the journey.")
+                        e1, e2, e3, e4 = st.columns(4)
+                        with e1:
+                            emph_calc = st.slider(
+                                "Calculation focus",
+                                0, 3, 2,
+                                key="jour_emph_calc",
+                                help="How much of the journey should involve calculation practice.",
                             )
-
-                        btn_j1, btn_j2 = st.columns([1, 1])
-                        with btn_j1:
-                            if st.button("Add a topic", use_container_width=True, key="jour_add_topic_btn"):
-                                st.session_state["jour_topic_count"] = min(int(st.session_state["jour_topic_count"]) + 1, 5)
-                                st.rerun()
-                        with btn_j2:
-                            if st.button(
-                                "Remove last topic",
-                                use_container_width=True,
-                                disabled=int(st.session_state["jour_topic_count"]) <= 1,
-                                key="jour_remove_topic_btn",
-                            ):
-                                removed_idx = int(st.session_state["jour_topic_count"]) - 1
-                                st.session_state["jour_topic_count"] = max(1, int(st.session_state["jour_topic_count"]) - 1)
-                                dead_key = f"jour_topic_{removed_idx}"
-                                if dead_key in st.session_state:
-                                    del st.session_state[dead_key]
-                                st.rerun()
-
-                        selected_topics = [t for t in jour_topic_rows if t]
-                        j_topic = " + ".join(selected_topics)
-
-                        # Track eligibility for this journey derived from topic entries
-                        jour_draft_track_ok = "separate_only" if any(get_topic_track_ok(t) == "separate_only" for t in selected_topics) else "both"
-                        # Fixed journey settings (no length/focus sliders)
-                        j_duration = 20
-                        st.caption("This Topic Journey will generate **5 steps** with a guided progression: definition → concept → calculation (if appropriate) → explanation → application (graph/practical/exam-style as appropriate).")
+                        with e2:
+                            emph_expl = st.slider(
+                                "Explanation focus",
+                                0, 3, 2,
+                                key="jour_emph_expl",
+                                help="How much of the journey should involve written explanations and reasoning.",
+                            )
+                        with e3:
+                            emph_graph = st.slider(
+                                "Graph focus",
+                                0, 3, 1,
+                                key="jour_emph_graph",
+                                help="How much of the journey should involve interpreting or sketching graphs, or analysing data.",
+                            )
+                        with e4:
+                            emph_prac = st.slider(
+                                "Practical focus",
+                                0, 3, 1,
+                                key="jour_emph_prac",
+                                help="How much of the journey should involve practical methods, required apparatus, variables, and analysis.",
+                            )
 
                         j_assignment = st.text_input("Assignment name for saving", value="Topic Journey", key="jour_assignment")
                         j_tags = st.text_input("Tags (comma separated)", value="", key="jour_tags")
@@ -3880,40 +3411,28 @@ else:
                         if not (j_topic or "").strip():
                             st.warning("Please enter a topic first.")
                         else:
+                            emph = {"calculation": emph_calc, "explanation": emph_expl, "graph": emph_graph, "practical": emph_prac}
+
                             def task_journey():
                                 return generate_topic_journey_with_ai(
                                     topic_plain_english=j_topic.strip(),
-                                    track=st.session_state.get("track", TRACK_DEFAULT),
+                                    duration_minutes=int(j_duration),
+                                    emphasis=emph,
                                 )
 
                             data = _run_ai_with_progress(
                                 task_fn=task_journey,
                                 ctx={"teacher": True, "mode": "topic_journey"},
-                                typical_range="45-120 seconds",
-                                est_seconds=70.0
+                                typical_range="8-20 seconds",
+                                est_seconds=16.0
                             )
 
                             if not isinstance(data, dict) or not data.get("steps"):
-                                # Store debug info for the error expander
-                                if isinstance(data, dict):
-                                    st.session_state["journey_last_reasons"] = data.get("_validation_reasons") or data.get("warnings")
-                                    st.session_state["journey_last_raw"] = data.get("_raw")
-                                else:
-                                    st.session_state["journey_last_reasons"] = None
-                                    st.session_state["journey_last_raw"] = None
                                 st.error("AI did not return a valid journey. Please try again.")
-                                reasons = st.session_state.get("journey_last_reasons")
-                                raw = st.session_state.get("journey_last_raw")
-                                if reasons:
-                                    with st.expander("Why it failed (debug)", expanded=False):
-                                        st.write(reasons)
-                                if raw:
-                                    with st.expander("Raw AI output (debug)", expanded=False):
-                                        st.code(raw, language="json")
                             else:
                                 token = pysecrets.token_hex(3)
                                 default_label = f"JOURNEY-{slugify(j_topic)[:24]}-{token}"
-                                draft_track_ok = jour_draft_track_ok
+                                draft_track_ok = "separate_only" if st.session_state.get("jour_free_text_separate_only") else "both"
                                 st.session_state["journey_draft"] = {
                                     "assignment_name": (j_assignment or "").strip() or "Topic Journey",
                                     "question_label": default_label,
