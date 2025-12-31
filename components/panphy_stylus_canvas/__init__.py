@@ -13,7 +13,7 @@ def stylus_canvas(
     height: int = 520,
     stroke_width: int = 2,
     stroke_color: str = "#000000",
-    background_color: str = "#ffffff",
+    background_color: str = "#F0F2F6",
     pen_only: bool = False,
     tool: str = "pen",
     command: str | None = None,
