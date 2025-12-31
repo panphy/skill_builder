@@ -174,6 +174,37 @@ def _persist_track_to_browser(track_value: str):
 """,
         unsafe_allow_html=True
     )
+def _inject_track_theme_css(track_value: str):
+    """
+    Streamlit theme.primaryColor is static, but we can strengthen the visual cue by
+    injecting a minimal CSS override for the primary accent color based on Track.
+    Kept intentionally small (no heavy layout CSS).
+    """
+    track_value = (track_value or "").strip().lower()
+    if track_value == "combined":
+        primary = "#F28C28"  # orange
+    else:
+        primary = "#1BC6B4"  # turquoise
+
+    st.markdown(
+        f"""
+<style>
+:root {{
+  --primary-color: {primary} !important;
+}}
+.stApp {{
+  --primary-color: {primary} !important;
+}}
+/* Many Streamlit widgets pick up --primary-color via CSS vars; this nudges buttons/links too. */
+a, a:visited {{
+  color: var(--primary-color) !important;
+}}
+</style>
+""",
+        unsafe_allow_html=True
+    )
+
+
 
 def init_track_state():
     # Run restore script first so first load picks up localStorage
@@ -267,12 +298,23 @@ DIFFICULTIES = SUBJECT_SETTINGS.get("difficulties") or ["Easy", "Medium", "Hard"
 
 # Prompt components (loaded from prompts.json)
 
-def _build_equation_guardrails(equations_pack: dict) -> tuple[str, list[tuple[str, str]]]:
-    """Return (equation_sheet_text, banned_patterns) from optional equations.json."""
+def _build_equation_guardrails(equations_pack: dict) -> tuple[str, list[tuple[str, str]], list[tuple[str, str]]]:
+    """
+    Return (equation_sheet_text, banned_patterns, allowed_calc_patterns) from optional equations.json.
+
+    - equation_sheet_text: human-readable bullet list injected into prompts
+    - banned_patterns: list[(regex, reason)] used for validation/repair
+    - allowed_calc_patterns: list[(regex, label)] used to ensure calculation questions only use allowed equations/relations
+    """
     if not isinstance(equations_pack, dict):
-        return ("", [])
+        return ("", [], [])
+
     eqs = equations_pack.get("preferred_equations", []) or []
     banned = equations_pack.get("banned_concepts", []) or []
+    allowed_rel = equations_pack.get("allowed_relations", []) or []
+    calc_policy = str(equations_pack.get("calculation_policy", "") or "").strip()
+
+    # Build display text for prompts
     lines: list[str] = []
     for item in eqs:
         if not isinstance(item, dict):
@@ -289,12 +331,36 @@ def _build_equation_guardrails(equations_pack: dict) -> tuple[str, list[tuple[st
         else:
             lines.append(f"- ${latex}$")
 
+    rel_lines: list[str] = []
+    for item in allowed_rel:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", "") or "").strip()
+        latex = str(item.get("latex", "") or "").strip()
+        notes = str(item.get("notes", "") or "").strip()
+        if latex and name and notes:
+            rel_lines.append(f"- {name}: ${latex}$ ({notes})")
+        elif latex and name:
+            rel_lines.append(f"- {name}: ${latex}$")
+        elif latex:
+            rel_lines.append(f"- ${latex}$")
+
     sheet_text = ""
-    if lines:
-        sheet_text = (
-            "AQA-style equation/notation guardrails (use EXACT symbols shown below; do not invent alternate notation):\n"
-            + "\n".join(lines)
-        )
+    if lines or rel_lines or calc_policy:
+        parts: list[str] = []
+        if calc_policy:
+            parts.append("CALCULATION POLICY (CRITICAL): " + calc_policy)
+        if lines:
+            parts.append(
+                "AQA equation/notation guardrails (use EXACT symbols shown below; do not invent alternate notation):\n"
+                + "\n".join(lines)
+            )
+        if rel_lines:
+            parts.append(
+                "Allowed GCSE derived relations (OK to use in addition to the AQA equations above):\n"
+                + "\n".join(rel_lines)
+            )
+        sheet_text = "\n\n".join(parts)
 
     banned_patterns: list[tuple[str, str]] = []
     for b in banned:
@@ -305,9 +371,34 @@ def _build_equation_guardrails(equations_pack: dict) -> tuple[str, list[tuple[st
         if pat:
             banned_patterns.append((pat, reason))
 
-    return sheet_text.strip(), banned_patterns
+    # Allowed calc patterns: equations + allowed relations
+    allowed_calc_patterns: list[tuple[str, str]] = []
+    for item in eqs:
+        if not isinstance(item, dict):
+            continue
+        pat = str(item.get("pattern", "") or "").strip()
+        latex = str(item.get("latex", "") or "").strip()
+        name = str(item.get("name", "") or "").strip() or latex
+        if pat:
+            allowed_calc_patterns.append((pat, name))
+        elif latex:
+            # fallback: look for the latex string (relaxed whitespace)
+            esc = re.escape(latex)
+            esc = esc.replace(r"\ ", r"\s*")
+            allowed_calc_patterns.append((esc, name))
 
-EQUATION_SHEET_TEXT, EQUATION_BANNED_PATTERNS = _build_equation_guardrails(SUBJECT_EQUATIONS_RAW)
+    for item in allowed_rel:
+        if not isinstance(item, dict):
+            continue
+        pat = str(item.get("pattern", "") or "").strip()
+        name = str(item.get("name", "") or "").strip() or pat
+        if pat:
+            allowed_calc_patterns.append((pat, name))
+
+    return sheet_text.strip(), banned_patterns, allowed_calc_patterns
+
+
+EQUATION_SHEET_TEXT, EQUATION_BANNED_PATTERNS, EQUATION_ALLOWED_CALC_PATTERNS = _build_equation_guardrails(SUBJECT_EQUATIONS_RAW)
 
 GCSE_ONLY_GUARDRAILS = str(SUBJECT_PROMPTS.get("gcse_only_guardrails", "") or "").strip()
 MARKDOWN_LATEX_RULES = str(SUBJECT_PROMPTS.get("markdown_latex_rules", "") or "").strip()
@@ -1744,6 +1835,7 @@ def generate_practice_question_with_ai(
             # Space physics: GCSE does NOT require redshift calculation with z = Δλ/λ
             (r"\bz\s*=\s*(?:\\Delta|Δ)\s*\\?lambda\s*/\s*\\?lambda\b|\bΔ\s*λ\s*/\s*λ\b", "Uses redshift calculation z=Δλ/λ (not required for AQA GCSE)"),
             (r"\b(lambda_obs|lambda_emit|λ_obs|λ_emit)\b", "Uses λ_obs/λ_emit style redshift symbols (not required for AQA GCSE)"),
+            (r"\bHubble\b|\bH_0\b|\bH0\b|\bHubble\s*constant\b|\bv\s*=\s*H\s*0?\s*d\b", "Uses Hubble\'s law / Hubble constant calculations (not AQA GCSE). Keep space/redshift qualitative."),
             # Springs: use AQA notation e for extension (not x)
             (r"\bF\s*=\s*k\s*x\b", "Uses F=kx notation; AQA GCSE equation sheet uses F = k e"),
             (r"\bE\s*=\s*\(?\s*1\s*/\s*2\s*\)?\s*k\s*x\s*\^\s*2\b|\\frac\{1\}\{2\}\s*k\s*x\^2", "Uses elastic energy with x; AQA GCSE uses e: E = 1/2 k e^2"),
@@ -1800,6 +1892,26 @@ def generate_practice_question_with_ai(
 
         bad = _forbidden_found(qtxt, mstxt)
         reasons.extend(bad)
+
+        # If this is a calculation-style question, enforce equation whitelist:
+        # Any required numerical calculation must be solvable using ONLY the AQA equations (plus allowed derived relations)
+        # listed in equations.json (basic arithmetic/rearrangement is fine).
+        calc_requested = bool(re.search(r"\bcalculate\b|\bwork\s*out\b|\bdetermine\b|\bcalculate\s+the\b", qtxt, flags=re.IGNORECASE))
+        if calc_requested and EQUATION_ALLOWED_CALC_PATTERNS:
+            combined_text = qtxt + "\n" + mstxt
+            ok_equation = False
+            for pat, _label in EQUATION_ALLOWED_CALC_PATTERNS:
+                try:
+                    if re.search(pat, combined_text, flags=re.IGNORECASE):
+                        ok_equation = True
+                        break
+                except re.error:
+                    continue
+            if not ok_equation:
+                reasons.append(
+                    "Calculation requested but no allowed AQA equation/derived relation was detected. "
+                    "Restrict calculations to equations/relations listed in equations.json (and include the equation explicitly)."
+                )
 
         if "$" in qtxt and "\\(" in qtxt:
             reasons.append("Use $...$ for LaTeX, avoid \\(...\\).")
@@ -1938,6 +2050,30 @@ def generate_topic_journey_with_ai(
             if mm <= 0 or mm > 12:
                 reasons.append(f"Step {i+1}: max_marks must be 1-12.")
             ms = str(stp.get("markscheme_text", "") or "")
+
+            # Enforce GCSE scope + AQA notation bans per step
+            q_step = str(stp.get("question_text", "") or "")
+            bad = _forbidden_found(q_step, ms)
+            for b in bad:
+                reasons.append(f"Step {i+1}: {b}")
+
+            # Calculation whitelist per step (only allowed AQA equations/derived relations)
+            calc_requested = bool(re.search(r"\bcalculate\b|\bwork\s*out\b|\bdetermine\b|\bcalculate\s+the\b", q_step, flags=re.IGNORECASE))
+            if calc_requested and EQUATION_ALLOWED_CALC_PATTERNS:
+                combined_text = q_step + "\n" + ms
+                ok_equation = False
+                for pat, _label in EQUATION_ALLOWED_CALC_PATTERNS:
+                    try:
+                        if re.search(pat, combined_text, flags=re.IGNORECASE):
+                            ok_equation = True
+                            break
+                    except re.error:
+                        continue
+                if not ok_equation:
+                    reasons.append(
+                        f"Step {i+1}: Calculation requested but no allowed AQA equation/derived relation detected. "
+                        "Restrict calculations to equations/relations listed in equations.json and include the equation explicitly."
+                    )
             if f"TOTAL = {mm}" not in ms:
                 reasons.append(f"Step {i+1}: markscheme_text must end with 'TOTAL = {mm}'.")
         return (len(reasons) == 0), reasons
@@ -2079,6 +2215,7 @@ if _sb_track != st.session_state.get("track", TRACK_DEFAULT):
     st.session_state["track"] = _sb_track
     _set_query_param(**{TRACK_PARAM: _sb_track})
 _persist_track_to_browser(st.session_state.get("track", TRACK_DEFAULT))
+_inject_track_theme_css(st.session_state.get("track", TRACK_DEFAULT))
 
 with st.sidebar:
     if st.session_state.get("track", TRACK_DEFAULT) == "combined":
