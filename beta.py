@@ -1976,47 +1976,6 @@ def generate_topic_journey_with_ai(
     steps_n = DURATION_TO_STEPS.get(int(duration_minutes), 8)
     topic_plain_english = (topic_plain_english or "").strip()
 
-
-def _normalize_journey_dict(d: Any) -> Any:
-    """Normalize common model deviations so validation is less brittle."""
-    if not isinstance(d, dict):
-        return d
-    # Ensure topic present (we already know the intended topic from input)
-    if not str(d.get("topic", "") or "").strip():
-        d["topic"] = topic_plain_english
-        # keep as warning, not a hard fail
-        try:
-            ws = d.get("warnings")
-            if not isinstance(ws, list):
-                ws = []
-            ws.append("WARN: Missing top-level topic in AI output; set from input.")
-            d["warnings"] = ws
-        except Exception:
-            pass
-
-    steps = d.get("steps", None)
-    # Some models return steps as an object keyed by numbers, normalize to list
-    if isinstance(steps, dict):
-        items = []
-        for k, v in steps.items():
-            try:
-                kk = int(str(k).strip())
-            except Exception:
-                kk = 10**9
-            items.append((kk, v))
-        items.sort(key=lambda x: x[0])
-        d["steps"] = [v for _, v in items]
-    elif isinstance(steps, str):
-        # try parse if it's a JSON string
-        try:
-            parsed = json.loads(steps)
-            if isinstance(parsed, list):
-                d["steps"] = parsed
-        except Exception:
-            pass
-    return d
-
-
     def _apply_notation_fixes(text: str) -> str:
         """Small deterministic fixes for AQA notation. Keep narrow and safe."""
         s = text or ""
@@ -2031,7 +1990,7 @@ def _normalize_journey_dict(d: Any) -> Any:
         if not isinstance(d, dict):
             return False, ["Output is not a JSON object."]
         if str(d.get("topic", "")).strip() == "":
-            reasons.append("WARN: Missing topic (set from input).")
+            reasons.append("Missing topic.")
         steps = d.get("steps", [])
 
         # Apply narrow deterministic notation fixes to each step (AQA symbols)
@@ -2084,7 +2043,7 @@ def _normalize_journey_dict(d: Any) -> Any:
                     except re.error:
                         continue
                 if not ok_equation:
-                    reasons.append(
+                                        reasons.append(
                         f"WARN: Step {i+1}: Calculation requested but no allowed AQA equation/derived relation detected. "
                         "Include an equation from the AQA sheet or allowed relations; teacher may need to edit."
                     )
@@ -2136,7 +2095,6 @@ def _normalize_journey_dict(d: Any) -> Any:
         )
         raw = response.choices[0].message.content or ""
         parsed = safe_parse_json(raw) or {}
-        parsed = _normalize_journey_dict(parsed)
         if isinstance(parsed, dict):
             parsed["_raw"] = raw
         return parsed or {}
@@ -2564,11 +2522,8 @@ if nav == "🧑‍🎓 Student":
                         tool=("pen" if tool == "Pen" else "eraser"),
                         command=cmd,
                         command_nonce=int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0),
-                        initial_data_url=st.session_state.get("last_canvas_data_url_single"),
                         key=f"stylus_canvas_single_{qid or 'none'}_{st.session_state['canvas_key']}",
                     )
-                    if isinstance(canvas_value, dict) and canvas_value.get("data_url"):
-                        st.session_state["last_canvas_data_url_single"] = canvas_value.get("data_url")
                     if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
                         st.session_state["last_canvas_data_url_single"] = canvas_value.get("data_url")
                 else:
@@ -2908,11 +2863,8 @@ if nav == "🧑‍🎓 Student":
                                 tool=("pen" if tool == "Pen" else "eraser"),
                                 command=cmd,
                                 command_nonce=int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0),
-                                initial_data_url=st.session_state.get("last_canvas_data_url_journey"),
                                 key=f"stylus_canvas_journey_{qid or 'none'}_{step_i}_{st.session_state['canvas_key']}",
                             )
-                            if isinstance(canvas_value, dict) and canvas_value.get("data_url"):
-                                st.session_state["last_canvas_data_url_journey"] = canvas_value.get("data_url")
                             if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
                                 st.session_state["last_canvas_data_url_journey"] = canvas_value.get("data_url")
                         else:
