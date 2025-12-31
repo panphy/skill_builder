@@ -372,6 +372,47 @@ def _build_equation_guardrails(equations_pack: dict) -> tuple[str, list[tuple[st
 
 EQUATION_SHEET_TEXT, EQUATION_BANNED_PATTERNS, EQUATION_ALLOWED_CALC_PATTERNS = _build_equation_guardrails(SUBJECT_EQUATIONS_RAW)
 
+
+
+def forbidden_found(question_text: str, markscheme_text: str) -> list[str]:
+    """Return human-readable reasons if content violates GCSE/AQA guardrails.
+
+    Uses patterns from subjects/physics/equations.json (banned_concepts) plus a few
+    hard safety bans that should never appear at GCSE.
+    """
+    t = (question_text or "") + "\n" + (markscheme_text or "")
+    bad: list[str] = []
+
+    # Patterns from subject pack
+    for pat, label in (EQUATION_BANNED_PATTERNS or []):
+        try:
+            if pat and re.search(pat, t, flags=re.IGNORECASE):
+                bad.append(str(label or pat))
+        except re.error:
+            # If a regex is malformed, ignore it rather than crashing generation.
+            continue
+
+    # Hard bans (never GCSE)
+    hard = [
+        (r"\\mu_0|\bmu0\b|\bμ0\b", "Uses μ0 (not GCSE)"),
+        (r"\\epsilon_0|\bepsilon0\b|\bε0\b", "Uses ε0 (not GCSE)"),
+        (r"\bcalculus\b|\bdifferentiat\w*\b|\bintegrat\w*\b", "Uses calculus (not GCSE)"),
+    ]
+    for pat, label in hard:
+        try:
+            if re.search(pat, t, flags=re.IGNORECASE):
+                bad.append(label)
+        except re.error:
+            continue
+
+    # De-duplicate while preserving order
+    seen = set()
+    out = []
+    for x in bad:
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
 GCSE_ONLY_GUARDRAILS = str(SUBJECT_PROMPTS.get("gcse_only_guardrails", "") or "").strip()
 MARKDOWN_LATEX_RULES = str(SUBJECT_PROMPTS.get("markdown_latex_rules", "") or "").strip()
 
@@ -1868,7 +1909,7 @@ def generate_practice_question_with_ai(
         # If this is a calculation-style question, enforce equation whitelist:
         # Any required numerical calculation must be solvable using ONLY the AQA equations (plus allowed derived relations)
         # listed in equations.json (basic arithmetic/rearrangement is fine).
-        calc_requested = bool(re.search(r"\bcalculate\b|\bwork\s*out\b|\bdetermine\b|\bcalculate\s+the\b", qtxt, flags=re.IGNORECASE))
+        calc_requested = bool(re.search(r"calculate|work out|determine|find", q_step, flags=re.IGNORECASE))
         if calc_requested and EQUATION_ALLOWED_CALC_PATTERNS:
             combined_text = qtxt + "\n" + mstxt
             ok_equation = False
@@ -2025,7 +2066,7 @@ def generate_topic_journey_with_ai(
 
             # Enforce GCSE scope + AQA notation bans per step
             q_step = str(stp.get("question_text", "") or "")
-            bad = _forbidden_found(q_step, ms)
+            bad = forbidden_found(q_step, ms)
             for b in bad:
                 reasons.append(f"Step {i+1}: {b}")
 
