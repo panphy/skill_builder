@@ -1117,17 +1117,86 @@ def encode_image(image_pil: Image.Image) -> str:
 
 
 def safe_parse_json(text_str: str):
+    """Best-effort extractor for a JSON object from an LLM response.
+
+    Priority:
+    1) Parse entire string as JSON
+    2) Parse any fenced ```json ... ``` blocks (prefer ones containing 'steps')
+    3) Parse balanced JSON objects found in the text (prefer ones containing 'steps')
+    """
+    s = (text_str or "").strip()
+    if not s:
+        return None
+
+    # 1) Direct parse
     try:
-        return json.loads(text_str)
+        return json.loads(s)
     except Exception:
         pass
-    m = re.search(r"\{.*\}", text_str, re.DOTALL)
-    if m:
+
+    def _prefer(obj_list):
+        """Prefer dicts containing a 'steps' list; else first dict."""
+        for o in obj_list:
+            if isinstance(o, dict) and isinstance(o.get("steps"), list) and len(o.get("steps")) > 0:
+                return o
+        for o in obj_list:
+            if isinstance(o, dict):
+                return o
+        return obj_list[0] if obj_list else None
+
+    # 2) Fenced json blocks
+    objs = []
+    for m in re.finditer(r"```json\s*(\{.*?\})\s*```", s, flags=re.DOTALL | re.IGNORECASE):
         try:
-            return json.loads(m.group(0))
+            objs.append(json.loads(m.group(1)))
         except Exception:
-            return None
+            continue
+    picked = _prefer(objs)
+    if picked is not None:
+        return picked
+
+    # 3) Balanced braces extraction: collect all top-level {...} objects
+    candidates = []
+    depth = 0
+    in_str = False
+    esc = False
+    start = None
+    for i, ch in enumerate(s):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        else:
+            if ch == '"':
+                in_str = True
+                continue
+            if ch == "{":
+                if depth == 0:
+                    start = i
+                depth += 1
+            elif ch == "}" and depth > 0:
+                depth -= 1
+                if depth == 0 and start is not None:
+                    candidates.append(s[start:i+1])
+                    start = None
+
+    parsed = []
+    for cand in candidates:
+        try:
+            parsed.append(json.loads(cand))
+        except Exception:
+            continue
+
+    picked = _prefer(parsed)
+    if picked is not None:
+        return picked
+
     return None
+
 
 
 def clamp_int(value, lo, hi, default=0):
@@ -1894,7 +1963,6 @@ JOURNEY_CHECKPOINT_EVERY = 3
 def generate_topic_journey_with_ai(
     topic_plain_english: str,
     duration_minutes: int,
-    emphasis: Dict[str, int],
 ) -> Dict[str, Any]:
     steps_n = DURATION_TO_STEPS.get(int(duration_minutes), 8)
     topic_plain_english = (topic_plain_english or "").strip()
@@ -1938,14 +2006,11 @@ def generate_topic_journey_with_ai(
         })
         system = (system or "").strip()
 
-        emph_txt = ", ".join([f"{k}={int(v)}" for k, v in (emphasis or {}).items()])
-
         base_user = _render_template(JOURNEY_USER_TPL, {
             "TOPIC_PLAIN": (topic_plain_english or "").strip(),
             "DURATION_MIN": int(duration_minutes),
             "STEPS_N": int(steps_n),
-            "EMPHASIS_TXT": emph_txt,
-        })
+                    })
         base_user = (base_user or "").strip()
 
         if not repair:
@@ -2002,6 +2067,11 @@ def generate_topic_journey_with_ai(
             if not isinstance(stp.get("spec_refs", []), list):
                 stp["spec_refs"] = []
             stp["spec_refs"] = [str(x).strip() for x in stp.get("spec_refs", []) if str(x).strip()][:6]
+
+    # If we still failed to get usable steps after repair, fail loudly so UI can show 'Explain error'.
+    if not steps or len(steps) == 0:
+        raise ValueError("AI returned invalid Journey JSON: missing a non-empty 'steps' list.")
+
 
     return {
         "topic": str(data.get("topic", "") or topic_plain_english).strip(),
@@ -3478,39 +3548,8 @@ else:
                         )
 
                         # Compact focus controls (sliders are visually large in Streamlit)
-                        st.caption(
-                            "Focus (0-3): 0 = none, 1 = light, 2 = medium, 3 = heavy. This adjusts the mix of step types in the journey."
-                        )
-                        fcols = st.columns(4)
-                        with fcols[0]:
-                            emph_retrieval = st.number_input(
-                                "Retrieval",
-                                min_value=0, max_value=3, value=int(st.session_state.get("jour_emph_retrieval", 2)),
-                                step=1, key="jour_emph_retrieval",
-                                help="Recall, key facts, definitions, and short prompts."
-                            )
-                        with fcols[1]:
-                            emph_calc = st.number_input(
-                                "Maths",
-                                min_value=0, max_value=3, value=int(st.session_state.get("jour_emph_calc", 2)),
-                                step=1, key="jour_emph_calc",
-                                help="Calculations, rearranging equations, units and significant figures."
-                            )
-                        with fcols[2]:
-                            emph_graph = st.number_input(
-                                "Graphs",
-                                min_value=0, max_value=3, value=int(st.session_state.get("jour_emph_graph", 1)),
-                                step=1, key="jour_emph_graph",
-                                help="Interpreting data, gradients and proportionality."
-                            )
-                        with fcols[3]:
-                            emph_prac = st.number_input(
-                                "Practical",
-                                min_value=0, max_value=3, value=int(st.session_state.get("jour_emph_prac", 1)),
-                                step=1, key="jour_emph_prac",
-                                help="Practical methods, apparatus, variables, and analysis."
-                            )
-                        j_assignment = st.text_input("Assignment name for saving", value="Topic Journey", key="jour_assignment")
+                        st.caption("Focus is chosen automatically based on the selected topic(s).")
+j_assignment = st.text_input("Assignment name for saving", value="Topic Journey", key="jour_assignment")
                         j_tags = st.text_input("Tags (comma separated)", value="", key="jour_tags")
 
                     # --- Right column: actions ---
@@ -3545,12 +3584,6 @@ else:
                                     return generate_topic_journey_with_ai(
                                         topic_plain_english=topic_plain,
                                         duration_minutes=j_duration,
-                                        emphasis={
-                                            "retrieval": int(emph_retrieval),
-                                            "calculation": int(emph_calc),
-                                            "graphs": int(emph_graph),
-                                            "practical": int(emph_prac),
-                                        },
                                     )
 
                                 try:
@@ -3561,13 +3594,11 @@ else:
                                         est_seconds=25.0,
                                     )
 
-                                    # Validate basic shape
-                                    if not isinstance(data, dict):
-                                        raise ValueError("AI did not return a JSON object for the journey.")
-                                    steps_list = data.get("steps")
-                                    if not isinstance(steps_list, list) or len(steps_list) == 0:
-                                        raise ValueError("Journey JSON missing a non-empty 'steps' list.")
+                                    if data is None:
+                                        raise ValueError("AI returned no usable Journey JSON (failed to parse).")
 
+                                    # Validate basic shape
+                                    
                                     # Default label
                                     token = pysecrets.token_hex(3)
                                     default_label = f"JOURNEY-{slugify(topic_plain)[:24]}-{token}"
