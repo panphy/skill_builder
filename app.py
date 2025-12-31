@@ -3290,7 +3290,7 @@ else:
                         else:
                             st.caption("Eligibility: Combined + Separate.")
 
-qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
+                        qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
                         difficulty = st.selectbox("Difficulty", DIFFICULTIES, key="gen_difficulty")
                         marks_req = st.number_input("Max marks (target)", min_value=1, max_value=12, value=4, step=1, key="gen_marks")
 
@@ -3429,27 +3429,38 @@ qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
                     st.caption("Generate a step-by-step Topic Journey (one saved object). You must vet and edit before saving.")
 
                     jc1, jc2 = st.columns([2, 1])
+
+                    # --- Left column: topic selection + controls ---
                     with jc1:
-                                                st.write("### Journey topics")
+                        st.write("### Journey topics")
+
+                        if "journey_topics_selected" not in st.session_state:
+                            st.session_state["journey_topics_selected"] = []
+                        if "journey_show_error" not in st.session_state:
+                            st.session_state["journey_show_error"] = False
+
                         topic_pick = st.selectbox(
                             "Choose a topic to add",
                             options=get_topic_names_for_track(st.session_state.get("track", TRACK_DEFAULT)),
                             key="jour_topic_pick",
-                            help="Add one or more topics from the official list. The journey will blend these topics into 5 steps (about 10 minutes).",
+                            help="Add one or more topics. The journey will blend these topics into 5 steps (about 10 minutes).",
                         )
-                        b1, b2 = st.columns([1, 1])
-                        with b1:
+
+                        add_c1, add_c2 = st.columns([1, 1])
+                        with add_c1:
                             if st.button("Add topic", key="jour_add_topic", use_container_width=True):
-                                current = list(st.session_state.get("journey_topics_selected", []) or [])
-                                if topic_pick and topic_pick not in current:
-                                    current.append(topic_pick)
-                                    st.session_state["journey_topics_selected"] = current
+                                sel = list(st.session_state.get("journey_topics_selected", []) or [])
+                                if topic_pick and topic_pick not in sel:
+                                    sel.append(topic_pick)
+                                    st.session_state["journey_topics_selected"] = sel
                                 st.session_state["journey_show_error"] = False
                                 st.rerun()
-                        with b2:
+
+                        with add_c2:
                             if st.button("Clear topics", key="jour_clear_topics", use_container_width=True):
                                 st.session_state["journey_topics_selected"] = []
                                 st.session_state["journey_show_error"] = False
+                                st.session_state["journey_draft"] = None
                                 st.rerun()
 
                         sel_topics = list(st.session_state.get("journey_topics_selected", []) or [])
@@ -3459,82 +3470,98 @@ qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
                         else:
                             st.info("Add at least one topic to build a journey.")
 
-j_duration = 10
+                        # Fixed journey size: 10 minutes, 5 steps
+                        j_duration = 10
                         st.caption("Journey length is fixed: 10 minutes, 5 steps.")
-                        st.caption("Focus sliders: 0 = none, 1 = light, 2 = medium, 3 = heavy. This adjusts the mix of step types in the journey.")
-                        e1, e2, e3, e4 = st.columns(4)
-                        with e1:
-                            emph_calc = st.slider(
-                                "Calculation focus",
-                                0, 3, 2,
-                                key="jour_emph_calc",
-                                help="How much of the journey should involve calculation practice.",
-                            )
-                        with e2:
-                            emph_expl = st.slider(
-                                "Explanation focus",
-                                0, 3, 2,
-                                key="jour_emph_expl",
-                                help="How much of the journey should involve written explanations and reasoning.",
-                            )
-                        with e3:
-                            emph_graph = st.slider(
-                                "Graph focus",
-                                0, 3, 1,
-                                key="jour_emph_graph",
-                                help="How much of the journey should involve interpreting or sketching graphs, or analysing data.",
-                            )
-                        with e4:
-                            emph_prac = st.slider(
-                                "Practical focus",
-                                0, 3, 1,
-                                key="jour_emph_prac",
-                                help="How much of the journey should involve practical methods, required apparatus, variables, and analysis.",
-                            )
+                        st.caption(
+                            "Focus sliders: 0 = none, 1 = light, 2 = medium, 3 = heavy. This adjusts the mix of step types in the journey."
+                        )
+
+                        emph_retrieval = st.slider(
+                            "Retrieval focus",
+                            0, 3, 2,
+                            key="jour_emph_retrieval",
+                            help="How much of the journey should involve recall, key facts, definitions, and short prompts.",
+                        )
+                        emph_calc = st.slider(
+                            "Maths/calculation focus",
+                            0, 3, 2,
+                            key="jour_emph_calc",
+                            help="How much of the journey should involve calculations, rearranging equations, units and significant figures.",
+                        )
+                        emph_graph = st.slider(
+                            "Graphs focus",
+                            0, 3, 1,
+                            key="jour_emph_graph",
+                            help="How much of the journey should involve graphs, interpreting data, gradients and proportionality.",
+                        )
+                        emph_prac = st.slider(
+                            "Practical focus",
+                            0, 3, 1,
+                            key="jour_emph_prac",
+                            help="How much of the journey should involve practical methods, required apparatus, variables, and analysis.",
+                        )
 
                         j_assignment = st.text_input("Assignment name for saving", value="Topic Journey", key="jour_assignment")
                         j_tags = st.text_input("Tags (comma separated)", value="", key="jour_tags")
 
+                    # --- Right column: actions ---
                     with jc2:
-                        gen_j = st.button("Generate journey draft", type="primary", use_container_width=True, disabled=not AI_READY, key="jour_gen_btn")
+                        gen_j = st.button(
+                            "Generate journey draft",
+                            type="primary",
+                            use_container_width=True,
+                            disabled=not AI_READY,
+                            key="jour_gen_btn",
+                        )
+
                         if st.button("Clear journey draft", use_container_width=True, key="jour_clear_btn"):
                             st.session_state["journey_draft"] = None
+                            st.session_state["journey_gen_error_details"] = None
+                            st.session_state["journey_show_error"] = False
                             st.rerun()
 
-                                        if gen_j:
-                        # Clear previous error state for this run
-                        st.session_state["journey_gen_error_details"] = None
-                        st.session_state["journey_show_error"] = False
+                        if gen_j:
+                            # Clear previous error state for this run
+                            st.session_state["journey_gen_error_details"] = None
+                            st.session_state["journey_show_error"] = False
 
-                        sel_topics = list(st.session_state.get("journey_topics_selected", []) or [])
-                        if not sel_topics:
-                            st.warning("Please add at least one topic first.")
-                        else:
-                            topic_plain = " | ".join(sel_topics)
-                            emph = {"calculation": emph_calc, "explanation": emph_expl, "graph": emph_graph, "practical": emph_prac}
+                            sel_topics = list(st.session_state.get("journey_topics_selected", []) or [])
+                            if not sel_topics:
+                                st.warning("Please add at least one topic first.")
+                            else:
+                                topic_plain = " | ".join(sel_topics)
 
-                            def task_journey():
-                                return generate_topic_journey_with_ai(
-                                    topic_plain_english=topic_plain,
-                                    duration_minutes=int(j_duration),
-                                    emphasis=emph,
-                                )
+                                def task_generate():
+                                    # 10 minutes, 5 steps is fixed
+                                    return generate_topic_journey_ai(
+                                        topic_plain=topic_plain,
+                                        duration_minutes=j_duration,
+                                        steps=5,
+                                        emphasis={
+                                            "retrieval": int(emph_retrieval),
+                                            "calculation": int(emph_calc),
+                                            "graphs": int(emph_graph),
+                                            "practical": int(emph_prac),
+                                        },
+                                    )
 
-                            try:
-                                data = _run_ai_with_progress(
-                                    task_fn=task_journey,
-                                    ctx={"teacher": True, "mode": "topic_journey"},
-                                    typical_range="8-25 seconds",
-                                    est_seconds=18.0
-                                )
+                                try:
+                                    data = _run_ai_with_progress(
+                                        task_fn=task_generate,
+                                        ctx={"teacher": True, "mode": "topic_journey"},
+                                        typical_range="15-35 seconds",
+                                        est_seconds=25.0,
+                                    )
 
-                                if not isinstance(data, dict) or not data.get("steps"):
-                                    st.error("AI did not return a valid journey. Please try again.")
-                                    try:
-                                        st.session_state["journey_gen_error_details"] = json.dumps(data, indent=2, ensure_ascii=False)
-                                    except Exception:
-                                        st.session_state["journey_gen_error_details"] = repr(data)
-                                else:
+                                    # Validate basic shape
+                                    if not isinstance(data, dict):
+                                        raise ValueError("AI did not return a JSON object for the journey.")
+                                    steps_list = data.get("steps")
+                                    if not isinstance(steps_list, list) or len(steps_list) == 0:
+                                        raise ValueError("Journey JSON missing a non-empty 'steps' list.")
+
+                                    # Default label
                                     token = pysecrets.token_hex(3)
                                     default_label = f"JOURNEY-{slugify(topic_plain)[:24]}-{token}"
 
@@ -3550,21 +3577,23 @@ j_duration = 10
                                         "journey": data,
                                     }
                                     st.success("Journey draft generated. Vet/edit below, then save as one assignment.")
-                            except Exception:
-                                st.error("Journey generation failed. Try again, or click Explain error for details.")
-                                st.session_state["journey_gen_error_details"] = traceback.format_exc()
 
-                    # Optional: reveal raw error details if the user wants them
-                    if st.session_state.get("journey_gen_error_details"):
-                        if st.button("Explain error", key="jour_explain_error", use_container_width=True):
-                            st.session_state["journey_show_error"] = True
+                                except Exception:
+                                    import traceback
+                                    st.session_state["journey_draft"] = None
+                                    st.session_state["journey_gen_error_details"] = traceback.format_exc()
+                                    st.error("Failed to generate a Topic Journey. You can try again, or click 'Explain error'.")
 
-                    if st.session_state.get("journey_show_error") and st.session_state.get("journey_gen_error_details"):
-                        with st.expander("Error details", expanded=True):
-                            st.code(st.session_state.get("journey_gen_error_details", ""))
-                            st.caption("These details help diagnose failures (model output shape, JSON errors, timeouts).")
+                        # Optional: reveal raw error details if the user wants them
+                        if st.session_state.get("journey_gen_error_details"):
+                            if st.button("Explain error", key="jour_explain_error", use_container_width=True):
+                                st.session_state["journey_show_error"] = True
 
-if st.session_state.get("journey_draft"):
+                        if st.session_state.get("journey_show_error") and st.session_state.get("journey_gen_error_details"):
+                            with st.expander("Error details", expanded=True):
+                                st.code(st.session_state.get("journey_gen_error_details", ""))
+                                st.caption("These details help diagnose failures (model output shape, JSON errors, timeouts).")
+                    if st.session_state.get("journey_draft"):
                         d = st.session_state["journey_draft"]
                         journey = d.get("journey", {}) if isinstance(d, dict) else {}
                         steps = journey.get("steps", []) if isinstance(journey, dict) else []
