@@ -3543,13 +3543,9 @@ else:
                         # Fixed journey size: 10 minutes, 5 steps
                         j_duration = 10
                         st.caption("Journey length is fixed: 10 minutes, 5 steps.")
-                        st.caption(
-                            "Focus sliders: 0 = none, 1 = light, 2 = medium, 3 = heavy. This adjusts the mix of step types in the journey."
-                        )
 
-                        # Compact focus controls (sliders are visually large in Streamlit)
                         st.caption("Focus is chosen automatically based on the selected topic(s).")
-j_assignment = st.text_input("Assignment name for saving", value="Topic Journey", key="jour_assignment")
+                        j_assignment = st.text_input("Assignment name for saving", value="Topic Journey", key="jour_assignment")
                         j_tags = st.text_input("Tags (comma separated)", value="", key="jour_tags")
 
                     # --- Right column: actions ---
