@@ -177,45 +177,39 @@ def _persist_track_to_browser(track_value: str):
 def _inject_track_theme_css(track_value: str):
     """
     Streamlit theme.primaryColor is static, but we can strengthen the visual cue by
-    injecting a small CSS override for the primary accent color based on Track.
+    injecting a CSS override for the primary accent color based on Track.
 
-    This targets both Streamlit CSS variables and BaseWeb components (tabs/buttons),
-    using high-specificity selectors and !important to win over injected styles.
+    This is best-effort (Streamlit internals change), so we target both Streamlit CSS
+    variables and common BaseWeb primitives used by widgets.
     """
     track_value = (track_value or "").strip().lower()
     if track_value == "combined":
         primary = "#F28C28"  # orange
+        primary_soft = "#FCE1C2"
     else:
         primary = "#1BC6B4"  # turquoise
+        primary_soft = "#BFF3ED"
 
     st.markdown(
         f"""
 <style>
-:root {{
+/* Primary accent variables (multiple roots for robustness) */
+:root, html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stSidebar"] {{
   --panphy-accent: {primary} !important;
+  --panphy-accent-soft: {primary_soft} !important;
   --primary-color: {primary} !important;
   --primaryColor: {primary} !important;
-}}
-.stApp, [data-testid="stAppViewContainer"] {{
-  --panphy-accent: {primary} !important;
-  --primary-color: {primary} !important;
-  --primaryColor: {primary} !important;
-}}
-/* Links */
-a, a:visited {{
-  color: var(--panphy-accent) !important;
 }}
 
-/* Tabs (BaseWeb) */
-.stTabs [data-baseweb="tab"][aria-selected="true"] {{
-  color: var(--panphy-accent) !important;
-}}
-.stTabs [data-baseweb="tab-highlight"],
+/* Tabs underline + active tab */
 .stTabs [data-baseweb="tab-border"] {{
   background-color: var(--panphy-accent) !important;
 }}
+.stTabs [data-baseweb="tab"][aria-selected="true"] {{
+  color: var(--panphy-accent) !important;
+}}
 
-/* Primary buttons */
+/* Buttons */
 button[data-testid="baseButton-primary"] {{
   background-color: var(--panphy-accent) !important;
   border-color: var(--panphy-accent) !important;
@@ -224,18 +218,37 @@ button[data-testid="baseButton-primary"]:hover {{
   filter: brightness(0.98);
 }}
 
-/* Checkbox/radio highlights (best-effort) */
-div[role="radiogroup"] input:checked + div,
-div[role="checkbox"] input:checked + div {{
+/* Links */
+a, a:visited {{
+  color: var(--panphy-accent) !important;
+}}
+
+/* Radio / checkbox (BaseWeb) */
+[data-baseweb="radio"] input:checked + div {{
   border-color: var(--panphy-accent) !important;
+}}
+[data-baseweb="radio"] input:checked + div > div {{
+  background-color: var(--panphy-accent) !important;
+}}
+[data-baseweb="checkbox"] input:checked + div {{
+  border-color: var(--panphy-accent) !important;
+  background-color: var(--panphy-accent) !important;
+}}
+
+/* Selectbox focus ring (BaseWeb) */
+[data-baseweb="select"] > div:focus-within {{
+  box-shadow: 0 0 0 2px var(--panphy-accent-soft) !important;
+  border-color: var(--panphy-accent) !important;
+}}
+
+/* Slider */
+[data-testid="stSlider"] [role="slider"] {{
+  outline-color: var(--panphy-accent) !important;
 }}
 </style>
 """,
         unsafe_allow_html=True
     )
-
-
-
 def init_track_state():
     # Run restore script first so first load picks up localStorage
     if "track_init_done" not in st.session_state:
@@ -2565,7 +2578,7 @@ if nav == "🧑‍🎓 Student":
                     canvas_value = stylus_canvas(
                         stroke_width=stroke_width,
                         stroke_color=stroke_color,
-                        background_color=CANVAS_BG_HEX,
+                        background_color="#F0F2F6",
                         height=520,
                         width=600,
                         pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
@@ -2606,7 +2619,7 @@ if nav == "🧑‍🎓 Student":
                         canvas_result = _st_canvas(
                             stroke_width=stroke_width,
                             stroke_color=stroke_color,
-                            background_color=CANVAS_BG_HEX,
+                            background_color="#F0F2F6",
                             height=400,
                             width=600,
                             drawing_mode="freedraw",
@@ -2906,7 +2919,7 @@ if nav == "🧑‍🎓 Student":
                             canvas_value = stylus_canvas(
                                 stroke_width=stroke_width,
                                 stroke_color=stroke_color,
-                                background_color=CANVAS_BG_HEX,
+                                background_color="#F0F2F6",
                                 height=400,
                                 width=600,
                                 pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
@@ -2946,7 +2959,7 @@ if nav == "🧑‍🎓 Student":
                                 canvas_result = _st_canvas(
                                     stroke_width=stroke_width,
                                     stroke_color=stroke_color,
-                                    background_color=CANVAS_BG_HEX,
+                                    background_color="#F0F2F6",
                                     height=400,
                                     width=600,
                                     drawing_mode="freedraw",
@@ -3457,7 +3470,7 @@ else:
                         if "gen_topic_count" not in st.session_state:
                             st.session_state["gen_topic_count"] = 1
 
-                        available_topics = get_topic_names_filtered()
+                        available_topics = get_topic_names_for_track(st.session_state.get('track', TRACK_DEFAULT))
                         if not available_topics:
                             st.error("No topics available for the selected Track. Check topics.json.")
                             st.stop()
@@ -3644,7 +3657,7 @@ else:
                         if "jour_topic_count" not in st.session_state:
                             st.session_state["jour_topic_count"] = 1
 
-                        available_topics = get_topic_names_filtered()
+                        available_topics = get_topic_names_for_track(st.session_state.get('track', TRACK_DEFAULT))
                         if not available_topics:
                             st.error("No topics available for the selected Track. Check topics.json.")
                             st.stop()
