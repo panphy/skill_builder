@@ -200,6 +200,7 @@ def _load_subject_pack(subject_site: str) -> dict:
     topics_path = subj_dir / "topics.json"
     prompts_path = subj_dir / "prompts.json"
     settings_path = subj_dir / "settings.json"
+    equations_path = subj_dir / "equations.json"
 
     if not topics_path.exists():
         raise FileNotFoundError(f"Missing topics file: {topics_path}")
@@ -209,8 +210,9 @@ def _load_subject_pack(subject_site: str) -> dict:
     topics = json.loads(topics_path.read_text(encoding="utf-8"))
     prompts = json.loads(prompts_path.read_text(encoding="utf-8"))
     settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.exists() else {}
+    equations = json.loads(equations_path.read_text(encoding="utf-8")) if equations_path.exists() else {}
 
-    return {"topics": topics, "prompts": prompts, "settings": settings}
+    return {"topics": topics, "prompts": prompts, "settings": settings, "equations": equations}
 
 def _render_template(tpl: str, mapping: Dict[str, Any]) -> str:
     # Simple token replacement. Tokens look like: <<TOKEN_NAME>>
@@ -228,6 +230,7 @@ except Exception as _e:
 SUBJECT_SETTINGS = SUBJECT_PACK.get("settings", {}) or {}
 SUBJECT_TOPICS_RAW = SUBJECT_PACK.get("topics", {}) or {}
 SUBJECT_PROMPTS = SUBJECT_PACK.get("prompts", {}) or {}
+SUBJECT_EQUATIONS_RAW = SUBJECT_PACK.get("equations", {}) or {}
 
 # Topics for dropdowns (student + teacher)
 TOPICS_CATALOG = SUBJECT_TOPICS_RAW.get("topics", [])
@@ -263,6 +266,49 @@ QUESTION_TYPES = SUBJECT_SETTINGS.get("question_types") or ["Calculation", "Expl
 DIFFICULTIES = SUBJECT_SETTINGS.get("difficulties") or ["Easy", "Medium", "Hard"]
 
 # Prompt components (loaded from prompts.json)
+
+def _build_equation_guardrails(equations_pack: dict) -> tuple[str, list[tuple[str, str]]]:
+    """Return (equation_sheet_text, banned_patterns) from optional equations.json."""
+    if not isinstance(equations_pack, dict):
+        return ("", [])
+    eqs = equations_pack.get("preferred_equations", []) or []
+    banned = equations_pack.get("banned_concepts", []) or []
+    lines: list[str] = []
+    for item in eqs:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", "") or "").strip()
+        latex = str(item.get("latex", "") or "").strip()
+        notes = str(item.get("notes", "") or "").strip()
+        if not latex:
+            continue
+        if name and notes:
+            lines.append(f"- {name}: ${latex}$ ({notes})")
+        elif name:
+            lines.append(f"- {name}: ${latex}$")
+        else:
+            lines.append(f"- ${latex}$")
+
+    sheet_text = ""
+    if lines:
+        sheet_text = (
+            "AQA-style equation/notation guardrails (use EXACT symbols shown below; do not invent alternate notation):\n"
+            + "\n".join(lines)
+        )
+
+    banned_patterns: list[tuple[str, str]] = []
+    for b in banned:
+        if not isinstance(b, dict):
+            continue
+        pat = str(b.get("pattern", "") or "").strip()
+        reason = str(b.get("reason", "") or "").strip() or "Out-of-scope / disallowed content."
+        if pat:
+            banned_patterns.append((pat, reason))
+
+    return sheet_text.strip(), banned_patterns
+
+EQUATION_SHEET_TEXT, EQUATION_BANNED_PATTERNS = _build_equation_guardrails(SUBJECT_EQUATIONS_RAW)
+
 GCSE_ONLY_GUARDRAILS = str(SUBJECT_PROMPTS.get("gcse_only_guardrails", "") or "").strip()
 MARKDOWN_LATEX_RULES = str(SUBJECT_PROMPTS.get("markdown_latex_rules", "") or "").strip()
 
@@ -1695,16 +1741,42 @@ def generate_practice_question_with_ai(
             (r"\bflux\b|\bflux linkage\b|\binductance\b", "Uses flux/inductance language (not GCSE here)"),
             (r"\bFaraday\b|\bLenz\b", "Uses Faraday/Lenz law (not GCSE equation form here)"),
             (r"\bcalculus\b|\bdifferentiat|\bintegrat", "Uses calculus (not GCSE)"),
+            # Space physics: GCSE does NOT require redshift calculation with z = Δλ/λ
+            (r"\bz\s*=\s*(?:\\Delta|Δ)\s*\\?lambda\s*/\s*\\?lambda\b|\bΔ\s*λ\s*/\s*λ\b", "Uses redshift calculation z=Δλ/λ (not required for AQA GCSE)"),
+            (r"\b(lambda_obs|lambda_emit|λ_obs|λ_emit)\b", "Uses λ_obs/λ_emit style redshift symbols (not required for AQA GCSE)"),
+            # Springs: use AQA notation e for extension (not x)
+            (r"\bF\s*=\s*k\s*x\b", "Uses F=kx notation; AQA GCSE equation sheet uses F = k e"),
+            (r"\bE\s*=\s*\(?\s*1\s*/\s*2\s*\)?\s*k\s*x\s*\^\s*2\b|\\frac\{1\}\{2\}\s*k\s*x\^2", "Uses elastic energy with x; AQA GCSE uses e: E = 1/2 k e^2"),
         ]
         for pat, label in patterns:
             if re.search(pat, t, flags=re.IGNORECASE):
                 bad.append(label)
+        # subject-pack bans (equations.json)
+        for pat, label in EQUATION_BANNED_PATTERNS:
+            if re.search(pat, t, flags=re.IGNORECASE):
+                bad.append(label)
         return bad
 
+
+    def _apply_notation_fixes(text: str) -> str:
+        """Small deterministic fixes for AQA notation. Keep narrow and safe."""
+        s = text or ""
+        # Elastic energy store: use e for extension (AQA sheet)
+        s = re.sub(r"\\frac\{1\}\{2\}\s*k\s*x\^2\b", r"\\frac{1}{2} k e^2", s)
+        s = re.sub(r"\b1\s*/\s*2\s*k\s*x\s*\^\s*2\b", "1/2 k e^2", s)
+        # Hooke's law: use e for extension (AQA sheet)
+        s = re.sub(r"\bF\s*=\s*k\s*x\b", "F = k e", s)
+        return s
     def _validate(d: Dict[str, Any]) -> Tuple[bool, List[str]]:
         reasons: List[str] = []
         qtxt = str(d.get("question_text", "") or "").strip()
         mstxt = str(d.get("markscheme_text", "") or "").strip()
+
+        # Apply narrow deterministic notation fixes (AQA symbols)
+        qtxt = _apply_notation_fixes(qtxt)
+        mstxt = _apply_notation_fixes(mstxt)
+        d["question_text"] = qtxt
+        d["markscheme_text"] = mstxt
 
         if not qtxt:
             reasons.append("Missing question_text.")
@@ -1738,6 +1810,7 @@ def generate_practice_question_with_ai(
         system = _render_template(QGEN_SYSTEM_TPL, {
             "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
             "MARKDOWN_LATEX_RULES": MARKDOWN_LATEX_RULES,
+            "EQUATION_SHEET": EQUATION_SHEET_TEXT,
             "TRACK": st.session_state.get("track", TRACK_DEFAULT),
         })
         system = (system or "").strip()
@@ -1817,6 +1890,16 @@ def generate_topic_journey_with_ai(
 ) -> Dict[str, Any]:
     steps_n = DURATION_TO_STEPS.get(int(duration_minutes), 8)
     topic_plain_english = (topic_plain_english or "").strip()
+
+    def _apply_notation_fixes(text: str) -> str:
+        """Small deterministic fixes for AQA notation. Keep narrow and safe."""
+        s = text or ""
+        # Elastic energy store: use e for extension (AQA sheet)
+        s = re.sub(r"\\frac\{1\}\{2\}\s*k\s*x\^2\b", r"\\frac{1}{2} k e^2", s)
+        s = re.sub(r"\b1\s*/\s*2\s*k\s*x\s*\^\s*2\b", "1/2 k e^2", s)
+        # Hooke's law: use e for extension (AQA sheet)
+        s = re.sub(r"\bF\s*=\s*k\s*x\b", "F = k e", s)
+        return s
     def _validate(d: Dict[str, Any]) -> Tuple[bool, List[str]]:
         reasons: List[str] = []
         if not isinstance(d, dict):
@@ -1824,6 +1907,16 @@ def generate_topic_journey_with_ai(
         if str(d.get("topic", "")).strip() == "":
             reasons.append("Missing topic.")
         steps = d.get("steps", [])
+
+        # Apply narrow deterministic notation fixes to each step (AQA symbols)
+        try:
+            for stp in steps:
+                if isinstance(stp, dict):
+                    stp["question_text"] = _apply_notation_fixes(str(stp.get("question_text","") or ""))
+                    stp["markscheme_text"] = _apply_notation_fixes(str(stp.get("markscheme_text","") or ""))
+        except Exception:
+            pass
+
         if not isinstance(steps, list) or len(steps) != steps_n:
             reasons.append(f"steps must be a list of length {steps_n}.")
             return False, reasons
@@ -1853,6 +1946,7 @@ def generate_topic_journey_with_ai(
         system = _render_template(JOURNEY_SYSTEM_TPL, {
             "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
             "MARKDOWN_LATEX_RULES": MARKDOWN_LATEX_RULES,
+            "EQUATION_SHEET": EQUATION_SHEET_TEXT,
             "TRACK": st.session_state.get("track", TRACK_DEFAULT),
         })
         system = (system or "").strip()
@@ -2305,7 +2399,7 @@ if nav == "🧑‍🎓 Student":
                         stroke_width=stroke_width,
                         stroke_color=stroke_color,
                         background_color=CANVAS_BG_HEX,
-                        height=400,
+                        height=520,
                         width=600,
                         pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
                         tool=("pen" if tool == "Pen" else "eraser"),
