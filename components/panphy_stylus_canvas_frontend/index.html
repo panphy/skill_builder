@@ -100,6 +100,10 @@
     initial_data_url: null,
   };
 
+
+  let lastCssW = args.width;
+  let lastCssH = args.height;
+
   let drawing = false;
   let lastX = 0;
   let lastY = 0;
@@ -109,7 +113,22 @@
   let history = [];
   let lastCommandNonce = -1;
 
-  function resizeAndReset(w, h) {
+  function resizePreserve(w, h) {
+    const prevW = lastCssW;
+    const prevH = lastCssH;
+
+    let snapshot = null;
+    if (!isEmpty) {
+      try {
+        snapshot = canvas.toDataURL("image/png");
+      } catch (e) {
+        snapshot = null;
+      }
+    }
+
+    lastCssW = w;
+    lastCssH = h;
+
     // handle device pixel ratio for sharpness
     const dpr = window.devicePixelRatio || 1;
     canvas.style.width = w + "px";
@@ -123,19 +142,42 @@
     ctx.fillStyle = args.background_color || '#F0F2F6';
     ctx.fillRect(0, 0, w, h);
 
-    isEmpty = true;
+    // Reset undo/redo history on resize to avoid coordinate mismatches
     history = [];
+
+    if (snapshot) {
+      // Redraw at the ORIGINAL scale (no fit-to-canvas). This prevents drawings from "rescaling" when layout changes.
+      return drawImageDataUrl(snapshot, prevW, prevH, { pushHistory: false }).then(() => true);
+    }
+
+    isEmpty = true;
+    return Promise.resolve(false);
   }
 
-  function drawImageDataUrl(dataUrl) {
+  // Backwards-compatible name
+  function resizeAndReset(w, h) {
+    return resizePreserve(w, h);
+  }
+
+
+function drawImageDataUrl(dataUrl, drawW, drawH, opts) {
+    const w = (typeof drawW === "number" && drawW > 0) ? drawW : args.width;
+    const h = (typeof drawH === "number" && drawH > 0) ? drawH : args.height;
+    const pushHistory = !(opts && opts.pushHistory === false);
+
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        // Fill bg then draw image at 1x CSS pixels (transform already set)
+        // Fill background at current canvas size
         canvas.style.setProperty('--canvas-bg', args.background_color || '#F0F2F6');
-    ctx.fillStyle = args.background_color || '#F0F2F6';
+        ctx.fillStyle = args.background_color || '#F0F2F6';
         ctx.fillRect(0, 0, args.width, args.height);
-        ctx.drawImage(img, 0, 0, args.width, args.height);
+
+        // Draw WITHOUT fitting to the new canvas size. Use the provided drawW/drawH (usually the original snapshot size).
+        ctx.drawImage(img, 0, 0, w, h);
+
+        isEmpty = false;
+        if (pushHistory) snapshotToHistory();
         resolve(true);
       };
       img.onerror = () => resolve(false);
@@ -282,32 +324,19 @@
 
     const needResize = (canvas.style.width !== (w + "px")) || (canvas.style.height !== (h + "px"));
     if (needResize) {
-      // Preserve drawing on resize (prevents wipes when Streamlit reruns or layout changes).
-      let snapshot = null;
-      const hadInk = !isEmpty;
-      try {
-        if (hadInk) snapshot = canvas.toDataURL("image/png");
-      } catch (e) {
-        snapshot = null;
-      }
-
-      resizeAndReset(w, h);
-
-      if (snapshot) {
-        const ok = await drawImageDataUrl(snapshot);
-        if (ok) {
-          isEmpty = false;
-          snapshotToHistory();
-          emitValue();
-        }
-      }
+      await resizeAndReset(w, h);
     }
 
     // Initial restore (optional)
     if (a.initial_data_url && typeof a.initial_data_url === "string") {
       // only restore if blank
       if (isEmpty) {
-        const ok = await drawImageDataUrl(a.initial_data_url);
+        const ok = await drawImageDataUrl(
+          a.initial_data_url,
+          a.initial_draw_width || a.width,
+          a.initial_draw_height || a.height,
+          { pushHistory: true }
+        );
         if (ok) {
           isEmpty = false;
           snapshotToHistory();
