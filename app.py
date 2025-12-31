@@ -1904,8 +1904,6 @@ def generate_topic_journey_with_ai(
                 reasons.append(f"Step {i+1}: missing objective.")
             if not str(stp.get("question_text", "")).strip():
                 reasons.append(f"Step {i+1}: missing question_text.")
-            if not str(stp.get("markscheme_text", "")).strip():
-                reasons.append(f"Step {i+1}: missing markscheme_text.")
             try:
                 mm = int(stp.get("max_marks", 0))
             except Exception:
