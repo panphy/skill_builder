@@ -35,10 +35,10 @@
     }
     #wrap {
       width: 100%;
-      height: auto;
+      height: 100%;
       box-sizing: border-box;
       border-radius: 12px;
-      overflow: visible;
+      overflow: hidden;
       background: #ffffff;
       border: 1px solid rgba(128,128,128,0.35);
     }
@@ -84,7 +84,6 @@
     sendMessageToStreamlitClient(COMPONENT_READY, { apiVersion: 1 });
   }
 
-  const resizer = document.getElementById("resizer");
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d", { willReadFrequently: false });
 
@@ -101,10 +100,6 @@
     initial_data_url: null,
   };
 
-
-  let lastCssW = args.width;
-  let lastCssH = args.height;
-
   let drawing = false;
   let lastX = 0;
   let lastY = 0;
@@ -114,24 +109,7 @@
   let history = [];
   let lastCommandNonce = -1;
 
-  function resizePreserve(w, h) {
-    const prevW = lastCssW;
-    const prevH = lastCssH;
-
-    let snapshot = null;
-    if (!isEmpty) {
-      try {
-        snapshot = canvas.toDataURL("image/png");
-      } catch (e) {
-        snapshot = null;
-      }
-    }
-
-    lastCssW = w;
-    lastCssH = h;
-    args.width = w;
-    args.height = h;
-
+  function resizeAndReset(w, h) {
     // handle device pixel ratio for sharpness
     const dpr = window.devicePixelRatio || 1;
     canvas.style.width = w + "px";
@@ -145,42 +123,19 @@
     ctx.fillStyle = args.background_color || '#F0F2F6';
     ctx.fillRect(0, 0, w, h);
 
-    // Reset undo/redo history on resize to avoid coordinate mismatches
-    history = [];
-
-    if (snapshot) {
-      // Redraw at the ORIGINAL scale (no fit-to-canvas). This prevents drawings from "rescaling" when layout changes.
-      return drawImageDataUrl(snapshot, prevW, prevH, { pushHistory: false }).then(() => true);
-    }
-
     isEmpty = true;
-    return Promise.resolve(false);
+    history = [];
   }
 
-  // Backwards-compatible name
-  function resizeAndReset(w, h) {
-    return resizePreserve(w, h);
-  }
-
-
-function drawImageDataUrl(dataUrl, drawW, drawH, opts) {
-    const w = (typeof drawW === "number" && drawW > 0) ? drawW : args.width;
-    const h = (typeof drawH === "number" && drawH > 0) ? drawH : args.height;
-    const pushHistory = !(opts && opts.pushHistory === false);
-
+  function drawImageDataUrl(dataUrl) {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        // Fill background at current canvas size
+        // Fill bg then draw image at 1x CSS pixels (transform already set)
         canvas.style.setProperty('--canvas-bg', args.background_color || '#F0F2F6');
-        ctx.fillStyle = args.background_color || '#F0F2F6';
-        ctx.fillRect(0, 0, lastCssW, lastCssH);
-
-        // Draw WITHOUT fitting to the new canvas size. Use the provided drawW/drawH (usually the original snapshot size).
-        ctx.drawImage(img, 0, 0, w, h);
-
-        isEmpty = false;
-        if (pushHistory) snapshotToHistory();
+    ctx.fillStyle = args.background_color || '#F0F2F6';
+        ctx.fillRect(0, 0, args.width, args.height);
+        ctx.drawImage(img, 0, 0, args.width, args.height);
         resolve(true);
       };
       img.onerror = () => resolve(false);
@@ -197,7 +152,7 @@ function drawImageDataUrl(dataUrl, drawW, drawH, opts) {
 
   function emitValue() {
     const url = canvas.toDataURL("image/png");
-    sendDataToPython({ data_url: url, is_empty: isEmpty, draw_width: lastCssW, draw_height: lastCssH });
+    sendDataToPython({ data_url: url, is_empty: isEmpty });
   }
 
   function allowedPointer(e) {
@@ -274,7 +229,7 @@ function drawImageDataUrl(dataUrl, drawW, drawH, opts) {
     if (cmd === "clear") {
       canvas.style.setProperty('--canvas-bg', args.background_color || '#F0F2F6');
     ctx.fillStyle = args.background_color || '#F0F2F6';
-      ctx.fillRect(0, 0, lastCssW, lastCssH);
+      ctx.fillRect(0, 0, args.width, args.height);
       isEmpty = true;
       history = [];
       emitValue();
@@ -286,7 +241,7 @@ function drawImageDataUrl(dataUrl, drawW, drawH, opts) {
         // nothing to undo
         canvas.style.setProperty('--canvas-bg', args.background_color || '#F0F2F6');
     ctx.fillStyle = args.background_color || '#F0F2F6';
-        ctx.fillRect(0, 0, lastCssW, lastCssH);
+        ctx.fillRect(0, 0, args.width, args.height);
         isEmpty = true;
         emitValue();
         return;
@@ -296,7 +251,7 @@ function drawImageDataUrl(dataUrl, drawW, drawH, opts) {
       if (!prev) {
         canvas.style.setProperty('--canvas-bg', args.background_color || '#F0F2F6');
     ctx.fillStyle = args.background_color || '#F0F2F6';
-        ctx.fillRect(0, 0, lastCssW, lastCssH);
+        ctx.fillRect(0, 0, args.width, args.height);
         isEmpty = true;
         emitValue();
         return;
@@ -327,19 +282,14 @@ function drawImageDataUrl(dataUrl, drawW, drawH, opts) {
 
     const needResize = (canvas.style.width !== (w + "px")) || (canvas.style.height !== (h + "px"));
     if (needResize) {
-      await resizeAndReset(w, h);
+      resizeAndReset(w, h);
     }
 
     // Initial restore (optional)
     if (a.initial_data_url && typeof a.initial_data_url === "string") {
       // only restore if blank
       if (isEmpty) {
-        const ok = await drawImageDataUrl(
-          a.initial_data_url,
-          a.initial_draw_width || a.width,
-          a.initial_draw_height || a.height,
-          { pushHistory: true }
-        );
+        const ok = await drawImageDataUrl(a.initial_data_url);
         if (ok) {
           isEmpty = false;
           snapshotToHistory();
@@ -368,28 +318,6 @@ function drawImageDataUrl(dataUrl, drawW, drawH, opts) {
   // In case Streamlit doesn't immediately size the iframe
   window.addEventListener("load", () => {
     setTimeout(() => setFrameHeight((args.height || 400) + 6), 0);
-  });
-
-  if (window.ResizeObserver && resizer) {
-    const resizeObserver = new ResizeObserver(() => {
-      const w = resizer.clientWidth || args.width || 600;
-      const h = resizer.clientHeight || args.height || 400;
-      if (w > 0 && h > 0) {
-        resizeAndReset(w, h);
-        setFrameHeight(h + 6);
-      }
-    });
-    resizeObserver.observe(resizer);
-  }
-
-  window.addEventListener("resize", () => {
-    if (!resizer) return;
-    const w = resizer.clientWidth || args.width || 600;
-    const h = resizer.clientHeight || args.height || 400;
-    if (w > 0 && h > 0) {
-      resizeAndReset(w, h);
-      setFrameHeight(h + 6);
-    }
   });
   </script>
 </body>
