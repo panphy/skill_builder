@@ -1879,7 +1879,7 @@ def generate_practice_question_with_ai(
                         break
                 except re.error:
                     continue
-                        if not ok_equation:
+            if not ok_equation:
                 reasons.append(
                     "WARN: Calculation requested but no allowed AQA equation/derived relation was detected. "
                     "Include an equation from the AQA sheet or allowed relations; teacher may need to edit."
@@ -2002,7 +2002,7 @@ def generate_topic_journey_with_ai(
         except Exception:
             pass
 
-                if not isinstance(steps, list) or len(steps) < steps_n:
+        if not isinstance(steps, list) or len(steps) < steps_n:
             reasons.append(f"steps must be a list with at least {steps_n} steps.")
             return False, reasons
 
