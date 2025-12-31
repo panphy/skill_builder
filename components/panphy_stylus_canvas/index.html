@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-
     html, body {
       margin: 0;
       padding: 0;
@@ -12,107 +11,80 @@
       overflow: hidden;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     }
-    #wrap {
+
+    /* Outer container matches app background; canvas itself matches input grey */
+    #resizer {
       width: 100%;
-      height: 100%;
+      height: 420px;           /* default; JS will set from args.height */
+      min-height: 260px;
+      resize: vertical;        /* user can drag the bottom edge like a textarea */
+      overflow: hidden;
       box-sizing: border-box;
       border-radius: 12px;
-      overflow: hidden;
-      background: #ffffff;
       border: 1px solid rgba(128,128,128,0.35);
-    }
-    canvas {
-      touch-action: none; /* prevents scrolling while drawing */
-      display: block;
-      width: 100%;
-      height: 100%;
-      border-radius: 0;
-      box-sizing: border-box;
-      border: 0;
+      background: transparent; /* behind-canvas uses app background */
     }
 
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;      /* prevents scroll/pinch interfering with drawing */
+      background: var(--canvas-bg, #F0F2F6); /* the drawing surface colour */
+    }
   </style>
 </head>
 <body>
-  <div id="wrap">
-    <canvas id="c"></canvas>
+  <div id="resizer">
+    <canvas id="canvas"></canvas>
   </div>
 
   <script>
-  // Minimal Streamlit bi-directional component plumbing (no React/tooling).
-  // Based on Streamlit community snippet (tvst) + variations:
-  // - streamlit:componentReady
-  // - streamlit:setFrameHeight
-  // - streamlit:setComponentValue
-  const RENDER = "streamlit:render";
-  const COMPONENT_READY = "streamlit:componentReady";
-  const SET_COMPONENT_VALUE = "streamlit:setComponentValue";
-  const SET_FRAME_HEIGHT = "streamlit:setFrameHeight";
+  // Streamlit custom component messaging
+  let args = {};
+  const resizer = document.getElementById("resizer");
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
 
-  function sendMessageToStreamlitClient(type, data) {
-    const outData = Object.assign({ isStreamlitMessage: true, type: type }, data);
-    window.parent.postMessage(outData, "*");
-  }
-  function setFrameHeight(height) {
-    sendMessageToStreamlitClient(SET_FRAME_HEIGHT, { height: height });
-  }
-  function sendDataToPython(data) {
-    sendMessageToStreamlitClient(SET_COMPONENT_VALUE, { value: data, dataType: "json" });
-  }
-  function initComponent() {
-    sendMessageToStreamlitClient(COMPONENT_READY, { apiVersion: 1 });
-  }
+  // Drawing state
+  let tool = "pen";
+  let strokeWidth = 2;
+  let strokeColor = "#000000";
+  let penOnly = false;
+  let bgColor = "#F0F2F6";
 
-  const canvas = document.getElementById("c");
-  const ctx = canvas.getContext("2d", { willReadFrequently: false });
+  let isDrawing = false;
+  let lastX = 0, lastY = 0;
 
-  let args = {
-    width: 600,
-    height: 400,
-    stroke_width: 2,
-    stroke_color: "#000000",
-    background_color: "#ffffff",
-    pen_only: false,
-    tool: "pen",
-    command: null,
-    command_nonce: 0,
-    initial_data_url: null,
-  };
-
-  let drawing = false;
-  let lastX = 0;
-  let lastY = 0;
+  // Undo history as image dataURLs
+  const history = [];
+  let historyIndex = -1;
   let isEmpty = true;
 
-  // Undo history: store data URLs after each stroke end
-  let history = [];
-  let lastCommandNonce = -1;
-
-  function resizeAndReset(w, h) {
-    // handle device pixel ratio for sharpness
-    const dpr = window.devicePixelRatio || 1;
-    canvas.style.width = w + "px";
-    canvas.style.height = h + "px";
-    canvas.width = Math.floor(w * dpr);
-    canvas.height = Math.floor(h * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    // fill background
-    ctx.fillStyle = args.background_color;
-    ctx.fillRect(0, 0, w, h);
-
-    isEmpty = true;
-    history = [];
+  function setFrameHeight(h) {
+    // Tell Streamlit the height; include a small margin for borders.
+    const msg = {isStreamlitMessage: true, type: "streamlit:setFrameHeight", height: h};
+    window.parent.postMessage(msg, "*");
   }
 
-  function drawImageDataUrl(dataUrl) {
+  function snapshotToHistory() {
+    try {
+      const url = canvas.toDataURL("image/png");
+      // Truncate redo branch
+      if (historyIndex < history.length - 1) history.splice(historyIndex + 1);
+      history.push(url);
+      historyIndex = history.length - 1;
+    } catch (e) {}
+  }
+
+  async function drawImageDataUrl(dataUrl) {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        // Fill bg then draw image at 1x CSS pixels (transform already set)
-        ctx.fillStyle = args.background_color;
-        ctx.fillRect(0, 0, args.width, args.height);
-        ctx.drawImage(img, 0, 0, args.width, args.height);
+        ctx.save();
+        ctx.globalCompositeOperation = "source-over";
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
         resolve(true);
       };
       img.onerror = () => resolve(false);
@@ -120,178 +92,224 @@
     });
   }
 
-  function snapshotToHistory() {
-    // Keep at most 30 snapshots to bound memory
-    const url = canvas.toDataURL("image/png");
-    history.push(url);
-    if (history.length > 30) history.shift();
+  function clearToBackground() {
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+    isEmpty = true;
+    snapshotToHistory();
+    sendState();
   }
 
-  function emitValue() {
-    const url = canvas.toDataURL("image/png");
-    sendDataToPython({ data_url: url, is_empty: isEmpty });
-  }
+  function resizeCanvasTo(wCss, hCss, keepContent=true) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(50, Math.floor(wCss));
+    const h = Math.max(50, Math.floor(hCss));
 
-  function allowedPointer(e) {
-    if (args.pen_only) return e.pointerType === "pen";
-    return (e.pointerType === "pen" || e.pointerType === "touch" || e.pointerType === "mouse");
-  }
-
-  function isHover(e) {
-    // On devices that support hover (incl. some stylus), pressure==0 and buttons==0 indicates hover.
-    // Also guard against move events without contact.
-    return (e.pressure === 0 && e.buttons === 0);
-  }
-
-  function pointerDown(e) {
-    if (!allowedPointer(e)) return;
-    if (isHover(e)) return;
-
-    drawing = true;
-    const rect = canvas.getBoundingClientRect();
-    lastX = e.clientX - rect.left;
-    lastY = e.clientY - rect.top;
-
-    // Capture pointer so we keep receiving move/up
-    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-  }
-
-  function pointerMove(e) {
-    if (!drawing) return;
-    if (!allowedPointer(e)) return;
-    if (isHover(e)) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.lineWidth = args.stroke_width;
-
-    if (args.tool === "eraser") {
-      ctx.strokeStyle = args.background_color;
-    } else {
-      ctx.strokeStyle = args.stroke_color;
+    // Preserve content
+    let prev = null;
+    if (keepContent) {
+      try { prev = canvas.toDataURL("image/png"); } catch (e) { prev = null; }
     }
 
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Paint background
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+
+    if (prev) {
+      drawImageDataUrl(prev).then(() => sendState());
+    } else {
+      sendState();
+    }
+  }
+
+  function fitToResizer(keepContent=true) {
+    const r = resizer.getBoundingClientRect();
+    // Use inner box; borders are outside the rect
+    resizeCanvasTo(r.width, r.height, keepContent);
+    // Include borders and a tiny margin so the bottom line is visible
+    setFrameHeight(resizer.offsetHeight + 6);
+  }
+
+  // Resize observer to handle sidebar toggle + user drag-resize
+  const ro = new ResizeObserver(() => fitToResizer(true));
+  ro.observe(resizer);
+
+  function getPointerType(ev) {
+    return ev.pointerType || (ev.touches ? "touch" : "mouse");
+  }
+
+  function allowedPointer(ev) {
+    if (!penOnly) return true;
+    const pt = getPointerType(ev);
+    return pt === "pen";
+  }
+
+  function getPos(ev) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (ev.clientX - rect.left);
+    const y = (ev.clientY - rect.top);
+    return {x, y};
+  }
+
+  function beginStroke(x, y) {
+    isDrawing = true;
+    lastX = x; lastY = y;
+    ctx.save();
+    if (tool === "eraser") {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.strokeStyle = "rgba(0,0,0,1)";
+      ctx.lineWidth = strokeWidth * 6;
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = strokeWidth;
+    }
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.restore();
+  }
+
+  function continueStroke(x, y) {
+    if (!isDrawing) return;
+    ctx.save();
+    if (tool === "eraser") {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.strokeStyle = "rgba(0,0,0,1)";
+      ctx.lineWidth = strokeWidth * 6;
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = strokeWidth;
+    }
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
     ctx.lineTo(x, y);
     ctx.stroke();
-
-    lastX = x;
-    lastY = y;
-
+    ctx.restore();
+    lastX = x; lastY = y;
     isEmpty = false;
   }
 
-  function pointerUp(e) {
-    if (!drawing) return;
-    drawing = false;
-
-    // Save snapshot for undo and emit value (only after stroke end)
+  function endStroke() {
+    if (!isDrawing) return;
+    isDrawing = false;
     snapshotToHistory();
-    emitValue();
+    sendState();
   }
 
-  canvas.addEventListener("pointerdown", pointerDown);
-  canvas.addEventListener("pointermove", pointerMove);
-  canvas.addEventListener("pointerup", pointerUp);
-  canvas.addEventListener("pointercancel", pointerUp);
-  canvas.addEventListener("pointerleave", (e) => { /* do nothing */ });
+  canvas.addEventListener("pointerdown", (ev) => {
+    if (!allowedPointer(ev)) return;
+    ev.preventDefault();
+    canvas.setPointerCapture(ev.pointerId);
+    const {x, y} = getPos(ev);
+    beginStroke(x, y);
+  });
 
-  async function applyCommand(cmd) {
-    if (!cmd) return;
-    if (cmd === "clear") {
-      ctx.fillStyle = args.background_color;
-      ctx.fillRect(0, 0, args.width, args.height);
-      isEmpty = true;
-      history = [];
-      emitValue();
-      return;
-    }
-    if (cmd === "undo") {
-      // Undo: pop current snapshot, then restore previous
-      if (history.length === 0) {
-        // nothing to undo
-        ctx.fillStyle = args.background_color;
-        ctx.fillRect(0, 0, args.width, args.height);
-        isEmpty = true;
-        emitValue();
-        return;
-      }
-      history.pop(); // remove latest
-      const prev = history.length ? history[history.length - 1] : null;
-      if (!prev) {
-        ctx.fillStyle = args.background_color;
-        ctx.fillRect(0, 0, args.width, args.height);
-        isEmpty = true;
-        emitValue();
-        return;
-      }
-      const ok = await drawImageDataUrl(prev);
-      isEmpty = !ok ? true : false;
-      emitValue();
-      return;
-    }
+  canvas.addEventListener("pointermove", (ev) => {
+    if (!allowedPointer(ev)) return;
+    if (!isDrawing) return;
+    ev.preventDefault();
+    const {x, y} = getPos(ev);
+    continueStroke(x, y);
+  });
+
+  canvas.addEventListener("pointerup", (ev) => {
+    if (!allowedPointer(ev)) return;
+    ev.preventDefault();
+    endStroke();
+  });
+  canvas.addEventListener("pointercancel", (ev) => { endStroke(); });
+
+  function undo() {
+    if (historyIndex <= 0) return;
+    historyIndex -= 1;
+    const url = history[historyIndex];
+    // Clear then draw
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+    drawImageDataUrl(url).then(() => sendState());
   }
 
-  async function onDataFromPython(event) {
-    if (event.data.type !== RENDER) return;
-    const a = event.data.args || {};
+  function sendState() {
+    let data_url = null;
+    try { data_url = canvas.toDataURL("image/png"); } catch (e) {}
+    const msg = {isStreamlitMessage: true, type: "streamlit:setComponentValue", value: {data_url, is_empty: isEmpty}};
+    window.parent.postMessage(msg, "*");
+  }
 
-    // Update args (with defaults)
-    args.width = a.width ?? args.width;
-    args.height = a.height ?? args.height;
-    args.stroke_width = a.stroke_width ?? args.stroke_width;
-    args.stroke_color = a.stroke_color ?? args.stroke_color;
-    args.background_color = a.background_color ?? args.background_color;
-    args.pen_only = a.pen_only ?? args.pen_only;
-    args.tool = a.tool ?? args.tool;
+  async function applyArgs(a) {
+    args = a || {};
+    tool = (args.tool === "eraser") ? "eraser" : "pen";
+    strokeWidth = Number(args.stroke_width) || 2;
+    strokeColor = String(args.stroke_color || "#000000");
+    penOnly = !!args.pen_only;
+    bgColor = String(args.background_color || "#F0F2F6");
 
-    // Resize only if needed (keeps drawing stable)
-    const w = Number(args.width) || 600;
-    const h = Number(args.height) || 400;
+    // Apply background to canvas
+    document.documentElement.style.setProperty("--canvas-bg", bgColor);
 
-    const needResize = (canvas.style.width !== (w + "px")) || (canvas.style.height !== (h + "px"));
-    if (needResize) {
-      resizeAndReset(w, h);
-    }
+    // Set initial height
+    const h = Number(args.height) || 420;
+    resizer.style.height = h + "px";
 
-    // Initial restore (optional)
-    if (a.initial_data_url && typeof a.initial_data_url === "string") {
-      // only restore if blank
-      if (isEmpty) {
-        const ok = await drawImageDataUrl(a.initial_data_url);
-        if (ok) {
-          isEmpty = false;
-          snapshotToHistory();
-          emitValue();
-        }
+    // Fit now
+    fitToResizer(false);
+
+    // Initial restore
+    if (args.initial_data_url && typeof args.initial_data_url === "string") {
+      const ok = await drawImageDataUrl(args.initial_data_url);
+      if (ok) {
+        isEmpty = false;
+        snapshotToHistory();
+        sendState();
       }
+    } else {
+      // Ensure history starts with a clean background
+      snapshotToHistory();
+      sendState();
     }
 
-    // Commands are gated by command_nonce so they don't repeat on reruns
-    const nonce = Number(a.command_nonce ?? 0);
-    if (nonce !== lastCommandNonce) {
-      lastCommandNonce = nonce;
-      const cmd = a.command ?? null;
-      await applyCommand(cmd);
-    }
+    // Commands
+    if (args.command === "undo") undo();
+    if (args.command === "clear") clearToBackground();
+  }
 
-    // adjust frame height
-    setFrameHeight(h + 6);
+  function onDataFromPython(event) {
+    const data = event.data;
+    if (!data || !data.isStreamlitMessage) return;
+    if (data.type === "streamlit:render") {
+      applyArgs(data.args || {});
+    }
   }
 
   window.addEventListener("message", onDataFromPython);
 
   // Initialize
-  initComponent();
-
-  // In case Streamlit doesn't immediately size the iframe
   window.addEventListener("load", () => {
-    setTimeout(() => setFrameHeight((args.height || 400) + 6), 0);
+    // Default paint
+    document.documentElement.style.setProperty("--canvas-bg", "#F0F2F6");
+    fitToResizer(false);
+    snapshotToHistory();
+    sendState();
   });
   </script>
 </body>
