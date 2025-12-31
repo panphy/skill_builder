@@ -1,370 +1,104 @@
 {
-  "schema_version": 2,
-  "subject_site": "physics",
-  "exam_board": "AQA",
-  "spec_code": "8463",
-  "tier": "foundation+higher",
-  "calculation_policy": "If the question requires a numerical calculation, it must be solvable using ONLY the AQA equations listed below plus the allowed derived relations (basic arithmetic/rearrangement/unit conversions are fine). Do NOT introduce new equations (eg Hubble's law, redshift fraction formulas, A-level/IB relationships). If a concept is outside this set, keep it qualitative.",
-  "preferred_equations": [
+  "meta": {
+    "subject": "AQA GCSE Physics (8463) Higher",
+    "notes": [
+      "This file is used as a guardrail so AI-generated questions follow AQA GCSE scope and AQA equation-sheet notation.",
+      "Equations are represented in LaTeX for prompt injection and for internal validation."
+    ],
+    "sources": [
+      "AQA GCSE Physics (8463) Equation Sheet (e.g., June 2024 insert): Ee = 1/2 k e^2 uses extension e (not x).",
+      "AQA GCSE Physics (8463) specification: red-shift is assessed qualitatively (no z calculation)."
+    ]
+  },
+  "notation_rules": [
+    "Springs: use extension symbol e (metres). Do not use x for extension in this app.",
+    "Hooke’s law should be written as F = k e (k in N/m, e in m).",
+    "Elastic potential energy should be written as E_e = 1/2 k e^2.",
+    "Space physics red-shift is qualitative at AQA GCSE: do not include z = Δλ/λ calculations."
+  ],
+  "key_equations": [
     {
-      "section": "recall",
-      "number": 1,
-      "name": "weight = mass × gravitational field strength",
-      "latex": "W = m g",
-      "notes": "",
-      "pattern": "W\\s*=\\s*m\\s*g"
+      "name": "Hooke’s law",
+      "latex": "$F = k e$"
     },
     {
-      "section": "recall",
-      "number": 2,
-      "name": "work done = force × distance along line of action",
-      "latex": "W = F s",
-      "notes": "",
-      "pattern": "W\\s*=\\s*F\\s*s"
+      "name": "Elastic potential energy",
+      "latex": "$E_e = \\frac{1}{2} k e^2$"
     },
     {
-      "section": "recall",
-      "number": 3,
-      "name": "force applied to a spring = spring constant × extension",
-      "latex": "F = k e",
-      "notes": "",
-      "pattern": "F\\s*=\\s*k\\s*e"
+      "name": "Kinetic energy",
+      "latex": "$E_k = \\frac{1}{2} m v^2$"
     },
     {
-      "section": "recall",
-      "number": 4,
-      "name": "moment of a force = force × distance normal to force",
-      "latex": "M = F d",
-      "notes": "",
-      "pattern": "M\\s*=\\s*F\\s*d"
+      "name": "Gravitational potential energy",
+      "latex": "$E_p = m g h$"
     },
     {
-      "section": "recall",
-      "number": 5,
-      "name": "pressure = force normal to surface / area",
-      "latex": "p = \\frac{F}{A}",
-      "notes": "",
-      "pattern": "p\\s*=\\s*\\\\frac\\{F\\}\\{A\\}"
+      "name": "Work done",
+      "latex": "$W = F s$"
     },
     {
-      "section": "recall",
-      "number": 6,
-      "name": "distance travelled = speed × time",
-      "latex": "s = v t",
-      "notes": "",
-      "pattern": "s\\s*=\\s*v\\s*t"
+      "name": "Power",
+      "latex": "$P = \\frac{E}{t}$"
     },
     {
-      "section": "recall",
-      "number": 7,
-      "name": "acceleration = change in velocity / time taken",
-      "latex": "a = \\frac{\\Delta v}{t}",
-      "notes": "",
-      "pattern": "a\\s*=\\s*\\\\frac\\{\\\\Delta\\s*v\\}\\{t\\}"
+      "name": "Momentum",
+      "latex": "$p = m v$"
     },
     {
-      "section": "recall",
-      "number": 8,
-      "name": "resultant force = mass × acceleration",
-      "latex": "F = m a",
-      "notes": "",
-      "pattern": "F\\s*=\\s*m\\s*a"
+      "name": "Force and momentum",
+      "latex": "$F = \\frac{\\Delta p}{\\Delta t}$"
     },
     {
-      "section": "recall",
-      "number": 9,
-      "name": "momentum = mass × velocity",
-      "latex": "p = m v",
-      "notes": "HT",
-      "pattern": "p\\s*=\\s*m\\s*v"
+      "name": "Pressure",
+      "latex": "$p = \\frac{F}{A}$"
     },
     {
-      "section": "recall",
-      "number": 10,
-      "name": "kinetic energy = 0.5 × mass × speed²",
-      "latex": "E_k = \\frac{1}{2} m v^2",
-      "notes": "",
-      "pattern": "E_k\\s*=\\s*\\\\frac\\{1\\}\\{2\\}\\s*m\\s*v\\^2"
+      "name": "Density",
+      "latex": "$\\rho = \\frac{m}{V}$"
     },
     {
-      "section": "recall",
-      "number": 11,
-      "name": "gravitational potential energy = mass × g × height",
-      "latex": "E_p = m g h",
-      "notes": "",
-      "pattern": "E_p\\s*=\\s*m\\s*g\\s*h"
+      "name": "Charge",
+      "latex": "$Q = I t$"
     },
     {
-      "section": "recall",
-      "number": 12,
-      "name": "power = energy transferred / time",
-      "latex": "P = \\frac{E}{t}",
-      "notes": "",
-      "pattern": "P\\s*=\\s*\\\\frac\\{E\\}\\{t\\}"
+      "name": "Ohm’s law",
+      "latex": "$V = I R$"
     },
     {
-      "section": "recall",
-      "number": 13,
-      "name": "power = work done / time",
-      "latex": "P = \\frac{W}{t}",
-      "notes": "",
-      "pattern": "P\\s*=\\s*\\\\frac\\{W\\}\\{t\\}"
+      "name": "Electrical power",
+      "latex": "$P = I V$"
     },
     {
-      "section": "recall",
-      "number": 14,
-      "name": "efficiency = useful output energy transfer / total input energy transfer",
-      "latex": "\\mathrm{efficiency}=\\frac{\\text{useful output energy transfer}}{\\text{total input energy transfer}}",
-      "notes": "",
-      "pattern": "\\\\mathrm\\{efficiency\\}=\\\\frac\\{\\\\text\\{useful\\s*output\\s*energy\\s*transfer\\}\\}\\{\\\\text\\{total\\s*input\\s*energy\\s*transfer\\}\\}"
+      "name": "Wave speed",
+      "latex": "$v = f \\lambda$"
     },
     {
-      "section": "recall",
-      "number": 15,
-      "name": "efficiency = useful power output / total power input",
-      "latex": "\\mathrm{efficiency}=\\frac{\\text{useful power output}}{\\text{total power input}}",
-      "notes": "",
-      "pattern": "\\\\mathrm\\{efficiency\\}=\\\\frac\\{\\\\text\\{useful\\s*power\\s*output\\}\\}\\{\\\\text\\{total\\s*power\\s*input\\}\\}"
+      "name": "Speed",
+      "latex": "$v = \\frac{s}{t}$"
     },
     {
-      "section": "recall",
-      "number": 16,
-      "name": "wave speed = frequency × wavelength",
-      "latex": "v = f \\lambda",
-      "notes": "",
-      "pattern": "v\\s*=\\s*f\\s*\\\\lambda"
-    },
-    {
-      "section": "recall",
-      "number": 17,
-      "name": "charge flow = current × time",
-      "latex": "Q = I t",
-      "notes": "",
-      "pattern": "Q\\s*=\\s*I\\s*t"
-    },
-    {
-      "section": "recall",
-      "number": 18,
-      "name": "potential difference = current × resistance",
-      "latex": "V = I R",
-      "notes": "",
-      "pattern": "V\\s*=\\s*I\\s*R"
-    },
-    {
-      "section": "recall",
-      "number": 19,
-      "name": "power = potential difference × current",
-      "latex": "P = V I",
-      "notes": "",
-      "pattern": "P\\s*=\\s*V\\s*I"
-    },
-    {
-      "section": "recall",
-      "number": 20,
-      "name": "power = current² × resistance",
-      "latex": "P = I^2 R",
-      "notes": "",
-      "pattern": "P\\s*=\\s*I\\^2\\s*R"
-    },
-    {
-      "section": "recall",
-      "number": 21,
-      "name": "energy transferred = power × time",
-      "latex": "E = P t",
-      "notes": "",
-      "pattern": "E\\s*=\\s*P\\s*t"
-    },
-    {
-      "section": "recall",
-      "number": 22,
-      "name": "energy transferred = charge flow × potential difference",
-      "latex": "E = Q V",
-      "notes": "",
-      "pattern": "E\\s*=\\s*Q\\s*V"
-    },
-    {
-      "section": "recall",
-      "number": 23,
-      "name": "density = mass / volume",
-      "latex": "\\rho = \\frac{m}{V}",
-      "notes": "",
-      "pattern": "\\\\rho\\s*=\\s*\\\\frac\\{m\\}\\{V\\}"
-    },
-    {
-      "section": "equation_sheet",
-      "number": 1,
-      "name": "pressure due to a column of liquid = height × density × g",
-      "latex": "p = h \\rho g",
-      "notes": "HT",
-      "pattern": "p\\s*=\\s*h\\s*\\\\rho\\s*g"
-    },
-    {
-      "section": "equation_sheet",
-      "number": 2,
-      "name": "(final velocity)² − (initial velocity)² = 2 × acceleration × distance",
-      "latex": "v^2 - u^2 = 2 a s",
-      "notes": "",
-      "pattern": "v\\^2\\s*\\-\\s*u\\^2\\s*=\\s*2\\s*a\\s*s"
-    },
-    {
-      "section": "equation_sheet",
-      "number": 3,
-      "name": "force = change in momentum / time taken",
-      "latex": "F = \\frac{m\\,\\Delta v}{\\Delta t}",
-      "notes": "HT",
-      "pattern": "F\\s*=\\s*\\\\frac\\{m\\\\,\\\\Delta\\s*v\\}\\{\\\\Delta\\s*t\\}"
-    },
-    {
-      "section": "equation_sheet",
-      "number": 4,
-      "name": "elastic potential energy = 0.5 × spring constant × (extension)²",
-      "latex": "E_e = \\frac{1}{2} k e^2",
-      "notes": "",
-      "pattern": "E_e\\s*=\\s*\\\\frac\\{1\\}\\{2\\}\\s*k\\s*e\\^2"
-    },
-    {
-      "section": "equation_sheet",
-      "number": 5,
-      "name": "change in thermal energy = mass × specific heat capacity × temperature change",
-      "latex": "\\Delta E = m c \\Delta \\theta",
-      "notes": "",
-      "pattern": "\\\\Delta\\s*E\\s*=\\s*m\\s*c\\s*\\\\Delta\\s*\\\\theta"
-    },
-    {
-      "section": "equation_sheet",
-      "number": 6,
-      "name": "period = 1 / frequency",
-      "latex": "T = \\frac{1}{f}",
-      "notes": "",
-      "pattern": "T\\s*=\\s*\\\\frac\\{1\\}\\{f\\}"
-    },
-    {
-      "section": "equation_sheet",
-      "number": 7,
-      "name": "magnification = image height / object height",
-      "latex": "\\text{magnification}=\\frac{\\text{image height}}{\\text{object height}}",
-      "notes": "",
-      "pattern": "\\\\text\\{magnification\\}=\\\\frac\\{\\\\text\\{image\\s*height\\}\\}\\{\\\\text\\{object\\s*height\\}\\}"
-    },
-    {
-      "section": "equation_sheet",
-      "number": 8,
-      "name": "force on a conductor carrying current at right angles to B = B × I × l",
-      "latex": "F = B I l",
-      "notes": "HT",
-      "pattern": "F\\s*=\\s*B\\s*I\\s*l"
-    },
-    {
-      "section": "equation_sheet",
-      "number": 9,
-      "name": "thermal energy for a change of state = mass × specific latent heat",
-      "latex": "E = m L",
-      "notes": "",
-      "pattern": "E\\s*=\\s*m\\s*L"
-    },
-    {
-      "section": "equation_sheet",
-      "number": 10,
-      "name": "transformer: Vp/Vs = np/ns",
-      "latex": "\\frac{V_p}{V_s}=\\frac{n_p}{n_s}",
-      "notes": "HT",
-      "pattern": "\\\\frac\\{V_p\\}\\{V_s\\}=\\\\frac\\{n_p\\}\\{n_s\\}"
-    },
-    {
-      "section": "equation_sheet",
-      "number": 11,
-      "name": "transformer: Vp Ip = Vs Is",
-      "latex": "V_p I_p = V_s I_s",
-      "notes": "HT",
-      "pattern": "V_p\\s*I_p\\s*=\\s*V_s\\s*I_s"
-    },
-    {
-      "section": "equation_sheet",
-      "number": 12,
-      "name": "For gases: pressure × volume = constant",
-      "latex": "p V = \\text{constant}",
-      "notes": "",
-      "pattern": "p\\s*V\\s*=\\s*\\\\text\\{constant\\}"
+      "name": "Acceleration",
+      "latex": "$a = \\frac{\\Delta v}{\\Delta t}$"
     }
   ],
-  "allowed_relations": [
-    {
-      "name": "Series circuit resistance",
-      "latex": "R_{total}=R_1+R_2+\\dots",
-      "pattern": "R_?\\s*\\{?total\\}?\\s*=\\s*R_?\\s*\\{?1\\}?\\s*\\+\\s*R_?\\s*\\{?2\\}?",
-      "notes": "GCSE circuit rule (derived)."
-    },
-    {
-      "name": "Parallel circuit resistance",
-      "latex": "\\frac{1}{R_{total}}=\\frac{1}{R_1}+\\frac{1}{R_2}+\\dots",
-      "pattern": "1\\s*/\\s*R_?\\s*\\{?total\\}?\\s*=\\s*1\\s*/\\s*R_?\\s*\\{?1\\}?\\s*\\+\\s*1\\s*/\\s*R_?\\s*\\{?2\\}?",
-      "notes": "GCSE circuit rule (derived)."
-    },
-    {
-      "name": "Series circuit potential difference",
-      "latex": "V_{total}=V_1+V_2+\\dots",
-      "pattern": "V_?\\s*\\{?total\\}?\\s*=\\s*V_?\\s*\\{?1\\}?\\s*\\+\\s*V_?\\s*\\{?2\\}?",
-      "notes": "GCSE circuit rule (derived)."
-    },
-    {
-      "name": "Parallel circuit current",
-      "latex": "I_{total}=I_1+I_2+\\dots",
-      "pattern": "I_?\\s*\\{?total\\}?\\s*=\\s*I_?\\s*\\{?1\\}?\\s*\\+\\s*I_?\\s*\\{?2\\}?",
-      "notes": "GCSE circuit rule (derived)."
-    },
-    {
-      "name": "Area of rectangle",
-      "latex": "A = l w",
-      "pattern": "A\\s*=\\s*l\\s*w",
-      "notes": "GCSE maths, used in physics for cross-sectional area."
-    },
-    {
-      "name": "Area of circle",
-      "latex": "A = \\pi r^2",
-      "pattern": "A\\s*=\\s*\\\\?pi\\s*r\\^2|A\\s*=\\s*π\\s*r\\^2",
-      "notes": "GCSE maths."
-    },
-    {
-      "name": "Volume of cuboid",
-      "latex": "V = l w h",
-      "pattern": "V\\s*=\\s*l\\s*w\\s*h",
-      "notes": "GCSE maths."
-    },
-    {
-      "name": "Volume of cylinder",
-      "latex": "V = \\pi r^2 h",
-      "pattern": "V\\s*=\\s*\\\\?pi\\s*r\\^2\\s*h|V\\s*=\\s*π\\s*r\\^2\\s*h",
-      "notes": "GCSE maths."
-    }
+  "forbidden_notes": [
+    "Do not ask students to calculate cosmological red-shift using z = Δλ/λ (AQA GCSE assesses red-shift qualitatively).",
+    "Do not use A-level electromagnetism constants (μ0, ε0) or solenoid field equations.",
+    "Do not use elastic potential energy written with x: E_e = 1/2 k x^2 (use e)."
   ],
-  "banned_concepts": [
+  "forbidden_patterns": [
     {
-      "pattern": "z\\s*=\\s*\\\\?frac\\{\\\\?Delta\\\\?lambda\\}\\{\\\\?lambda\\}",
-      "reason": "AQA GCSE Physics does not require redshift calculation using z = Δλ/λ; keep redshift qualitative."
+      "regex": "\\bz\\s*=\\s*(\\\\Delta|Δ)\\s*\\\\lambda\\s*/\\s*\\\\lambda|\\bz\\s*=\\s*(delta|Δ)\\s*lambda\\s*/\\s*lambda|Δ\\s*λ\\s*/\\s*λ|Δ\\s*lambda\\s*/\\s*lambda",
+      "reason": "Red-shift calculation (z = Δλ/λ) is out of scope for AQA GCSE Physics."
     },
     {
-      "pattern": "\\\\?frac\\{\\\\?Delta\\\\?lambda\\}\\{\\\\?lambda\\}",
-      "reason": "Avoid redshift fraction formula Δλ/λ for GCSE (AQA)."
+      "regex": "\\\\frac\\{1\\}\\{2\\}\\s*k\\s*x\\s*\\^\\s*2|\\b0\\.5\\s*k\\s*x\\s*\\^\\s*2\\b|\\b1\\s*/\\s*2\\s*k\\s*x\\s*\\^\\s*2\\b|\\bk\\s*x\\s*\\^\\s*2\\b",
+      "reason": "Use AQA notation for elastic potential energy: E_e = 1/2 k e^2."
     },
     {
-      "pattern": "\\bHubble\\b",
-      "reason": "Avoid Hubble's law / Hubble constant calculations; not required for AQA GCSE Physics."
-    },
-    {
-      "pattern": "\\bH_0\\b|\\bH0\\b|\\bHubble\\s*constant\\b",
-      "reason": "Hubble constant calculations are out-of-scope for AQA GCSE Physics."
-    },
-    {
-      "pattern": "\\bv\\s*=\\s*H\\s*0?\\s*d\\b",
-      "reason": "Do not use v = H0 d (Hubble's law) calculations at GCSE (AQA)."
-    },
-    {
-      "pattern": "\\brecession(al)?\\s*velocity\\b|\\brecessional\\b",
-      "reason": "Avoid cosmology recession velocity calculations; keep qualitative at GCSE."
-    },
-    {
-      "pattern": "\\bv\\s*=\\s*H\\s*0?\\s*d\\b|\\bv\\s*=\\s*H_0\\s*d\\b",
-      "reason": "Do not use Hubble's law calculations at GCSE."
+      "regex": "\\bF\\s*=\\s*k\\s*x\\b|\\bF\\s*=\\s*kx\\b",
+      "reason": "Use AQA notation for Hooke’s law: F = k e."
     }
   ]
 }
