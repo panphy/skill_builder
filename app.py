@@ -317,133 +317,6 @@ if EQUATION_GUARDRAILS:
     GCSE_ONLY_GUARDRAILS = (GCSE_ONLY_GUARDRAILS + "\n\n" + EQUATION_GUARDRAILS).strip()
 
 
-_EQ_SYMBOL_PLACEHOLDERS = {
-    "\\Delta": "<<DELTA>>",
-    "\\rho": "<<RHO>>",
-    "\\lambda": "<<LAMBDA>>",
-    "\\theta": "<<THETA>>",
-    "\\mu": "<<MU>>",
-}
-
-_EQ_PLACEHOLDER_REGEX = {
-    "<<DELTA>>": r"(?:\\Delta|Δ)",
-    "<<RHO>>": r"(?:\\rho|ρ)",
-    "<<LAMBDA>>": r"(?:\\lambda|λ)",
-    "<<THETA>>": r"(?:\\theta|θ)",
-    "<<MU>>": r"(?:\\mu|μ)",
-}
-
-def _normalize_equation_latex(latex: str) -> str:
-    s = (latex or "").strip().strip("$")
-    if not s:
-        return ""
-    s = s.replace(r"\,", " ")
-    s = re.sub(r"\\text\{([^{}]+)\}", r"\1", s)
-    for cmd, placeholder in _EQ_SYMBOL_PLACEHOLDERS.items():
-        s = s.replace(cmd, placeholder)
-    return s
-
-def _expand_fraction_variants(latex: str) -> List[str]:
-    pattern = r"\\frac\{([^{}]+)\}\{([^{}]+)\}"
-    variants = {latex}
-    changed = True
-    while changed:
-        changed = False
-        new_variants: set[str] = set()
-        for variant in variants:
-            match = re.search(pattern, variant)
-            if match:
-                num, den = match.group(1), match.group(2)
-                new_variants.add(variant)
-                new_variants.add(variant[:match.start()] + f"{num}/{den}" + variant[match.end():])
-                changed = True
-            else:
-                new_variants.add(variant)
-        variants = new_variants
-    return sorted(variants)
-
-def _latex_variant_to_pattern(latex: str) -> str:
-    escaped = re.escape(latex)
-    for placeholder, regex in _EQ_PLACEHOLDER_REGEX.items():
-        escaped = escaped.replace(re.escape(placeholder), regex)
-    escaped = escaped.replace(r"\{", r"\s*\{?\s*").replace(r"\}", r"\s*\}?\s*")
-    escaped = escaped.replace(r"\ ", r"(?:\s*|\\cdot\s*|·\s*)")
-    for op, rep in [
-        ("=", r"\s*=\s*"),
-        (r"\+", r"\s*\+\s*"),
-        (r"\-", r"\s*-\s*"),
-        (r"\*", r"\s*\*\s*"),
-        ("/", r"\s*/\s*"),
-        (r"\^", r"\s*\^\s*"),
-        ("_", r"\s*_\s*"),
-    ]:
-        escaped = escaped.replace(op, rep)
-    return r"^\s*" + escaped + r"\s*$"
-
-def _build_equation_whitelist_patterns(eq_pack: dict) -> List[re.Pattern]:
-    eqs = eq_pack.get("key_equations") or []
-    patterns: List[re.Pattern] = []
-    seen: set[str] = set()
-    for eq in eqs:
-        if not isinstance(eq, dict):
-            continue
-        latex = _normalize_equation_latex(str(eq.get("latex", "") or ""))
-        if not latex:
-            continue
-        for variant in _expand_fraction_variants(latex):
-            pattern = _latex_variant_to_pattern(variant)
-            if pattern in seen:
-                continue
-            seen.add(pattern)
-            patterns.append(re.compile(pattern, flags=re.IGNORECASE))
-    return patterns
-
-EQUATION_WHITELIST_PATTERNS = _build_equation_whitelist_patterns(SUBJECT_EQUATIONS)
-
-def _extract_equation_candidates(text: str) -> List[str]:
-    candidates: List[str] = []
-    if not text:
-        return candidates
-    for match in re.finditer(r"\$\$(.+?)\$\$", text, flags=re.DOTALL):
-        segment = match.group(1) or ""
-        if "=" in segment:
-            candidates.append(segment)
-    for match in re.finditer(r"(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)", text, flags=re.DOTALL):
-        segment = match.group(1) or ""
-        if "=" in segment:
-            candidates.append(segment)
-    text_without_math = re.sub(r"\$\$(.+?)\$\$", " ", text, flags=re.DOTALL)
-    text_without_math = re.sub(r"(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)", " ", text_without_math, flags=re.DOTALL)
-    for match in re.finditer(r"(?m)([A-Za-z0-9\\Δρλθμ^_{}]+[^\n]{0,80}?=[^\n]{1,80})", text_without_math):
-        candidates.append(match.group(1))
-    return candidates
-
-def _normalize_equation_candidate(candidate: str) -> str:
-    eq = (candidate or "").strip()
-    eq = eq.strip("$").strip()
-    eq = eq.strip(" .;")
-    return eq
-
-def _find_non_whitelisted_equations(question_text: str, markscheme_text: str) -> List[str]:
-    if not EQUATION_WHITELIST_PATTERNS:
-        return []
-    found: List[str] = []
-    seen: set[str] = set()
-    for text in [question_text, markscheme_text]:
-        for cand in _extract_equation_candidates(text or ""):
-            norm = _normalize_equation_candidate(cand)
-            if not norm or "=" not in norm:
-                continue
-            if re.search(r"\bTOTAL\b", norm, flags=re.IGNORECASE):
-                continue
-            if any(pat.match(norm) for pat in EQUATION_WHITELIST_PATTERNS):
-                continue
-            if norm not in seen:
-                seen.add(norm)
-                found.append(norm)
-    return found
-
-
 # Prompt templates
 QGEN_SYSTEM_TPL = str(SUBJECT_PROMPTS.get("qgen_system", "") or "")
 QGEN_USER_TPL = str(SUBJECT_PROMPTS.get("qgen_user", "") or "")
@@ -2051,13 +1924,6 @@ def generate_practice_question_with_ai(
         bad = _forbidden_found(qtxt, mstxt)
         reasons.extend(bad)
 
-        non_whitelisted = _find_non_whitelisted_equations(qtxt, mstxt)
-        if non_whitelisted:
-            reasons.append(
-                "Uses non-whitelisted equation(s): "
-                + "; ".join(non_whitelisted[:8])
-            )
-
         if "$" in qtxt and "\\(" in qtxt:
             reasons.append("Use $...$ for LaTeX, avoid \\(...\\).")
 
@@ -2075,56 +1941,6 @@ def generate_practice_question_with_ai(
             pass
 
         return (len(reasons) == 0), reasons
-
-    def _self_check_equations(d: Dict[str, Any]) -> List[str]:
-        if not SUBJECT_EQUATIONS.get("key_equations"):
-            return []
-        qtxt = str(d.get("question_text", "") or "").strip()
-        mstxt = str(d.get("markscheme_text", "") or "").strip()
-        if not qtxt and not mstxt:
-            return []
-
-        system = (
-            "You are a strict equation-sheet compliance checker. "
-            "Given a question and markscheme, list every equation used or implied, "
-            "and confirm whether each equation is present in the provided equation sheet. "
-            "Return JSON only with keys: used_equations (array of strings), "
-            "disallowed_equations (array of strings). "
-            "If none, use empty arrays."
-        )
-        user = "\n\n".join([
-            "EQUATION SHEET:",
-            EQUATION_GUARDRAILS or "(none)",
-            "QUESTION:",
-            qtxt or "(none)",
-            "MARKSCHEME:",
-            mstxt or "(none)",
-        ])
-
-        try:
-            response = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                max_completion_tokens=800,
-                response_format={"type": "json_object"},
-            )
-            raw = response.choices[0].message.content or ""
-            data = safe_parse_json(raw) or {}
-        except Exception:
-            return []
-
-        disallowed = data.get("disallowed_equations", [])
-        if not isinstance(disallowed, list):
-            return []
-        items = [str(x).strip() for x in disallowed if str(x).strip()]
-        if not items:
-            return []
-        return [
-            "Self-check flagged disallowed equation(s): " + "; ".join(items[:8])
-        ]
 
     def _call_model(repair: bool, reasons: Optional[List[str]] = None) -> Dict[str, Any]:
         system = _render_template(QGEN_SYSTEM_TPL, {
@@ -2170,8 +1986,6 @@ def generate_practice_question_with_ai(
 
     data = _call_model(repair=False)
     ok, reasons = _validate(data)
-    reasons.extend(_self_check_equations(data))
-    ok = ok and len(reasons) == 0
 
     if not ok:
         data2 = _call_model(repair=True, reasons=reasons)
@@ -2240,15 +2054,6 @@ def generate_topic_journey_with_ai(
             ms = str(stp.get("markscheme_text", "") or "")
             if f"TOTAL = {mm}" not in ms:
                 reasons.append(f"Step {i+1}: markscheme_text must end with 'TOTAL = {mm}'.")
-            non_whitelisted = _find_non_whitelisted_equations(
-                str(stp.get("question_text", "") or ""),
-                str(stp.get("markscheme_text", "") or ""),
-            )
-            if non_whitelisted:
-                reasons.append(
-                    f"Step {i+1}: uses non-whitelisted equation(s): "
-                    + "; ".join(non_whitelisted[:6])
-                )
         return (len(reasons) == 0), reasons
 
     def _call_model(repair: bool, reasons: Optional[List[str]] = None) -> Dict[str, Any]:
