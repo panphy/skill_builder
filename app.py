@@ -1845,6 +1845,171 @@ def get_gpt_feedback_from_bank(
 # ============================================================
 # AI QUESTION GENERATOR (teacher-only, vet, then save)
 # ============================================================
+@st.cache_data(show_spinner=False)
+def _get_equation_whitelist(eq_pack: dict) -> set:
+    whitelist: set = set()
+    if not isinstance(eq_pack, dict):
+        return whitelist
+    for eq in eq_pack.get("key_equations", []) or []:
+        if isinstance(eq, dict):
+            latex = str(eq.get("latex", "") or "").strip()
+            if latex:
+                whitelist.add(_normalize_equation_text(latex))
+    notes = eq_pack.get("notation_rules") or []
+    for note in notes:
+        for match in _get_equation_regexes()["plain_eq"].finditer(str(note or "")):
+            whitelist.add(_normalize_equation_text(match.group(1)))
+    return whitelist
+
+
+@st.cache_data(show_spinner=False)
+def _get_equation_regexes() -> Dict[str, re.Pattern]:
+    latex_block = re.compile(r"\$\$(.+?)\$\$", flags=re.DOTALL)
+    latex_inline = re.compile(r"\$(.+?)\$")
+    latex_paren = re.compile(r"\\\((.+?)\\\)")
+    latex_bracket = re.compile(r"\\\[(.+?)\\\]", flags=re.DOTALL)
+    plain_eq = re.compile(
+        r"([A-Za-z\\ΔλρθημΩπ][A-Za-z0-9\\ΔλρθημΩπ_{}^+\-*/(). ]{0,60}="
+        r"[A-Za-z0-9\\ΔλρθημΩπ_{}^+\-*/(). ]{1,60})"
+    )
+    return {
+        "latex_block": latex_block,
+        "latex_inline": latex_inline,
+        "latex_paren": latex_paren,
+        "latex_bracket": latex_bracket,
+        "plain_eq": plain_eq,
+    }
+
+
+def _normalize_equation_text(eq: str) -> str:
+    s = str(eq or "").strip()
+    if not s:
+        return ""
+    s = s.replace("−", "-").replace("–", "-")
+    greek_map = {
+        "Δ": "\\Delta",
+        "λ": "\\lambda",
+        "ρ": "\\rho",
+        "θ": "\\theta",
+        "μ": "\\mu",
+    }
+    for k, v in greek_map.items():
+        s = s.replace(k, v)
+    s = re.sub(r"^\$+|\$+$", "", s)
+    s = re.sub(r"\\left|\\right", "", s)
+    s = re.sub(r"\s+", "", s)
+    return s
+
+
+def _extract_equation_candidates(text: str) -> List[str]:
+    if not text:
+        return []
+    regexes = _get_equation_regexes()
+    candidates: List[str] = []
+    for key in ("latex_block", "latex_inline", "latex_paren", "latex_bracket"):
+        for match in regexes[key].finditer(text):
+            cand = (match.group(1) or "").strip()
+            if cand:
+                candidates.append(cand)
+    for line in (text or "").splitlines():
+        for match in regexes["plain_eq"].finditer(line):
+            cand = (match.group(1) or "").strip()
+            if cand:
+                candidates.append(cand)
+    return candidates
+
+
+def _find_non_whitelisted_equations(text: str) -> List[str]:
+    whitelist = _get_equation_whitelist(SUBJECT_EQUATIONS)
+    if not whitelist:
+        return []
+    candidates = _extract_equation_candidates(text)
+    non_whitelisted: List[str] = []
+    for cand in candidates:
+        norm = _normalize_equation_text(cand)
+        if norm and norm not in whitelist:
+            non_whitelisted.append(cand)
+    if non_whitelisted:
+        LOGGER.info(
+            "Equation whitelist validation found non-whitelisted equations",
+            extra={"ctx": {"component": "equation_whitelist", "count": len(non_whitelisted)}},
+        )
+    else:
+        LOGGER.info(
+            "Equation whitelist validation passed",
+            extra={"ctx": {"component": "equation_whitelist", "count": 0}},
+        )
+    return non_whitelisted
+
+
+def _self_check_equations(question_text: str, markscheme_text: str, subject_pack: dict) -> List[str]:
+    eq_pack = subject_pack or {}
+    key_eqs = eq_pack.get("key_equations") or []
+    whitelist = [str(e.get("latex", "") or "").strip() for e in key_eqs if isinstance(e, dict)]
+    notation = [str(n).strip() for n in (eq_pack.get("notation_rules") or []) if str(n).strip()]
+    prompt = _render_template(
+        """
+You are checking GCSE Physics equations for compliance with the official equation sheet.
+List every equation explicitly used in the question and mark scheme.
+Then verify each equation appears on the official equation sheet list provided.
+
+Return JSON: {"violations":[{"equation":"...","reason":"..."}]}
+
+Official equations (LaTeX):
+<<WHITELIST>>
+
+Notation rules / canonical forms:
+<<NOTATION>>
+
+Question:
+<<QUESTION>>
+
+Mark scheme:
+<<MARKSCHEME>>
+""",
+        {
+            "WHITELIST": "\n".join([f"- {w}" for w in whitelist]) or "(none)",
+            "NOTATION": "\n".join([f"- {n}" for n in notation]) or "(none)",
+            "QUESTION": question_text or "",
+            "MARKSCHEME": markscheme_text or "",
+        },
+    ).strip()
+
+    try:
+        response = client.with_options(timeout=10).chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": prompt}],
+            max_completion_tokens=500,
+            response_format={"type": "json_object"},
+        )
+        raw = response.choices[0].message.content or ""
+        data = safe_parse_json(raw) or {}
+        violations = data.get("violations", [])
+        if isinstance(violations, list):
+            out = []
+            for v in violations:
+                if isinstance(v, dict):
+                    eq = str(v.get("equation", "") or "").strip()
+                    reason = str(v.get("reason", "") or "").strip()
+                    if eq:
+                        out.append(f"{eq} ({reason})" if reason else eq)
+                else:
+                    s = str(v).strip()
+                    if s:
+                        out.append(s)
+            LOGGER.info(
+                "Equation self-check completed",
+                extra={"ctx": {"component": "equation_self_check", "count": len(out)}},
+            )
+            return out
+    except Exception as exc:
+        LOGGER.warning(
+            "Equation self-check failed; skipping",
+            extra={"ctx": {"component": "equation_self_check", "error": type(exc).__name__}},
+        )
+    return []
+
+
 def generate_practice_question_with_ai(
     topic_text: str,
     difficulty: str,
@@ -1924,6 +2089,11 @@ def generate_practice_question_with_ai(
         bad = _forbidden_found(qtxt, mstxt)
         reasons.extend(bad)
 
+        non_whitelisted = _find_non_whitelisted_equations(f"{qtxt}\n{mstxt}")
+        if non_whitelisted:
+            offending = ", ".join(sorted(set(non_whitelisted)))
+            reasons.append(f"Contains non-whitelisted equations: {offending}")
+
         if "$" in qtxt and "\\(" in qtxt:
             reasons.append("Use $...$ for LaTeX, avoid \\(...\\).")
 
@@ -1986,6 +2156,14 @@ def generate_practice_question_with_ai(
 
     data = _call_model(repair=False)
     ok, reasons = _validate(data)
+    self_check = _self_check_equations(
+        str(data.get("question_text", "") or ""),
+        str(data.get("markscheme_text", "") or ""),
+        SUBJECT_EQUATIONS,
+    )
+    if self_check:
+        reasons.append("Self-check found equation sheet violations: " + "; ".join(self_check))
+        ok = False
 
     if not ok:
         data2 = _call_model(repair=True, reasons=reasons)
@@ -2054,6 +2232,12 @@ def generate_topic_journey_with_ai(
             ms = str(stp.get("markscheme_text", "") or "")
             if f"TOTAL = {mm}" not in ms:
                 reasons.append(f"Step {i+1}: markscheme_text must end with 'TOTAL = {mm}'.")
+            non_whitelisted = _find_non_whitelisted_equations(
+                f"{stp.get('question_text', '')}\n{stp.get('markscheme_text', '')}"
+            )
+            if non_whitelisted:
+                offending = ", ".join(sorted(set(non_whitelisted)))
+                reasons.append(f"Step {i+1}: contains non-whitelisted equations: {offending}")
         return (len(reasons) == 0), reasons
 
     def _call_model(repair: bool, reasons: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -2096,6 +2280,21 @@ def generate_topic_journey_with_ai(
 
     data = _call_model(repair=False)
     ok, reasons = _validate(data)
+    steps_for_check = data.get("steps", []) if isinstance(data, dict) else []
+    if isinstance(steps_for_check, list):
+        for idx, stp in enumerate(steps_for_check):
+            if not isinstance(stp, dict):
+                continue
+            self_check = _self_check_equations(
+                str(stp.get("question_text", "") or ""),
+                str(stp.get("markscheme_text", "") or ""),
+                SUBJECT_EQUATIONS,
+            )
+            if self_check:
+                reasons.append(
+                    f"Step {idx+1}: self-check found equation sheet violations: " + "; ".join(self_check)
+                )
+                ok = False
     if not ok:
         data2 = _call_model(repair=True, reasons=reasons)
         ok2, reasons2 = _validate(data2)
