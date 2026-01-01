@@ -1295,14 +1295,13 @@ def render_md_box(title: str, md_text: str, caption: str = "", empty_text: str =
 def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: float) -> dict:
     """Run a blocking task while showing a full-page overlay to prevent mid-run interaction.
 
-    IMPORTANT: Do NOT show a numeric ETA/percent as it can be misleading on variable model latency.
-    Instead, show an indeterminate progress indicator plus an elapsed timer.
+    IMPORTANT: Keep the progress display simple and avoid presenting a precise ETA.
     """
     overlay = st.empty()
     start_t = time.monotonic()
 
-    def _render_overlay(subtitle: str, elapsed_s: float):
-        # Render a full-page blocker with an indeterminate bar.
+    def _render_overlay(subtitle: str, percent: int):
+        # Render a full-page blocker with a simple percent progress bar.
         overlay.markdown(
             f"""
 <style>
@@ -1364,7 +1363,7 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
   color: rgba(0,0,0,0.58);
   margin-top: 6px;
 }}
-.pp-indeterminate {{
+.pp-progress {{
   margin-top: 14px;
   width: 100%;
   height: 10px;
@@ -1373,21 +1372,16 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
   overflow: hidden;
   position: relative;
 }}
-.pp-indeterminate::before {{
-  content: "";
-  position: absolute;
-  left: -35%;
-  top: 0;
+.pp-progress-fill {{
   height: 100%;
-  width: 35%;
   background: rgba(0,0,0,0.25);
   border-radius: 999px;
-  animation: pp-sweep 1.1s ease-in-out infinite;
+  transition: width 0.35s ease;
 }}
-@keyframes pp-sweep {{
-  0%   {{ left: -35%; }}
-  50%  {{ left: 100%; }}
-  100% {{ left: 100%; }}
+.pp-note {{
+  font-size: 12px;
+  color: rgba(0,0,0,0.52);
+  margin-top: 6px;
 }}
 </style>
 
@@ -1398,15 +1392,25 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
       <div>
         <div class="pp-title">Working…</div>
         <div class="pp-subtitle">{subtitle}</div>
-        <div class="pp-meta">Elapsed: {int(elapsed_s)}s • Typical: {typical_range}</div>
+        <div class="pp-meta">{percent}% • Typical: {typical_range}</div>
+        <div class="pp-note">May take longer for complex tasks.</div>
       </div>
     </div>
-    <div class="pp-indeterminate"></div>
+    <div class="pp-progress">
+      <div class="pp-progress-fill" style="width: {percent}%;"></div>
+    </div>
   </div>
 </div>
 """,
             unsafe_allow_html=True,
         )
+
+    def _calc_percent(elapsed_s: float, done: bool = False) -> int:
+        if done:
+            return 100
+        if est_seconds <= 0:
+            return 0
+        return min(99, max(0, int((elapsed_s / est_seconds) * 100)))
 
     _render_overlay("AI is working. Please wait.", 0)
 
@@ -1416,12 +1420,12 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
             # Update the elapsed timer a few times per second.
             while not fut.done():
                 elapsed = time.monotonic() - start_t
-                _render_overlay("AI is working. Please wait.", elapsed)
+                _render_overlay("AI is working. Please wait.", _calc_percent(elapsed))
                 time.sleep(0.35)
 
             report = fut.result()
 
-        _render_overlay("Done. Updating the page…", time.monotonic() - start_t)
+        _render_overlay("Done. Updating the page…", _calc_percent(time.monotonic() - start_t, done=True))
         time.sleep(0.08)
         return report
     finally:
