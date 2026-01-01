@@ -1409,7 +1409,7 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
     <div class="pp-row">
       <div class="pp-spinner"></div>
       <div>
-        <div class="pp-title">Working…</div>
+        <div class="pp-title">AI is working. Please wait...</div>
         <div class="pp-subtitle">{subtitle}</div>
         <div class="pp-meta">{percent}% • Typical: {typical_range}</div>
         <div class="pp-note">May take longer for complex tasks.</div>
@@ -1431,7 +1431,7 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
             return 0
         return min(95, max(0, int((elapsed_s / est_seconds) * 100)))
 
-    _render_overlay("AI is working. Please wait.", 0)
+    _render_overlay("", 0)
 
     try:
         with ThreadPoolExecutor(max_workers=1) as ex:
@@ -1439,7 +1439,7 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
             # Update the elapsed timer a few times per second.
             while not fut.done():
                 elapsed = time.monotonic() - start_t
-                _render_overlay("AI is working. Please wait.", _calc_percent(elapsed))
+                _render_overlay("", _calc_percent(elapsed))
                 time.sleep(0.35)
 
             report = fut.result()
