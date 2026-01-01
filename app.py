@@ -2490,6 +2490,7 @@ if nav == "🧑‍🎓 Student":
                         st.session_state["last_canvas_data_url_single"] = None
                         st.session_state["last_canvas_image_data_single"] = None
                         st.session_state["canvas_cmd_nonce_single"] = int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0) + 1
+                        st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
                         cmd = "clear"
 
                     stroke_width = 2 if tool == "Pen" else 30
@@ -2863,6 +2864,7 @@ if nav == "🧑‍🎓 Student":
                                 st.session_state["last_canvas_data_url_journey"] = None
                                 st.session_state["last_canvas_image_data_journey"] = None
                                 st.session_state["canvas_cmd_nonce_journey"] = int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0) + 1
+                                st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
                                 cmd = "clear"
 
                             stroke_width = 2 if tool == "Pen" else 30
