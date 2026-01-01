@@ -3524,6 +3524,11 @@ else:
                                     if (ms_img is None) and (not ms_text):
                                         st.caption("No mark scheme text/image (image-only teacher uploads are supported).")
 
+                        if st.session_state.get("bank_delete_reset"):
+                            st.session_state["bank_delete_picks"] = []
+                            st.session_state["confirm_delete_bank_entry"] = False
+                            st.session_state["bank_delete_reset"] = False
+
                         bank_delete_open = bool(st.session_state.get("bank_delete_picks")) or bool(
                             st.session_state.get("confirm_delete_bank_entry")
                         )
@@ -3551,8 +3556,7 @@ else:
                                     delete_ok = delete_question_bank_by_id(delete_id) and delete_ok
                                 if delete_ok:
                                     st.success("Question bank entry(ies) deleted.")
-                                    st.session_state["bank_delete_picks"] = []
-                                    st.session_state["confirm_delete_bank_entry"] = False
+                                    st.session_state["bank_delete_reset"] = True
                                     st.rerun()
                                 else:
                                     st.error("Delete failed. Check database errors above.")
