@@ -1249,7 +1249,7 @@ def _restore_segments(text_in: str, store: Dict[str, str]) -> str:
     return out
 
 def normalize_markdown_math(md_text: str) -> str:
-    """
+    r"""
     Heuristic normalizer for Streamlit Markdown + MathJax rendering.
 
     Goals:
