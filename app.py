@@ -2260,7 +2260,11 @@ def generate_topic_journey_with_ai(
                 reasons.append(f"Step {i+1}: contains non-whitelisted equations: {offending}")
         return (len(reasons) == 0), reasons
 
-    def _call_model(repair: bool, reasons: Optional[List[str]] = None) -> Dict[str, Any]:
+    def _call_model(
+        repair: bool,
+        reasons: Optional[List[str]] = None,
+        extra_hint: str | None = None,
+    ) -> Dict[str, Any]:
         system = _render_template(JOURNEY_SYSTEM_TPL, {
             "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
             "MARKDOWN_LATEX_RULES": MARKDOWN_LATEX_RULES,
