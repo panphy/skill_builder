@@ -2292,9 +2292,11 @@ JOURNEY_CHECKPOINT_EVERY = 3
 def generate_topic_journey_with_ai(
     topic_plain_english: str,
     duration_minutes: int,
+    extra_instructions: str = "",
 ) -> Dict[str, Any]:
     steps_n = DURATION_TO_STEPS.get(int(duration_minutes), 8)
     topic_plain_english = (topic_plain_english or "").strip()
+    extra_instructions = (extra_instructions or "").strip()
     def _validate(d: Dict[str, Any]) -> Tuple[bool, List[str]]:
         reasons: List[str] = []
         if not isinstance(d, dict):
@@ -2351,6 +2353,8 @@ def generate_topic_journey_with_ai(
             "STEPS_N": int(steps_n),
                     })
         base_user = (base_user or "").strip()
+        if extra_instructions:
+            base_user = base_user + "\n\nOptional constraints for the AI:\n" + extra_instructions
 
         if not repair:
             user = base_user
@@ -3882,7 +3886,6 @@ else:
                         assignment_name_ai = st.text_input("Assignment name for saving", value="AI Practice", key="gen_assignment")
 
                     with gen_c2:
-                        st.caption("Workflow: Generate draft → edit/vet → Approve & Save.")
                         gen_clicked = st.button("Generate draft", type="primary", use_container_width=True, disabled=not AI_READY, key="gen_btn")
 
                         if st.button("Clear draft", use_container_width=True, key="clear_draft"):
@@ -3958,7 +3961,7 @@ else:
                         with ed2:
                             st.caption("Mark scheme is confidential. Students never see it.")
                             approve_clicked = st.button("Approve & Save to bank", type="primary", use_container_width=True, key="approve_save")
-                            st.caption("Tip: use Markdown and LaTeX ($...$) freely.")
+                            st.caption("Tip: use Markdown and LaTeX freely.")
 
                         d_qtext = st.text_area("Question text (student will see this)", value=d.get("question_text", ""), height=180, key="draft_qtext")
                         d_mstext = st.text_area("Mark scheme (teacher-only)", value=d.get("markscheme_text", ""), height=220, key="draft_mstext")
@@ -4040,6 +4043,12 @@ else:
 
                         j_assignment = st.text_input("Assignment name for saving", value="Topic Journey", key="jour_assignment")
                         j_tags = st.text_input("Tags (comma separated)", value="", key="jour_tags")
+                        j_extra_instr = st.text_area(
+                            "Optional constraints for the AI",
+                            height=80,
+                            placeholder="e.g. Include one tricky unit conversion. Use g = 9.8 N/kg. Require a final answer with units.",
+                            key="jour_extra"
+                        )
 
                     # --- Right column: actions ---
                     with jc2:
@@ -4073,6 +4082,7 @@ else:
                                     return generate_topic_journey_with_ai(
                                         topic_plain_english=topic_plain,
                                         duration_minutes=j_duration,
+                                        extra_instructions=j_extra_instr or "",
                                     )
 
                                 try:
@@ -4232,7 +4242,7 @@ else:
             # -------------------------
             with tab_upload:
                 st.write("## 🖼️ Upload a teacher question (images)")
-                st.caption("Optional question text supports Markdown and LaTeX ($...$).")
+                st.caption("Optional question text supports Markdown and LaTeX.")
 
                 with st.form("upload_q_form", clear_on_submit=True):
                     c1, c2 = st.columns([2, 1])
