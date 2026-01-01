@@ -146,11 +146,12 @@
     try { window.localStorage.setItem(k, String(Math.round(h))); } catch (e) {}
   }
 
-  function fillBackground(w, h) {
+  function clearCanvas() {
     ctx.save();
     ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = args.background_color || "#ffffff";
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
   }
 
@@ -159,8 +160,11 @@
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        // Draw at 1:1 (CSS pixel coordinates)
+        // Draw at 1:1 device pixels to avoid DPR scaling.
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.drawImage(img, 0, 0);
+        ctx.restore();
         resolve(true);
       };
       img.onerror = () => resolve(false);
@@ -201,7 +205,7 @@
     currentH = h;
 
     // Always re-fill background on resize
-    fillBackground(w, h);
+    clearCanvas();
 
     if (prevUrl) {
       // Restore pixels into the new canvas (top-left)
@@ -291,7 +295,7 @@
     if (!cmd) return;
 
     if (cmd === "clear") {
-      fillBackground(currentW, currentH);
+      clearCanvas();
       isEmpty = true;
       history = [];
       emitValue();
@@ -300,7 +304,7 @@
 
     if (cmd === "undo") {
       if (!history.length) {
-        fillBackground(currentW, currentH);
+        clearCanvas();
         isEmpty = true;
         emitValue();
         return;
@@ -308,12 +312,12 @@
       history.pop(); // remove latest
       const prev = history.length ? history[history.length - 1] : null;
       if (!prev) {
-        fillBackground(currentW, currentH);
+        clearCanvas();
         isEmpty = true;
         emitValue();
         return;
       }
-      fillBackground(currentW, currentH);
+      clearCanvas();
       const ok = await drawImageDataUrl(prev);
       isEmpty = !ok;
       emitValue();
