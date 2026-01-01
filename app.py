@@ -2404,8 +2404,8 @@ if nav == "🧑‍🎓 Student":
                     st.warning("This question has no question text or image.")
             st.caption(f"Max Marks: {max_marks}")
 
-            
             st.write("")
+            st.markdown("**Answer in the box below.**")
             mode_single = st.radio(
                 "Answer mode",
                 ["⌨️ Type answer", "✍️ Write answer"],
@@ -2416,8 +2416,6 @@ if nav == "🧑‍🎓 Student":
 
             if str(mode_single).startswith("⌨️"):
                 text_header = st.columns([1, 0.12])
-                with text_header[0]:
-                    st.markdown("**Answer (typed)**")
                 with text_header[1]:
                     text_expanded = bool(st.session_state.get("text_expanded_single", False))
                     if st.button(
@@ -2490,8 +2488,6 @@ if nav == "🧑‍🎓 Student":
                                 )
             else:
                 canvas_header = st.columns([1, 0.12])
-                with canvas_header[0]:
-                    st.markdown("**Answer (write/draw)**")
                 with canvas_header[1]:
                     canvas_expanded = bool(st.session_state.get("canvas_expanded_single", False))
                     if st.button(
@@ -2772,8 +2768,8 @@ if nav == "🧑‍🎓 Student":
                         notes[str(idx)] = md
                         st.session_state["journey_checkpoint_notes"] = notes
 
-                    
                     st.write("")
+                    st.markdown("**Answer in the box below.**")
                     mode_journey = st.radio(
                         "Answer mode",
                         ["⌨️ Type answer", "✍️ Write answer"],
@@ -2784,8 +2780,6 @@ if nav == "🧑‍🎓 Student":
 
                     if str(mode_journey).startswith("⌨️"):
                         text_header = st.columns([1, 0.12])
-                        with text_header[0]:
-                            st.markdown("**Answer (typed)**")
                         with text_header[1]:
                             text_expanded = bool(st.session_state.get("text_expanded_journey", False))
                             if st.button(
@@ -2864,8 +2858,6 @@ if nav == "🧑‍🎓 Student":
                                         )
                     else:
                         canvas_header = st.columns([1, 0.12])
-                        with canvas_header[0]:
-                            st.markdown("**Answer (write/draw)**")
                         with canvas_header[1]:
                             canvas_expanded = bool(st.session_state.get("canvas_expanded_journey", False))
                             if st.button(
