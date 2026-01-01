@@ -3533,7 +3533,6 @@ else:
             ensure_question_bank_table()
 
             st.write("### Question Bank manager")
-            st.caption("Use the tabs below to (1) browse and preview what is already in the bank, (2) generate AI practice questions, or (3) upload scanned questions. All features are unchanged, only reorganised.")
 
             tab_browse, tab_ai, tab_upload = st.tabs(["🔎 Browse & preview", "🤖 AI generator", "🖼️ Upload scans"])
 
