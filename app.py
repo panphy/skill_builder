@@ -3215,7 +3215,10 @@ elif nav == "🔒 Teacher Dashboard":
                 st.write("### Recent attempts")
                 st.dataframe(df.head(50), use_container_width=True)
 
-                with st.expander("Delete an attempt", expanded=False):
+                attempt_delete_open = bool(st.session_state.get("attempt_delete_picks")) or bool(
+                    st.session_state.get("confirm_delete_attempt")
+                )
+                with st.expander("Delete attempts", expanded=attempt_delete_open):
                     df_del = df.head(200).copy()
                     df_del = df_del[df_del["id"].notna()]
                     if df_del.empty:
@@ -3237,21 +3240,30 @@ elif nav == "🔒 Teacher Dashboard":
                             return f"{created_at} | {student_id} | {question_key} | {mode} | {marks} [id {aid}]"
 
                         df_del["label"] = df_del.apply(_fmt_attempt, axis=1)
-                        attempt_pick = st.selectbox("Select attempt", df_del["label"].tolist(), key="attempt_delete_pick")
+                        attempt_picks = st.multiselect(
+                            "Select attempts to delete",
+                            df_del["label"].tolist(),
+                            key="attempt_delete_picks",
+                        )
                         confirm_delete = st.checkbox(
-                            "I understand this will permanently delete the selected attempt.",
+                            "I understand this will permanently delete the selected attempts.",
                             key="confirm_delete_attempt",
                         )
                         if st.button(
-                            "Delete selected attempt",
+                            "Delete selected attempts",
                             type="primary",
                             use_container_width=True,
-                            disabled=not confirm_delete,
+                            disabled=not (confirm_delete and attempt_picks),
                             key="delete_attempt_btn",
                         ):
-                            attempt_id = int(df_del.loc[df_del["label"] == attempt_pick, "id"].iloc[0])
-                            if delete_attempt_by_id(attempt_id):
-                                st.success("Attempt deleted.")
+                            delete_ok = True
+                            for attempt_pick in attempt_picks:
+                                attempt_id = int(df_del.loc[df_del["label"] == attempt_pick, "id"].iloc[0])
+                                delete_ok = delete_attempt_by_id(attempt_id) and delete_ok
+                            if delete_ok:
+                                st.success("Attempt(s) deleted.")
+                                st.session_state["attempt_delete_picks"] = []
+                                st.session_state["confirm_delete_attempt"] = False
                                 st.rerun()
                             else:
                                 st.error("Delete failed. Check database errors above.")
@@ -3492,22 +3504,35 @@ else:
                                     if (ms_img is None) and (not ms_text):
                                         st.caption("No mark scheme text/image (image-only teacher uploads are supported).")
 
-                        with st.expander("Delete this question bank entry", expanded=False):
+                        bank_delete_open = bool(st.session_state.get("bank_delete_picks")) or bool(
+                            st.session_state.get("confirm_delete_bank_entry")
+                        )
+                        with st.expander("Delete question bank entries", expanded=bank_delete_open):
                             st.warning("Deleting a question removes it from the database permanently.")
+                            delete_picks = st.multiselect(
+                                "Select entries to delete",
+                                options,
+                                key="bank_delete_picks",
+                            )
                             confirm_delete_q = st.checkbox(
-                                "I understand this will permanently delete the selected entry.",
+                                "I understand this will permanently delete the selected entries.",
                                 key="confirm_delete_bank_entry",
                             )
                             if st.button(
-                                "Delete selected entry",
+                                "Delete selected entries",
                                 type="primary",
                                 use_container_width=True,
-                                disabled=not confirm_delete_q,
+                                disabled=not (confirm_delete_q and delete_picks),
                                 key="delete_bank_entry_btn",
                             ):
-                                if delete_question_bank_by_id(pick_id):
-                                    st.success("Question bank entry deleted.")
-                                    st.session_state["bank_preview_pick"] = None
+                                delete_ok = True
+                                for label in delete_picks:
+                                    delete_id = int(df_f.loc[df_f["label"] == label, "id"].iloc[0])
+                                    delete_ok = delete_question_bank_by_id(delete_id) and delete_ok
+                                if delete_ok:
+                                    st.success("Question bank entry(ies) deleted.")
+                                    st.session_state["bank_delete_picks"] = []
+                                    st.session_state["confirm_delete_bank_entry"] = False
                                     st.rerun()
                                 else:
                                     st.error("Delete failed. Check database errors above.")
