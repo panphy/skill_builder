@@ -1500,7 +1500,8 @@ def load_attempts_df_cached(_fp: str, subject_site: str, limit: int = 5000) -> p
     with eng.connect() as conn:
         df = pd.read_sql(
             text("""
-                select created_at, student_id, question_key, mode, marks_awarded, max_marks, readback_type
+                select id, created_at, student_id, question_key, question_bank_id, step_index, mode,
+                       marks_awarded, max_marks, readback_type
                 from public.physics_attempts_v1
                 where subject_site = :subject_site
                 order by created_at desc
@@ -1523,6 +1524,28 @@ def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
     except Exception as e:
         st.session_state["db_last_error"] = f"Load Error: {type(e).__name__}: {e}"
         return pd.DataFrame()
+
+
+def delete_attempt_by_id(attempt_id: int) -> bool:
+    eng = get_db_engine()
+    if eng is None:
+        return False
+    ensure_attempts_table()
+    try:
+        with eng.begin() as conn:
+            res = conn.execute(
+                text("delete from public.physics_attempts_v1 where id = :id and subject_site = :subject_site"),
+                {"id": int(attempt_id), "subject_site": SUBJECT_SITE},
+            )
+        st.session_state["db_last_error"] = ""
+        try:
+            load_attempts_df_cached.clear()
+        except Exception:
+            pass
+        return res.rowcount > 0
+    except Exception as e:
+        st.session_state["db_last_error"] = f"Delete Attempt Error: {type(e).__name__}: {e}"
+        return False
 
 
 @st.cache_data(ttl=30)
@@ -1681,6 +1704,29 @@ def insert_question_bank_row(
         return True
     except Exception as e:
         st.session_state["db_last_error"] = f"Insert Question Bank Error: {type(e).__name__}: {e}"
+        return False
+
+
+def delete_question_bank_by_id(qid: int) -> bool:
+    eng = get_db_engine()
+    if eng is None:
+        return False
+    ensure_question_bank_table()
+    try:
+        with eng.begin() as conn:
+            res = conn.execute(
+                text("delete from public.question_bank_v1 where id = :id and subject_site = :subject_site"),
+                {"id": int(qid), "subject_site": SUBJECT_SITE},
+            )
+        st.session_state["db_last_error"] = ""
+        try:
+            load_question_bank_df_cached.clear()
+            load_question_by_id_cached.clear()
+        except Exception:
+            pass
+        return res.rowcount > 0
+    except Exception as e:
+        st.session_state["db_last_error"] = f"Delete Question Error: {type(e).__name__}: {e}"
         return False
 
 # ============================================================
@@ -3168,6 +3214,47 @@ elif nav == "🔒 Teacher Dashboard":
 
                 st.write("### Recent attempts")
                 st.dataframe(df.head(50), use_container_width=True)
+
+                with st.expander("Delete an attempt", expanded=False):
+                    df_del = df.head(200).copy()
+                    df_del = df_del[df_del["id"].notna()]
+                    if df_del.empty:
+                        st.info("No attempts available for deletion.")
+                    else:
+                        def _fmt_attempt(r):
+                            created_at = str(r.get("created_at", "") or "")
+                            student_id = str(r.get("student_id", "") or "")
+                            question_key = str(r.get("question_key", "") or "")
+                            mode = str(r.get("mode", "") or "")
+                            try:
+                                marks = f"{int(r.get('marks_awarded', 0))}/{int(r.get('max_marks', 0))}"
+                            except Exception:
+                                marks = ""
+                            try:
+                                aid = int(r.get("id"))
+                            except Exception:
+                                aid = -1
+                            return f"{created_at} | {student_id} | {question_key} | {mode} | {marks} [id {aid}]"
+
+                        df_del["label"] = df_del.apply(_fmt_attempt, axis=1)
+                        attempt_pick = st.selectbox("Select attempt", df_del["label"].tolist(), key="attempt_delete_pick")
+                        confirm_delete = st.checkbox(
+                            "I understand this will permanently delete the selected attempt.",
+                            key="confirm_delete_attempt",
+                        )
+                        if st.button(
+                            "Delete selected attempt",
+                            type="primary",
+                            use_container_width=True,
+                            disabled=not confirm_delete,
+                            key="delete_attempt_btn",
+                        ):
+                            attempt_id = int(df_del.loc[df_del["label"] == attempt_pick, "id"].iloc[0])
+                            if delete_attempt_by_id(attempt_id):
+                                st.success("Attempt deleted.")
+                                st.rerun()
+                            else:
+                                st.error("Delete failed. Check database errors above.")
         else:
             st.caption("Enter the teacher password to view analytics.")
 
@@ -3404,6 +3491,26 @@ else:
                                         st.markdown(normalize_markdown_math(ms_text))
                                     if (ms_img is None) and (not ms_text):
                                         st.caption("No mark scheme text/image (image-only teacher uploads are supported).")
+
+                        with st.expander("Delete this question bank entry", expanded=False):
+                            st.warning("Deleting a question removes it from the database permanently.")
+                            confirm_delete_q = st.checkbox(
+                                "I understand this will permanently delete the selected entry.",
+                                key="confirm_delete_bank_entry",
+                            )
+                            if st.button(
+                                "Delete selected entry",
+                                type="primary",
+                                use_container_width=True,
+                                disabled=not confirm_delete_q,
+                                key="delete_bank_entry_btn",
+                            ):
+                                if delete_question_bank_by_id(pick_id):
+                                    st.success("Question bank entry deleted.")
+                                    st.session_state["bank_preview_pick"] = None
+                                    st.rerun()
+                                else:
+                                    st.error("Delete failed. Check database errors above.")
 
                         st.divider()
                         st.write("### Recent question bank entries")
