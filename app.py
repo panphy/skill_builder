@@ -2128,7 +2128,11 @@ def generate_practice_question_with_ai(
 
         return (len(reasons) == 0), reasons
 
-    def _call_model(repair: bool, reasons: Optional[List[str]] = None) -> Dict[str, Any]:
+    def _call_model(
+        repair: bool,
+        reasons: Optional[List[str]] = None,
+        extra_hint: str | None = None,
+    ) -> Dict[str, Any]:
         system = _render_template(QGEN_SYSTEM_TPL, {
             "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
             "MARKDOWN_LATEX_RULES": MARKDOWN_LATEX_RULES,
@@ -2280,6 +2284,8 @@ def generate_topic_journey_with_ai(
                 "STEPS_N": int(steps_n),
             })
             user = (user or "").strip() + "\n\n" + base_user
+            if extra_hint:
+                user = user + "\n\nExtra constraints:\n" + extra_hint.strip()
 
 
         response = client.chat.completions.create(
@@ -2317,8 +2323,30 @@ def generate_topic_journey_with_ai(
         if ok2:
             data = data2
         else:
-            data = data2 if isinstance(data2, dict) and data2 else data
-            data["warnings"] = reasons2[:12]
+            if isinstance(data2, dict):
+                steps_candidate = data2.get("steps", None)
+                steps_list = steps_candidate if isinstance(steps_candidate, list) else []
+            else:
+                steps_list = []
+            needs_steps = (
+                "steps must be a list" in " ".join(reasons2).lower()
+                or len(steps_list) == 0
+            )
+            if needs_steps:
+                extra_hint = (
+                    "Return a complete steps list of exactly the requested length. "
+                    "Keep each step concise (1-2 sentences per question/markscheme) to avoid truncation."
+                )
+                data3 = _call_model(repair=True, reasons=reasons2, extra_hint=extra_hint)
+                ok3, reasons3 = _validate(data3)
+                if ok3:
+                    data = data3
+                else:
+                    data = data3 if isinstance(data3, dict) and data3 else data2
+                    data["warnings"] = reasons3[:12]
+            else:
+                data = data2 if isinstance(data2, dict) and data2 else data
+                data["warnings"] = reasons2[:12]
 
     # Final clean-up / normalization (display-time normalization will still run)
     steps = data.get("steps", [])
