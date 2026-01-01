@@ -78,6 +78,20 @@ st.set_page_config(
     layout="wide"
 )
 
+st.markdown(
+    """
+<style>
+div[data-testid="stButton"] button[aria-label="⤢"] span,
+div[data-testid="stButton"] button[aria-label="⤡"] span {
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 700;
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
 # =========================
 # --- CONSTANTS ---
 # =========================
