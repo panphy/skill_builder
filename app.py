@@ -1294,19 +1294,14 @@ def render_height_controls(label: str, state_key: str, default: int, min_h: int,
     if state_key not in st.session_state:
         st.session_state[state_key] = int(default)
     st.session_state[state_key] = clamp_int(st.session_state[state_key], min_h, max_h, default=default)
-    cols = st.columns([1, 1, 4])
-    with cols[0]:
-        if st.button("−", key=f"{state_key}_dec", help=f"Reduce {label} height"):
-            st.session_state[state_key] = clamp_int(
-                st.session_state[state_key] - step, min_h, max_h, default=default
-            )
-    with cols[1]:
-        if st.button("＋", key=f"{state_key}_inc", help=f"Increase {label} height"):
-            st.session_state[state_key] = clamp_int(
-                st.session_state[state_key] + step, min_h, max_h, default=default
-            )
-    with cols[2]:
-        st.caption(f"{label} height: {st.session_state[state_key]} px")
+    st.session_state[state_key] = st.slider(
+        f"{label} height (px)",
+        min_value=min_h,
+        max_value=max_h,
+        value=int(st.session_state[state_key]),
+        step=step,
+        key=f"{state_key}_slider",
+    )
     return int(st.session_state[state_key])
 
 # ============================================================
@@ -1430,7 +1425,7 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
             return 100
         if est_seconds <= 0:
             return 0
-        return min(90, max(0, int((elapsed_s / est_seconds) * 100)))
+        return min(95, max(0, int((elapsed_s / est_seconds) * 100)))
 
     _render_overlay("AI is working. Please wait.", 0)
 
