@@ -2395,7 +2395,6 @@ if nav == "🧑‍🎓 Student":
             max_marks = int(q_row.get("max_marks", 1))
             q_text = (q_row.get("question_text") or "").strip()
 
-            st.markdown("**Question**")
             with st.container(border=True):
                 if question_img is not None:
                     st.image(question_img, caption="Question image", use_container_width=True)
