@@ -1926,6 +1926,8 @@ def _find_non_whitelisted_equations(text: str) -> List[str]:
     candidates = _extract_equation_candidates(text)
     non_whitelisted: List[str] = []
     for cand in candidates:
+        if re.match(r"^\s*TOTAL\s*=", cand, flags=re.IGNORECASE):
+            continue
         norm = _normalize_equation_text(cand)
         if norm and norm not in whitelist:
             non_whitelisted.append(cand)
