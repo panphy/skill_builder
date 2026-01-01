@@ -49,10 +49,18 @@ Teachers can:
 
 ---
 
-## Repo structure (typical)
+## Repo structure
 
 - `app.py`  
-  Main Streamlit app (single file).
+  Main Streamlit app.
+- `components/`  
+  Custom Streamlit component(s) for the stylus/drawing canvas.
+  - `panphy_stylus_canvas/`  
+    Component package with the HTML/JS frontend and Python wrapper.
+- `subjects/`  
+  Subject configuration and content data.
+  - `physics/`  
+    Physics prompts, equations, settings, and topic definitions (JSON).
 - `requirements.txt`  
   Python dependencies.
 - `README.md`  
