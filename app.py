@@ -85,6 +85,10 @@ MODEL_NAME = "gpt-5-mini"
 CANVAS_BG_HEX = "#ffffff"
 CANVAS_BG_RGB = (255, 255, 255)
 MAX_IMAGE_WIDTH = 1024
+TEXTAREA_HEIGHT_DEFAULT = 320
+TEXTAREA_HEIGHT_EXPANDED = 520
+CANVAS_HEIGHT_DEFAULT = 520
+CANVAS_HEIGHT_EXPANDED = 720
 
 STORAGE_BUCKET = "physics-bank"
 
@@ -2366,10 +2370,22 @@ if nav == "🧑‍🎓 Student":
             )
 
             if str(mode_single).startswith("⌨️"):
-                st.markdown("**Answer (typed)**")
+                text_header = st.columns([1, 0.12])
+                with text_header[0]:
+                    st.markdown("**Answer (typed)**")
+                with text_header[1]:
+                    text_expanded = bool(st.session_state.get("text_expanded_single", False))
+                    if st.button(
+                        "⤡" if text_expanded else "⤢",
+                        help=("Collapse working area" if text_expanded else "Expand working area"),
+                        key="text_expand_btn_single",
+                    ):
+                        st.session_state["text_expanded_single"] = not text_expanded
+                        text_expanded = not text_expanded
+                text_height = TEXTAREA_HEIGHT_EXPANDED if text_expanded else TEXTAREA_HEIGHT_DEFAULT
                 answer_single = st.text_area(
                     "Type your working:",
-                    height=320,
+                    height=text_height,
                     placeholder="Enter your answer here...",
                     key="student_answer_text_single",
                 )
@@ -2395,6 +2411,7 @@ if nav == "🧑‍🎓 Student":
                             )
                         else:
                             increment_rate_limit(sid)
+                            st.session_state["text_expanded_single"] = False
 
                             def task():
                                 ms_path = (st.session_state.get("cached_ms_path") or q_row.get("markscheme_image_path") or "").strip()
@@ -2427,7 +2444,24 @@ if nav == "🧑‍🎓 Student":
                                     question_bank_id=qid,
                                 )
             else:
-                st.markdown("**Answer (write/draw)**")
+                canvas_header = st.columns([1, 0.12])
+                with canvas_header[0]:
+                    st.markdown("**Answer (write/draw)**")
+                with canvas_header[1]:
+                    canvas_expanded = bool(st.session_state.get("canvas_expanded_single", False))
+                    if st.button(
+                        "⤡" if canvas_expanded else "⤢",
+                        help=("Collapse working area" if canvas_expanded else "Expand working area"),
+                        key="canvas_expand_btn_single",
+                    ):
+                        st.session_state["canvas_expanded_single"] = not canvas_expanded
+                        canvas_expanded = not canvas_expanded
+                canvas_height = CANVAS_HEIGHT_EXPANDED if canvas_expanded else CANVAS_HEIGHT_DEFAULT
+                canvas_storage_key = (
+                    f"panphy_canvas_h_{SUBJECT_SITE}_single_expanded"
+                    if canvas_expanded
+                    else f"panphy_canvas_h_{SUBJECT_SITE}_single"
+                )
                 if _stylus_canvas_available():
                     tool_row = st.columns([2.2, 1.4, 1, 1])
                     with tool_row[0]:
@@ -2464,9 +2498,9 @@ if nav == "🧑‍🎓 Student":
                         stroke_width=stroke_width,
                         stroke_color=stroke_color,
                         background_color=CANVAS_BG_HEX,
-                        height=520,
+                        height=canvas_height,
                         width=None,
-                        storage_key=f"panphy_canvas_h_{SUBJECT_SITE}_single",
+                        storage_key=canvas_storage_key,
                         initial_data_url=st.session_state.get("last_canvas_data_url_single"),
                         pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
                         tool=("pen" if tool == "Pen" else "eraser"),
@@ -2507,7 +2541,7 @@ if nav == "🧑‍🎓 Student":
                             stroke_width=stroke_width,
                             stroke_color=stroke_color,
                             background_color=CANVAS_BG_HEX,
-                            height=520,
+                            height=canvas_height,
                             width=600,
                             drawing_mode="freedraw",
                             key=f"canvas_single_{st.session_state['canvas_key']}",
@@ -2566,6 +2600,7 @@ if nav == "🧑‍🎓 Student":
                         )
                         st.stop()
 
+                    st.session_state["canvas_expanded_single"] = False
                     img_for_ai = preprocess_canvas_image(img_data)
 
                     canvas_bytes = _encode_image_bytes(img_for_ai, "JPEG", quality=80)
@@ -2702,10 +2737,22 @@ if nav == "🧑‍🎓 Student":
                     )
 
                     if str(mode_journey).startswith("⌨️"):
-                        st.markdown("**Answer (typed)**")
+                        text_header = st.columns([1, 0.12])
+                        with text_header[0]:
+                            st.markdown("**Answer (typed)**")
+                        with text_header[1]:
+                            text_expanded = bool(st.session_state.get("text_expanded_journey", False))
+                            if st.button(
+                                "⤡" if text_expanded else "⤢",
+                                help=("Collapse working area" if text_expanded else "Expand working area"),
+                                key="text_expand_btn_journey",
+                            ):
+                                st.session_state["text_expanded_journey"] = not text_expanded
+                                text_expanded = not text_expanded
+                        text_height = TEXTAREA_HEIGHT_EXPANDED if text_expanded else TEXTAREA_HEIGHT_DEFAULT
                         answer_journey = st.text_area(
                             "Type your working:",
-                            height=320,
+                            height=text_height,
                             placeholder="Enter your answer here...",
                             key="student_answer_text_journey",
                         )
@@ -2731,6 +2778,7 @@ if nav == "🧑‍🎓 Student":
                                     )
                                 else:
                                     increment_rate_limit(sid)
+                                    st.session_state["text_expanded_journey"] = False
 
                                     def task():
                                         return get_gpt_feedback_from_bank(
@@ -2769,7 +2817,24 @@ if nav == "🧑‍🎓 Student":
                                             step_index=step_i,
                                         )
                     else:
-                        st.markdown("**Answer (write/draw)**")
+                        canvas_header = st.columns([1, 0.12])
+                        with canvas_header[0]:
+                            st.markdown("**Answer (write/draw)**")
+                        with canvas_header[1]:
+                            canvas_expanded = bool(st.session_state.get("canvas_expanded_journey", False))
+                            if st.button(
+                                "⤡" if canvas_expanded else "⤢",
+                                help=("Collapse working area" if canvas_expanded else "Expand working area"),
+                                key="canvas_expand_btn_journey",
+                            ):
+                                st.session_state["canvas_expanded_journey"] = not canvas_expanded
+                                canvas_expanded = not canvas_expanded
+                        canvas_height = CANVAS_HEIGHT_EXPANDED if canvas_expanded else CANVAS_HEIGHT_DEFAULT
+                        canvas_storage_key = (
+                            f"panphy_canvas_h_{SUBJECT_SITE}_journey_expanded"
+                            if canvas_expanded
+                            else f"panphy_canvas_h_{SUBJECT_SITE}_journey"
+                        )
                         if _stylus_canvas_available():
                             tool_row = st.columns([2.2, 1.4, 1, 1])
                             with tool_row[0]:
@@ -2806,9 +2871,9 @@ if nav == "🧑‍🎓 Student":
                                 stroke_width=stroke_width,
                                 stroke_color=stroke_color,
                                 background_color=CANVAS_BG_HEX,
-                                height=520,
+                                height=canvas_height,
                                 width=None,
-                                storage_key=f"panphy_canvas_h_{SUBJECT_SITE}_journey",
+                                storage_key=canvas_storage_key,
                                 initial_data_url=st.session_state.get("last_canvas_data_url_journey"),
                                 pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
                                 tool=("pen" if tool == "Pen" else "eraser"),
@@ -2848,7 +2913,7 @@ if nav == "🧑‍🎓 Student":
                                     stroke_width=stroke_width,
                                     stroke_color=stroke_color,
                                     background_color=CANVAS_BG_HEX,
-                                    height=520,
+                                    height=canvas_height,
                                     width=600,
                                     drawing_mode="freedraw",
                                     key=f"canvas_journey_{st.session_state['canvas_key']}",
@@ -2907,6 +2972,7 @@ if nav == "🧑‍🎓 Student":
                                 )
                                 st.stop()
 
+                            st.session_state["canvas_expanded_journey"] = False
                             img_for_ai = preprocess_canvas_image(img_data)
 
                             canvas_bytes = _encode_image_bytes(img_for_ai, "JPEG", quality=80)
