@@ -1508,8 +1508,9 @@ def load_attempts_df_cached(_fp: str, subject_site: str, limit: int = 5000) -> p
 
 def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
     fp = (st.secrets.get("DATABASE_URL", "") or "")[:40]
+    subject_site = (SUBJECT_SITE or "").strip().lower()
     try:
-        return load_attempts_df_cached(fp, subject_site=SUBJECT_SITE, limit=limit)
+        return load_attempts_df_cached(fp, subject_site=subject_site, limit=limit)
     except Exception as e:
         st.session_state["db_last_error"] = f"Load Error: {type(e).__name__}: {e}"
         return pd.DataFrame()
