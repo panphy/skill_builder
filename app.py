@@ -3665,6 +3665,8 @@ else:
                     df_f = df_all
                     if src_sel:
                         df_f = df_f[df_f["source"].isin(src_sel)]
+                    else:
+                        df_f = df_f.iloc[0:0]
                     if asg_sel != "All":
                         df_f = df_f[df_f["assignment_name"] == asg_sel]
                     if (search_txt or "").strip():
