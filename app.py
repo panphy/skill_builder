@@ -4045,7 +4045,7 @@ else:
 
                     # --- Left column: topic selection + controls ---
                     with jc1:
-                        st.write("### Journey topics")
+                        st.write("### Journey topic")
 
                         if "journey_topics_selected" not in st.session_state:
                             st.session_state["journey_topics_selected"] = []
@@ -4053,41 +4053,27 @@ else:
                             st.session_state["journey_show_error"] = False
 
                         topic_pick = st.selectbox(
-                            "Choose a topic to add",
+                            "Choose a topic",
                             options=get_topic_names_for_track(st.session_state.get("track", TRACK_DEFAULT)),
                             key="jour_topic_pick",
-                            help="Add one or more topics. The journey will blend these topics into 5 steps (about 10 minutes).",
+                            help="Select a single topic. The journey will build 5 steps (about 10 minutes).",
                         )
 
-                        add_c1, add_c2 = st.columns([1, 1])
-                        with add_c1:
-                            if st.button("Add topic", key="jour_add_topic", use_container_width=True):
-                                sel = list(st.session_state.get("journey_topics_selected", []) or [])
-                                if topic_pick and topic_pick not in sel:
-                                    sel.append(topic_pick)
-                                    st.session_state["journey_topics_selected"] = sel
-                                st.session_state["journey_show_error"] = False
-                                st.rerun()
-
-                        with add_c2:
-                            if st.button("Clear topics", key="jour_clear_topics", use_container_width=True):
-                                st.session_state["journey_topics_selected"] = []
-                                st.session_state["journey_show_error"] = False
-                                st.session_state["journey_draft"] = None
-                                st.rerun()
+                        st.session_state["journey_topics_selected"] = [topic_pick] if topic_pick else []
+                        st.session_state["journey_show_error"] = False
 
                         sel_topics = list(st.session_state.get("journey_topics_selected", []) or [])
                         if sel_topics:
-                            st.markdown("**Selected topics:**")
-                            st.markdown("\n".join([f"- {t}" for t in sel_topics]))
+                            st.markdown("**Selected topic:**")
+                            st.markdown(f"- {sel_topics[0]}")
                         else:
-                            st.info("Add at least one topic to build a journey.")
+                            st.info("Choose a topic to build a journey.")
 
                         # Fixed journey size: 10 minutes, 5 steps
                         j_duration = 10
                         st.caption("Journey length is fixed: 10 minutes, 5 steps.")
 
-                        st.caption("Focus is chosen automatically based on the selected topic(s).")
+                        st.caption("Focus is chosen automatically based on the selected topic.")
                         j_assignment = st.text_input("Assignment name for saving", value="Topic Journey", key="jour_assignment")
                         j_tags = st.text_input("Tags (comma separated)", value="", key="jour_tags")
 
