@@ -2406,17 +2406,17 @@ if nav == "🧑‍🎓 Student":
 
             st.write("")
             st.markdown("**Answer in the box below.**")
-            mode_single = st.radio(
-                "Answer mode",
-                ["⌨️ Type answer", "✍️ Write answer"],
-                horizontal=True,
-                label_visibility="collapsed",
-                key="answer_mode_single",
-            )
-
-            if str(mode_single).startswith("⌨️"):
-                text_header = st.columns([1, 0.12])
-                with text_header[1]:
+            mode_row = st.columns([0.12, 0.88])
+            with mode_row[1]:
+                mode_single = st.radio(
+                    "Answer mode",
+                    ["⌨️ Type answer", "✍️ Write answer"],
+                    horizontal=True,
+                    label_visibility="collapsed",
+                    key="answer_mode_single",
+                )
+            with mode_row[0]:
+                if str(mode_single).startswith("⌨️"):
                     text_expanded = bool(st.session_state.get("text_expanded_single", False))
                     if st.button(
                         "⤡" if text_expanded else "⤢",
@@ -2425,6 +2425,17 @@ if nav == "🧑‍🎓 Student":
                     ):
                         st.session_state["text_expanded_single"] = not text_expanded
                         text_expanded = not text_expanded
+                else:
+                    canvas_expanded = bool(st.session_state.get("canvas_expanded_single", False))
+                    if st.button(
+                        "⤡" if canvas_expanded else "⤢",
+                        help=("Collapse working area" if canvas_expanded else "Expand working area"),
+                        key="canvas_expand_btn_single",
+                    ):
+                        st.session_state["canvas_expanded_single"] = not canvas_expanded
+                        canvas_expanded = not canvas_expanded
+
+            if str(mode_single).startswith("⌨️"):
                 text_height = TEXTAREA_HEIGHT_EXPANDED if text_expanded else TEXTAREA_HEIGHT_DEFAULT
                 answer_single = st.text_area(
                     "Type your working:",
@@ -2487,16 +2498,6 @@ if nav == "🧑‍🎓 Student":
                                     question_bank_id=qid,
                                 )
             else:
-                canvas_header = st.columns([1, 0.12])
-                with canvas_header[1]:
-                    canvas_expanded = bool(st.session_state.get("canvas_expanded_single", False))
-                    if st.button(
-                        "⤡" if canvas_expanded else "⤢",
-                        help=("Collapse working area" if canvas_expanded else "Expand working area"),
-                        key="canvas_expand_btn_single",
-                    ):
-                        st.session_state["canvas_expanded_single"] = not canvas_expanded
-                        canvas_expanded = not canvas_expanded
                 canvas_height = CANVAS_HEIGHT_EXPANDED if canvas_expanded else CANVAS_HEIGHT_DEFAULT
                 canvas_storage_key = (
                     f"panphy_canvas_h_{SUBJECT_SITE}_single_expanded"
