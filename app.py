@@ -2076,6 +2076,56 @@ def generate_practice_question_with_ai(
 
         return (len(reasons) == 0), reasons
 
+    def _self_check_equations(d: Dict[str, Any]) -> List[str]:
+        if not SUBJECT_EQUATIONS.get("key_equations"):
+            return []
+        qtxt = str(d.get("question_text", "") or "").strip()
+        mstxt = str(d.get("markscheme_text", "") or "").strip()
+        if not qtxt and not mstxt:
+            return []
+
+        system = (
+            "You are a strict equation-sheet compliance checker. "
+            "Given a question and markscheme, list every equation used or implied, "
+            "and confirm whether each equation is present in the provided equation sheet. "
+            "Return JSON only with keys: used_equations (array of strings), "
+            "disallowed_equations (array of strings). "
+            "If none, use empty arrays."
+        )
+        user = "\n\n".join([
+            "EQUATION SHEET:",
+            EQUATION_GUARDRAILS or "(none)",
+            "QUESTION:",
+            qtxt or "(none)",
+            "MARKSCHEME:",
+            mstxt or "(none)",
+        ])
+
+        try:
+            response = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                max_completion_tokens=800,
+                response_format={"type": "json_object"},
+            )
+            raw = response.choices[0].message.content or ""
+            data = safe_parse_json(raw) or {}
+        except Exception:
+            return []
+
+        disallowed = data.get("disallowed_equations", [])
+        if not isinstance(disallowed, list):
+            return []
+        items = [str(x).strip() for x in disallowed if str(x).strip()]
+        if not items:
+            return []
+        return [
+            "Self-check flagged disallowed equation(s): " + "; ".join(items[:8])
+        ]
+
     def _call_model(repair: bool, reasons: Optional[List[str]] = None) -> Dict[str, Any]:
         system = _render_template(QGEN_SYSTEM_TPL, {
             "GCSE_ONLY_GUARDRAILS": GCSE_ONLY_GUARDRAILS,
@@ -2120,6 +2170,8 @@ def generate_practice_question_with_ai(
 
     data = _call_model(repair=False)
     ok, reasons = _validate(data)
+    reasons.extend(_self_check_equations(data))
+    ok = ok and len(reasons) == 0
 
     if not ok:
         data2 = _call_model(repair=True, reasons=reasons)
