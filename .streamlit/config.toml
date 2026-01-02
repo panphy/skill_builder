@@ -1,4 +1,8 @@
-# The "Separate" badge uses the app primary color. To make it turquoise, set theme.primaryColor in .streamlit/config.toml (e.g. #20C997)
-
+# PanPhy visual system theme
 [theme]
-primaryColor = "#20C997"  # turquoise
+base = "light"
+primaryColor = "#2F80ED"
+backgroundColor = "#F6F8FC"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#0F172A"
+font = "sans serif"
