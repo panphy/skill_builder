@@ -81,6 +81,11 @@ st.set_page_config(
 st.markdown(
     """
 <style>
+section[data-testid="stSidebar"],
+section[data-testid="stSidebar"] > div {
+  width: 240px;
+}
+
 div[data-testid="stButton"] button[aria-label="⤢"] span,
 div[data-testid="stButton"] button[aria-label="⤡"] span {
   font-size: 22px;
