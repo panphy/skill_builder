@@ -86,6 +86,11 @@ section[data-testid="stSidebar"] > div {
   width: 240px;
 }
 
+section[data-testid="stSidebar"] div[data-testid="stSidebarUserContent"] {
+  padding-right: 0.5rem;
+  padding-left: 0.75rem;
+}
+
 div[data-testid="stButton"] button[aria-label="⤢"] span,
 div[data-testid="stButton"] button[aria-label="⤡"] span {
   font-size: 22px;
