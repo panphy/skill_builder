@@ -14,6 +14,15 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine, text
 import secrets as pysecrets
+from components.ui import (
+    inject_global_styles,
+    render_hero,
+    render_card,
+    render_empty_state,
+    render_skeleton,
+    render_callout,
+    render_bullets,
+)
 
 import logging
 from logging.handlers import RotatingFileHandler
@@ -91,6 +100,7 @@ div[data-testid="stButton"] button[aria-label="⤡"] span {
 """,
     unsafe_allow_html=True,
 )
+inject_global_styles()
 
 # =========================
 # --- CONSTANTS ---
@@ -115,6 +125,29 @@ MAX_DIM_PX = 4000
 QUESTION_MAX_MB = 5.0
 MARKSCHEME_MAX_MB = 5.0
 CANVAS_MAX_MB = 2.0
+
+PERSONAS = [
+    {
+        "title": "Focused GCSE student",
+        "job": "Practice a specific topic and get fast, actionable feedback.",
+        "needs": "Clear prompts, quick scoring, and next-step guidance.",
+    },
+    {
+        "title": "Time-strapped teacher",
+        "job": "Publish questions, see class trends, and spot gaps.",
+        "needs": "Easy upload, analytics, and reusable questions.",
+    },
+    {
+        "title": "Head of Science",
+        "job": "Standardize practice quality and track progress at scale.",
+        "needs": "Consistent feedback and exportable evidence.",
+    },
+]
+
+PREMIUM_ENABLED = bool(
+    st.secrets.get("PREMIUM_ENABLED", False)
+    or str(os.getenv("PREMIUM_ENABLED", "")).strip().lower() in {"1", "true", "yes"}
+)
 
 # ============================================================
 # SUBJECT CONTENT (topics + prompts)
@@ -2504,14 +2537,115 @@ def render_report(report: dict):
         for n in report["next_steps"]:
             st.markdown(normalize_markdown_math(f"- {n}"))
 
+
+def premium_active() -> bool:
+    return bool(st.session_state.get("premium_preview", False) or PREMIUM_ENABLED)
+
+
+def render_feedback_panel(q_row: Dict[str, Any], q_type: str, journey_obj: Optional[dict]):
+    with st.container(border=True):
+        if st.session_state.get("feedback"):
+            render_report(st.session_state["feedback"])
+
+            if q_row and q_type == "journey":
+                step_i = int(st.session_state.get("journey_step_index", 0) or 0)
+                notes = st.session_state.get("journey_checkpoint_notes", {}) or {}
+                note_md = notes.get(str(step_i))
+                if note_md:
+                    st.divider()
+                    st.markdown(normalize_markdown_math(note_md))
+
+            st.divider()
+
+            if q_row and q_type == "journey":
+                step_i = int(st.session_state.get("journey_step_index", 0) or 0)
+                steps = (journey_obj or {}).get("steps", [])
+                total_steps = len(steps) if isinstance(steps, list) else 0
+
+                def _reset_answer_inputs_for_step():
+                    st.session_state["last_canvas_image_data"] = None  # legacy
+                    st.session_state["last_canvas_image_data_journey"] = None
+                    st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
+                    st.session_state["student_answer_text_journey"] = ""
+
+                def _journey_redo_cb():
+                    st.session_state["feedback"] = None
+                    _reset_answer_inputs_for_step()
+
+                def _journey_next_cb(step_i: int, total_steps: int):
+                    st.session_state["feedback"] = None
+                    _reset_answer_inputs_for_step()
+                    st.session_state["journey_step_index"] = min(step_i + 1, max(0, total_steps - 1))
+
+                cbtn1, cbtn2 = st.columns(2)
+                with cbtn1:
+                    st.button("Redo this step", width='stretch', key="journey_redo", on_click=_journey_redo_cb)
+                with cbtn2:
+                    next_disabled = (total_steps <= 0) or (step_i >= total_steps - 1)
+                    label = "Finish" if next_disabled else "Next step"
+                    st.button(
+                        label,
+                        width='stretch',
+                        disabled=next_disabled,
+                        key="journey_next",
+                        on_click=_journey_next_cb,
+                        args=(step_i, total_steps),
+                    )
+
+                if total_steps > 0 and step_i >= total_steps - 1:
+                    st.success("Journey complete! You can redo the final step, or choose a new assignment.")
+            else:
+                def _new_attempt_cb():
+                    st.session_state["feedback"] = None
+                    st.session_state["last_canvas_image_data"] = None  # legacy
+                    st.session_state["last_canvas_image_data_single"] = None
+                    st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
+                    st.session_state["student_answer_text_single"] = ""
+
+                st.button("Start New Attempt", width='stretch', key="new_attempt", on_click=_new_attempt_cb)
+        else:
+            st.info("Submit an answer to receive feedback.")
+
+
+def build_feedback_exports(report: dict) -> Tuple[str, str]:
+    if not report:
+        return "", ""
+    md_parts = [
+        f"**Marks:** {int(report.get('marks_awarded', 0))} / {int(report.get('max_marks', 0))}",
+        "",
+        f"**Summary:** {report.get('summary', '')}",
+        "",
+    ]
+    feedback_points = report.get("feedback_points") or []
+    if feedback_points:
+        md_parts.append("**Feedback**")
+        md_parts.extend([f"- {p}" for p in feedback_points])
+        md_parts.append("")
+    next_steps = report.get("next_steps") or []
+    if next_steps:
+        md_parts.append("**Next steps**")
+        md_parts.extend([f"- {p}" for p in next_steps])
+        md_parts.append("")
+    md_out = "\n".join([p for p in md_parts if p is not None])
+    json_out = json.dumps(report, indent=2)
+    return md_out, json_out
+
 # ============================================================
 # NAVIGATION
 # ============================================================
 st.sidebar.title("⚛️ PanPhy")
 nav = st.sidebar.radio(
     "Navigate",
-    ["🧑‍🎓 Student", "🔒 Teacher Dashboard", "📚 Question Bank"],
-    index=0,
+    [
+        "✨ Onboarding",
+        "🧑‍🎓 Practice",
+        "📊 Results",
+        "⬇️ Export & Share",
+        "🔒 Teacher Dashboard",
+        "📚 Question Bank",
+        "💎 Upgrade",
+    ],
+    index=1,
     key="nav_page",
 )
 
@@ -2530,6 +2664,12 @@ if _sb_track != st.session_state.get("track", TRACK_DEFAULT):
 _persist_track_to_browser(st.session_state.get("track", TRACK_DEFAULT))
 
 with st.sidebar:
+    st.caption("Plan: Starter")
+    st.caption(f"Usage limit: {RATE_LIMIT_MAX} AI checks/hour")
+    if st.button("Upgrade", width='stretch', key="sidebar_upgrade"):
+        st.session_state["nav_page"] = "💎 Upgrade"
+        st.rerun()
+
     if st.session_state.get("track", TRACK_DEFAULT) == "combined":
         if hasattr(st, "badge"):
             st.badge("COMBINED", color="orange")
@@ -2578,110 +2718,182 @@ with header_right:
             st.caption(msg)
 
 # ============================================================
-# STUDENT PAGE
+# ONBOARDING PAGE
 # ============================================================
-if nav == "🧑‍🎓 Student":
+if nav == "✨ Onboarding":
+    render_hero(
+        "PanPhy Skill Builder",
+        "A focused practice studio for GCSE Physics. Shorten feedback loops, capture evidence, and keep students moving.",
+        badge="UX refresh in progress",
+    )
+    st.divider()
+
+    st.markdown("### Target personas & jobs-to-be-done")
+    p_cols = st.columns(3)
+    for col, persona in zip(p_cols, PERSONAS):
+        with col:
+            render_card(
+                persona["title"],
+                persona["job"],
+                caption=f"Needs: {persona['needs']}",
+            )
+
+    st.markdown("### Current flow audit (key friction points)")
+    render_callout(
+        "Findings",
+        "Dense forms, unclear progress, and long vertical flows made it hard to know what to do next. "
+        "We now guide users through a clear step sequence and provide strong empty/loading states.",
+    )
+
+    st.markdown("### New information architecture")
+    render_bullets(
+        [
+            "Onboarding → Practice → Results → Export/Share",
+            "Teacher analytics and question bank live in separate admin pages.",
+            "Upgrade surfaces highlight premium features without blocking core learning.",
+        ]
+    )
+
+    st.markdown("### Getting started")
+    render_callout(
+        "Recommended path",
+        "Use Practice to select a question, submit work, and review AI feedback. "
+        "Visit Results for saved feedback and Export/Share to capture evidence.",
+    )
+
+# ============================================================
+# STUDENT PRACTICE PAGE
+# ============================================================
+elif nav == "🧑‍🎓 Practice":
     st.divider()
 
     source_options = ["AI Practice", "Teacher Uploads", "All"]
     expand_by_default = st.session_state.get("selected_qid") is None
 
-    with st.expander("Question selection", expanded=expand_by_default):
-        sel1, sel2 = st.columns([2, 2])
-        with sel1:
-            source = st.selectbox("Source", source_options, key="student_source")
-        with sel2:
-            st.text_input(
-                "Student ID (optional)",
-                placeholder="e.g. 10A_23",
-                help="Leave blank to submit anonymously.",
-                key="student_id",
-            )
+    if "student_flow_step" not in st.session_state:
+        st.session_state["student_flow_step"] = 0
 
-        if not db_ready():
-            st.error("Database not ready. Configure DATABASE_URL first.")
-        else:
-            dfb = load_question_bank_df(limit=5000)
-            if dfb.empty:
-                st.info("No questions in the database yet. Ask your teacher to generate or upload questions in the Question Bank page.")
+    step_labels = ["1. Select", "2. Solve", "3. Review"]
+    step_index = int(st.session_state.get("student_flow_step", 0))
+    step_index = max(0, min(step_index, len(step_labels) - 1))
+
+    step_choice = st.radio(
+        "Progress",
+        step_labels,
+        index=step_index,
+        horizontal=True,
+        key="student_flow_step_radio",
+    )
+    step_index = step_labels.index(step_choice)
+    st.session_state["student_flow_step"] = step_index
+
+    if step_index == 0:
+        with st.expander("Question selection", expanded=expand_by_default):
+            sel1, sel2 = st.columns([2, 2])
+            with sel1:
+                source = st.selectbox("Source", source_options, key="student_source")
+            with sel2:
+                st.text_input(
+                    "Student ID (optional)",
+                    placeholder="e.g. 10A_23",
+                    help="Leave blank to submit anonymously.",
+                    key="student_id",
+                )
+
+            if not db_ready():
+                st.error("Database not ready. Configure DATABASE_URL first.")
             else:
-                if source == "AI Practice":
-                    df_src = dfb[dfb["source"] == "ai_generated"].copy()
-                elif source == "Teacher Uploads":
-                    df_src = dfb[dfb["source"] == "teacher"].copy()
+                dfb = load_question_bank_df(limit=5000)
+                if dfb.empty:
+                    st.info(
+                        "No questions in the database yet. Ask your teacher to generate or upload questions in the Question Bank page."
+                    )
                 else:
-                    df_src = dfb.copy()
-
-                if df_src.empty:
-                    st.info("No questions available for this source yet.")
-                else:
-                    assignments = ["All"] + sorted(df_src["assignment_name"].dropna().unique().tolist())
-                    if st.session_state.get("student_assignment_filter") not in assignments:
-                        st.session_state["student_assignment_filter"] = "All"
-                    assignment_filter = st.selectbox("Assignment", assignments, key="student_assignment_filter")
-
-                    if assignment_filter != "All":
-                        df2 = df_src[df_src["assignment_name"] == assignment_filter].copy()
+                    if source == "AI Practice":
+                        df_src = dfb[dfb["source"] == "ai_generated"].copy()
+                    elif source == "Teacher Uploads":
+                        df_src = dfb[dfb["source"] == "teacher"].copy()
                     else:
-                        df2 = df_src.copy()
+                        df_src = dfb.copy()
 
-                    if df2.empty:
-                        st.info("No questions available for this assignment.")
+                    if df_src.empty:
+                        st.info("No questions available for this source yet.")
                     else:
-                        df2 = df2.sort_values(["assignment_name", "question_label", "id"], kind="mergesort")
-                        df2["label"] = df2.apply(
-                            lambda r: f"{r['assignment_name']} | {r['question_label']} ({int(r['max_marks'])} marks) [{r.get('question_type','single')}] [id {int(r['id'])}]",
-                            axis=1
-                        )
-                        choices = df2["label"].tolist()
-                        labels_map = dict(zip(df2["label"], df2["id"]))
+                        assignments = ["All"] + sorted(df_src["assignment_name"].dropna().unique().tolist())
+                        if st.session_state.get("student_assignment_filter") not in assignments:
+                            st.session_state["student_assignment_filter"] = "All"
+                        assignment_filter = st.selectbox("Assignment", assignments, key="student_assignment_filter")
 
-                        choice_key = f"student_question_choice::{source}::{assignment_filter}"
-                        if st.session_state.get(choice_key) not in choices:
-                            st.session_state[choice_key] = choices[0]
+                        if assignment_filter != "All":
+                            df2 = df_src[df_src["assignment_name"] == assignment_filter].copy()
+                        else:
+                            df2 = df_src.copy()
 
-                        choice = st.selectbox("Question", choices, key=choice_key)
-                        chosen_id = int(labels_map.get(choice, 0)) if choice else 0
+                        if df2.empty:
+                            st.info("No questions available for this assignment.")
+                        else:
+                            df2 = df2.sort_values(["assignment_name", "question_label", "id"], kind="mergesort")
+                            df2["label"] = df2.apply(
+                                lambda r: (
+                                    f"{r['assignment_name']} | {r['question_label']} ({int(r['max_marks'])} marks) "
+                                    f"[{r.get('question_type','single')}] [id {int(r['id'])}]"
+                                ),
+                                axis=1,
+                            )
+                            choices = df2["label"].tolist()
+                            labels_map = dict(zip(df2["label"], df2["id"]))
 
-                        if chosen_id:
-                            if st.session_state.get("selected_qid") != chosen_id:
-                                st.session_state["selected_qid"] = chosen_id
+                            choice_key = f"student_question_choice::{source}::{assignment_filter}"
+                            if st.session_state.get(choice_key) not in choices:
+                                st.session_state[choice_key] = choices[0]
 
-                                q_row = load_question_by_id(chosen_id)
-                                st.session_state["cached_q_row"] = q_row
+                            choice = st.selectbox("Question", choices, key=choice_key)
+                            chosen_id = int(labels_map.get(choice, 0)) if choice else 0
 
-                                st.session_state["cached_q_path"] = (q_row.get("question_image_path") or "").strip()
-                                st.session_state["cached_ms_path"] = (q_row.get("markscheme_image_path") or "").strip()
+                            if chosen_id:
+                                if st.session_state.get("selected_qid") != chosen_id:
+                                    st.session_state["selected_qid"] = chosen_id
 
-                                q_path = (st.session_state.get("cached_q_path") or "").strip()
-                                if q_path:
-                                    fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
-                                    q_bytes = cached_download_from_storage(q_path, fp)
-                                    st.session_state["cached_question_img"] = safe_bytes_to_pil(q_bytes)
-                                else:
-                                    st.session_state["cached_question_img"] = None
+                                    q_row = load_question_by_id(chosen_id)
+                                    st.session_state["cached_q_row"] = q_row
 
-                                # Reset attempt state
-                                st.session_state["feedback"] = None
-                                st.session_state["canvas_key"] += 1
-                                st.session_state["last_canvas_image_data"] = None  # legacy
-                                st.session_state["last_canvas_image_data_single"] = None
-                                st.session_state["last_canvas_data_url_single"] = None
-                                st.session_state["last_canvas_image_data_journey"] = None
-                                st.session_state["last_canvas_data_url_journey"] = None
+                                    st.session_state["cached_q_path"] = (q_row.get("question_image_path") or "").strip()
+                                    st.session_state["cached_ms_path"] = (q_row.get("markscheme_image_path") or "").strip()
 
-                                # Reset Topic Journey state (if applicable)
-                                st.session_state["journey_step_index"] = 0
-                                st.session_state["journey_step_reports"] = []
-                                st.session_state["journey_checkpoint_notes"] = {}
-                                st.session_state["journey_active_id"] = int(chosen_id)
-                                st.session_state["journey_json_cache"] = None
-                                st.session_state["student_answer_text_single"] = ""
-                                st.session_state["student_answer_text_journey"] = ""
+                                    q_path = (st.session_state.get("cached_q_path") or "").strip()
+                                    if q_path:
+                                        fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
+                                        q_bytes = cached_download_from_storage(q_path, fp)
+                                        st.session_state["cached_question_img"] = safe_bytes_to_pil(q_bytes)
+                                    else:
+                                        st.session_state["cached_question_img"] = None
 
-    if st.session_state.get("cached_q_row"):
-        _qr = st.session_state["cached_q_row"]
-        st.caption(f"Selected: {_qr.get('assignment_name', '')} | {_qr.get('question_label', '')}")
+                                    # Reset attempt state
+                                    st.session_state["feedback"] = None
+                                    st.session_state["canvas_key"] += 1
+                                    st.session_state["last_canvas_image_data"] = None  # legacy
+                                    st.session_state["last_canvas_image_data_single"] = None
+                                    st.session_state["last_canvas_data_url_single"] = None
+                                    st.session_state["last_canvas_image_data_journey"] = None
+                                    st.session_state["last_canvas_data_url_journey"] = None
+
+                                    # Reset Topic Journey state (if applicable)
+                                    st.session_state["journey_step_index"] = 0
+                                    st.session_state["journey_step_reports"] = []
+                                    st.session_state["journey_checkpoint_notes"] = {}
+                                    st.session_state["journey_active_id"] = int(chosen_id)
+                                    st.session_state["journey_json_cache"] = None
+                                    st.session_state["student_answer_text_single"] = ""
+                                    st.session_state["student_answer_text_journey"] = ""
+
+        if st.session_state.get("cached_q_row"):
+            _qr = st.session_state["cached_q_row"]
+            st.caption(f"Selected: {_qr.get('assignment_name', '')} | {_qr.get('question_label', '')}")
+            if st.button("Continue to Solve", type="primary", width='stretch', key="continue_to_solve"):
+                st.session_state["student_flow_step"] = 1
+                st.rerun()
+        else:
+            render_empty_state("🧪", "Choose a question", "Select a question to unlock the solve step.")
 
     student_id = st.session_state.get("student_id", "") or ""
     q_row: Dict[str, Any] = st.session_state.get("cached_q_row") or {}
@@ -2715,443 +2927,91 @@ if nav == "🧑‍🎓 Student":
                 journey_obj = {}
             st.session_state["journey_json_cache"] = journey_obj
 
-    col1, col2 = st.columns([5, 4])
+    if step_index == 1:
+        top_actions = st.columns([1, 1, 2])
+        with top_actions[0]:
+            if st.button("Change question", width='stretch', key="step_change_question"):
+                st.session_state["student_flow_step"] = 0
+                st.rerun()
+        with top_actions[1]:
+            if st.session_state.get("feedback") and st.button("Review results", width='stretch', key="step_review"):
+                st.session_state["student_flow_step"] = 2
+                st.rerun()
+
+        col1, col2 = st.columns([5, 4])
 
         # -------------------------
-    # LEFT: Question + Answer
-    # -------------------------
-    with col1:
-        if not q_row:
-            st.subheader("📝 Question")
-            st.info("Select a question above to begin.")
-        elif q_type != "journey":
-            st.subheader("📝 Question")
-            max_marks = int(q_row.get("max_marks", 1))
-            q_text = (q_row.get("question_text") or "").strip()
-
-            with st.container(border=True):
-                if question_img is not None:
-                    st.image(question_img, caption="Question image", width='stretch')
-                if q_text:
-                    st.markdown(normalize_markdown_math(q_text))
-                if (question_img is None) and (not q_text):
-                    st.warning("This question has no question text or image.")
-            st.caption(f"Max Marks: {max_marks}")
-
-            st.write("")
-            st.markdown("**Answer in the box below.**")
-            mode_row = st.columns([0.88, 0.12])
-            with mode_row[0]:
-                mode_single = st.radio(
-                    "Answer mode",
-                    ["⌨️ Type answer", "✍️ Write answer"],
-                    horizontal=True,
-                    label_visibility="collapsed",
-                    key="answer_mode_single",
-                )
-            with mode_row[1]:
-                if str(mode_single).startswith("⌨️"):
-                    text_expanded = bool(st.session_state.get("text_expanded_single", False))
-                    if st.button(
-                        "⤡" if text_expanded else "⤢",
-                        help=("Collapse working area" if text_expanded else "Expand working area"),
-                        key="text_expand_btn_single",
-                    ):
-                        st.session_state["text_expanded_single"] = not text_expanded
-                        text_expanded = not text_expanded
-                else:
-                    canvas_expanded = bool(st.session_state.get("canvas_expanded_single", False))
-                    if st.button(
-                        "⤡" if canvas_expanded else "⤢",
-                        help=("Collapse working area" if canvas_expanded else "Expand working area"),
-                        key="canvas_expand_btn_single",
-                    ):
-                        st.session_state["canvas_expanded_single"] = not canvas_expanded
-                        canvas_expanded = not canvas_expanded
-
-            if str(mode_single).startswith("⌨️"):
-                text_height = TEXTAREA_HEIGHT_EXPANDED if text_expanded else TEXTAREA_HEIGHT_DEFAULT
-                answer_single = st.text_area(
-                    "Type your working:",
-                    height=text_height,
-                    placeholder="Enter your answer here...",
-                    key="student_answer_text_single",
-                )
-
-                if st.button(
-                    "Submit Text",
-                    type="primary",
-                    disabled=not AI_READY or not db_ready(),
-                    key="submit_text_btn_single",
-                ):
-                    sid = _effective_student_id(student_id)
-
-                    if not str(answer_single).strip():
-                        st.toast("Please type an answer first.", icon="⚠️")
-                    else:
-                        try:
-                            allowed_now, _, reset_str = _check_rate_limit_db(sid)
-                        except Exception:
-                            allowed_now, reset_str = True, ""
-                        if not allowed_now:
-                            st.error(
-                                f"You’ve reached the limit of {RATE_LIMIT_MAX} submissions per hour. Please try again at {reset_str}."
-                            )
-                        else:
-                            increment_rate_limit(sid)
-                            st.session_state["text_expanded_single"] = False
-
-                            def task():
-                                ms_path = (st.session_state.get("cached_ms_path") or q_row.get("markscheme_image_path") or "").strip()
-                                ms_img = None
-                                if ms_path:
-                                    fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
-                                    ms_bytes = cached_download_from_storage(ms_path, fp)
-                                    ms_img = bytes_to_pil(ms_bytes) if ms_bytes else None
-                                return get_gpt_feedback_from_bank(
-                                    student_answer=answer_single,
-                                    q_row=q_row,
-                                    is_student_image=False,
-                                    question_img=question_img,
-                                    markscheme_img=ms_img,
-                                )
-
-                            st.session_state["feedback"] = _run_ai_with_progress(
-                                task_fn=task,
-                                ctx={"student_id": sid, "question": q_key or "", "mode": "text"},
-                                typical_range="5-10 seconds",
-                                est_seconds=9.0,
-                            )
-
-                            if db_ready() and q_key:
-                                insert_attempt(
-                                    student_id,
-                                    q_key,
-                                    st.session_state["feedback"],
-                                    mode="text",
-                                    question_bank_id=qid,
-                                )
+        # LEFT: Question + Answer
+        # -------------------------
+        with col1:
+            if not q_row:
+                st.subheader("📝 Question")
+                render_skeleton(lines=4)
+                render_empty_state("🧭", "Select a question", "Go back to Step 1 to choose a prompt.")
             else:
-                canvas_height = CANVAS_HEIGHT_EXPANDED if canvas_expanded else CANVAS_HEIGHT_DEFAULT
-                canvas_storage_key = (
-                    f"panphy_canvas_h_{SUBJECT_SITE}_single_expanded"
-                    if canvas_expanded
-                    else f"panphy_canvas_h_{SUBJECT_SITE}_single"
-                )
-                if _stylus_canvas_available():
-                    tool_row = st.columns([2.2, 1.4, 1, 1])
-                    with tool_row[0]:
-                        tool = st.radio(
-                            "Tool",
-                            ["Pen", "Eraser"],
-                            horizontal=True,
-                            label_visibility="collapsed",
-                            key="canvas_tool_single",
-                        )
-                    with tool_row[1]:
-                        st.checkbox(
-                            "Stylus-only",
-                            help="Best on iPad. When enabled, finger/palm touches are ignored.",
-                            key="stylus_only_enabled",
-                        )
-                    undo_clicked = tool_row[2].button("↩️ Undo", width='stretch', key="canvas_undo_single")
-                    clear_clicked = tool_row[3].button("🗑️ Clear", width='stretch', key="canvas_clear_single")
-                    cmd = None
-                    if undo_clicked:
-                        st.session_state["feedback"] = None
-                        st.session_state["canvas_cmd_nonce_single"] = int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0) + 1
-                        cmd = "undo"
-                    if clear_clicked:
-                        st.session_state["feedback"] = None
-                        st.session_state["last_canvas_data_url_single"] = None
-                        st.session_state["last_canvas_image_data_single"] = None
-                        st.session_state["canvas_cmd_nonce_single"] = int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0) + 1
-                        st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
-                        cmd = "clear"
-
-                    stroke_width = 2 if tool == "Pen" else 30
-                    stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
-                    canvas_value = stylus_canvas(
-                        stroke_width=stroke_width,
-                        stroke_color=stroke_color,
-                        background_color=CANVAS_BG_HEX,
-                        height=canvas_height,
-                        width=None,
-                        storage_key=canvas_storage_key,
-                        initial_data_url=st.session_state.get("last_canvas_data_url_single"),
-                        pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
-                        tool=("pen" if tool == "Pen" else "eraser"),
-                        command=cmd,
-                        command_nonce=int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0),
-                        key=f"stylus_canvas_single_{qid or 'none'}_{st.session_state['canvas_key']}",
-                    )
-                    if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
-                        st.session_state["last_canvas_data_url_single"] = canvas_value.get("data_url")
-                else:
-                    tool_row = st.columns([2, 1])
-                    with tool_row[0]:
-                        tool = st.radio(
-                            "Tool",
-                            ["Pen", "Eraser"],
-                            horizontal=True,
-                            label_visibility="collapsed",
-                            key="canvas_tool_single",
-                        )
-                    clear_clicked = tool_row[1].button("🗑️ Clear", width='stretch', key="canvas_clear_single")
-                    if clear_clicked:
-                        st.session_state["feedback"] = None
-                        st.session_state["last_canvas_image_data_single"] = None
-                        st.session_state["last_canvas_data_url_single"] = None
-                        st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
-                        st.rerun()
-                    stroke_width = 2 if tool == "Pen" else 30
-                    stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
-                    try:
-                        from streamlit_drawable_canvas import st_canvas as _st_canvas
-                    except Exception:
-                        _st_canvas = None
-                    if _st_canvas is None:
-                        st.warning("Canvas unavailable. Add components folder or install streamlit-drawable-canvas.")
-                        canvas_result = None
-                    else:
-                        canvas_result = _st_canvas(
-                            stroke_width=stroke_width,
-                            stroke_color=stroke_color,
-                            background_color=CANVAS_BG_HEX,
-                            height=canvas_height,
-                            width=600,
-                            drawing_mode="freedraw",
-                            key=f"canvas_single_{st.session_state['canvas_key']}",
-                            display_toolbar=False,
-                            update_streamlit=True,
-                        )
-                        if canvas_result is not None and getattr(canvas_result, "image_data", None) is not None:
-                            if canvas_has_ink(canvas_result.image_data):
-                                st.session_state["last_canvas_image_data_single"] = canvas_result.image_data
-
-                submitted_writing = st.button(
-                    "Submit Writing",
-                    type="primary",
-                    disabled=not AI_READY or not db_ready(),
-                    key="submit_writing_btn_single",
-                )
-
-                if submitted_writing:
-                    sid = _effective_student_id(student_id)
-
-                    img_data = None
-                    if _stylus_canvas_available():
-                        data_url = None
-                        try:
-                            data_url = (canvas_value or {}).get("data_url") if isinstance(canvas_value, dict) else None
-                        except Exception:
-                            data_url = None
-                        if not data_url:
-                            data_url = st.session_state.get("last_canvas_data_url_single")
-                        if data_url:
-                            try:
-                                img_data = data_url_to_image_data(data_url)
-                                # Keep legacy cache in sync
-                                st.session_state["last_canvas_image_data_single"] = img_data
-                            except Exception:
-                                img_data = None
-                    else:
-                        if canvas_result is not None and getattr(canvas_result, "image_data", None) is not None:
-                            img_data = canvas_result.image_data
-                        if img_data is None:
-                            img_data = st.session_state.get("last_canvas_image_data_single")
-                    if img_data is None:
-                        img_data = st.session_state.get("last_canvas_image_data_single")
-
-                    if img_data is None or (not canvas_has_ink(img_data)):
-                        st.toast("Canvas is blank. Write your answer first, then press Submit.", icon="⚠️")
-                        st.stop()
-
-                    try:
-                        allowed_now, _, reset_str = _check_rate_limit_db(sid)
-                    except Exception:
-                        allowed_now, reset_str = True, ""
-                    if not allowed_now:
-                        st.error(
-                            f"You’ve reached the limit of {RATE_LIMIT_MAX} submissions per hour. Please try again at {reset_str}."
-                        )
-                        st.stop()
-
-                    st.session_state["canvas_expanded_single"] = False
-                    img_for_ai = preprocess_canvas_image(img_data)
-
-                    canvas_bytes = _encode_image_bytes(img_for_ai, "JPEG", quality=80)
-                    ok_canvas, msg_canvas = validate_image_file(canvas_bytes, CANVAS_MAX_MB, "canvas")
-                    if not ok_canvas:
-                        okc, outb, _outct, err = _compress_bytes_to_limit(
-                            canvas_bytes, CANVAS_MAX_MB, _purpose="canvas", prefer_fmt="JPEG"
-                        )
-                        if not okc:
-                            st.error(err or msg_canvas)
-                            st.stop()
-                        img_for_ai = Image.open(io.BytesIO(outb)).convert("RGB")
-
-                    increment_rate_limit(sid)
-
-                    def task():
-                        ms_path = (st.session_state.get("cached_ms_path") or q_row.get("markscheme_image_path") or "").strip()
-                        ms_img = None
-                        if ms_path:
-                            fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
-                            ms_bytes = cached_download_from_storage(ms_path, fp)
-                            ms_img = bytes_to_pil(ms_bytes) if ms_bytes else None
-                        return get_gpt_feedback_from_bank(
-                            student_answer=img_for_ai,
-                            q_row=q_row,
-                            is_student_image=True,
-                            question_img=question_img,
-                            markscheme_img=ms_img,
-                        )
-
-                    st.session_state["feedback"] = _run_ai_with_progress(
-                        task_fn=task,
-                        ctx={"student_id": sid, "question": q_key or "", "mode": "writing"},
-                        typical_range="8-15 seconds",
-                        est_seconds=13.0,
-                    )
-
-                    if db_ready() and q_key:
-                        insert_attempt(
-                            student_id,
-                            q_key,
-                            st.session_state["feedback"],
-                            mode="writing",
-                            question_bank_id=qid,
-                        )
-
-
-        else:
-            # -------------------------
-            # Topic Journey student flow (one step at a time)
-            # -------------------------
-            st.subheader("🧭 Topic Journey")
-            if not isinstance(journey_obj, dict) or not journey_obj.get("steps"):
-                st.error("This Topic Journey is missing its steps JSON.")
-            else:
-                steps = journey_obj.get("steps", [])
-                if not isinstance(steps, list) or not steps:
-                    st.error("This Topic Journey has no steps.")
-                else:
-                    step_i = int(st.session_state.get("journey_step_index", 0) or 0)
-                    step_i = max(0, min(step_i, len(steps) - 1))
-                    st.session_state["journey_step_index"] = step_i
-
-                    checkpoint_every = int(
-                        journey_obj.get("checkpoint_every", JOURNEY_CHECKPOINT_EVERY) or JOURNEY_CHECKPOINT_EVERY
-                    )
-
-                    st.caption(f"Step {step_i + 1} of {len(steps)}")
-                    step = steps[step_i] if step_i < len(steps) else {}
-
-                    obj = str(step.get("objective", "") or "").strip()
-                    qtxt = str(step.get("question_text", "") or "").strip()
-                    mm = clamp_int(step.get("max_marks", 1), 1, 50, default=1)
+                if q_type != "journey":
+                    st.subheader("📝 Question")
+                    max_marks = int(q_row.get("max_marks", 1))
+                    q_text = (q_row.get("question_text") or "").strip()
 
                     with st.container(border=True):
-                        if obj:
-                            st.markdown(normalize_markdown_math(f"**Objective:** {obj}"))
-                        if qtxt:
-                            st.markdown(normalize_markdown_math(qtxt))
-                        else:
-                            st.warning("This step has no question text.")
-
-                    st.caption(f"Max Marks (this step): {mm}")
-
-                    # Build a step-level q_row compatible with the marker
-                    step_q_row = {
-                        "max_marks": int(mm),
-                        "question_text": qtxt,
-                        "markscheme_text": str(step.get("markscheme_text", "") or "").strip(),
-                    }
-
-                    def _update_checkpoint_notes(reports_list, idx, total_steps):
-                        # Deterministic checkpoint summary (no extra AI calls)
-                        if not isinstance(reports_list, list):
-                            return
-                        if not (((idx + 1) % checkpoint_every == 0) or (idx == total_steps - 1)):
-                            return
-
-                        last_reports = [
-                            r
-                            for r in reports_list[max(0, idx - (checkpoint_every - 1)) : idx + 1]
-                            if isinstance(r, dict)
-                        ]
-                        mastered, improve = [], []
-                        for r in last_reports:
-                            if int(r.get("marks_awarded", 0)) >= int(r.get("max_marks", 1)):
-                                mastered.extend((r.get("feedback_points", []) or [])[:2])
-                            else:
-                                improve.extend((r.get("next_steps", []) or [])[:3])
-
-                        mastered = [m for m in mastered if str(m).strip()][:6]
-                        improve = [n for n in improve if str(n).strip()][:6]
-
-                        md = "### Checkpoint\n"
-                        md += "**Mastered (recent):**\n"
-                        md += "\n".join([f"- {x}" for x in mastered]) if mastered else "- (keep going - you're building foundations)"
-                        md += "\n\n**Next improvements:**\n"
-                        md += "\n".join([f"- {x}" for x in improve]) if improve else "- (no major issues detected in recent steps)"
-
-                        notes = st.session_state.get("journey_checkpoint_notes", {}) or {}
-                        if not isinstance(notes, dict):
-                            notes = {}
-                        notes[str(idx)] = md
-                        st.session_state["journey_checkpoint_notes"] = notes
+                        if question_img is not None:
+                            st.image(question_img, caption="Question image", width='stretch')
+                        if q_text:
+                            st.markdown(normalize_markdown_math(q_text))
+                        if (question_img is None) and (not q_text):
+                            st.warning("This question has no question text or image.")
+                    st.caption(f"Max Marks: {max_marks}")
 
                     st.write("")
                     st.markdown("**Answer in the box below.**")
                     mode_row = st.columns([0.88, 0.12])
                     with mode_row[0]:
-                        mode_journey = st.radio(
+                        mode_single = st.radio(
                             "Answer mode",
                             ["⌨️ Type answer", "✍️ Write answer"],
                             horizontal=True,
                             label_visibility="collapsed",
-                            key="answer_mode_journey",
+                            key="answer_mode_single",
                         )
                     with mode_row[1]:
-                        if str(mode_journey).startswith("⌨️"):
-                            text_expanded = bool(st.session_state.get("text_expanded_journey", False))
+                        if str(mode_single).startswith("⌨️"):
+                            text_expanded = bool(st.session_state.get("text_expanded_single", False))
                             if st.button(
                                 "⤡" if text_expanded else "⤢",
                                 help=("Collapse working area" if text_expanded else "Expand working area"),
-                                key="text_expand_btn_journey",
+                                key="text_expand_btn_single",
                             ):
-                                st.session_state["text_expanded_journey"] = not text_expanded
+                                st.session_state["text_expanded_single"] = not text_expanded
                                 text_expanded = not text_expanded
                         else:
-                            canvas_expanded = bool(st.session_state.get("canvas_expanded_journey", False))
+                            canvas_expanded = bool(st.session_state.get("canvas_expanded_single", False))
                             if st.button(
                                 "⤡" if canvas_expanded else "⤢",
                                 help=("Collapse working area" if canvas_expanded else "Expand working area"),
-                                key="canvas_expand_btn_journey",
+                                key="canvas_expand_btn_single",
                             ):
-                                st.session_state["canvas_expanded_journey"] = not canvas_expanded
+                                st.session_state["canvas_expanded_single"] = not canvas_expanded
                                 canvas_expanded = not canvas_expanded
 
-                    if str(mode_journey).startswith("⌨️"):
+                    if str(mode_single).startswith("⌨️"):
                         text_height = TEXTAREA_HEIGHT_EXPANDED if text_expanded else TEXTAREA_HEIGHT_DEFAULT
-                        answer_journey = st.text_area(
+                        answer_single = st.text_area(
                             "Type your working:",
                             height=text_height,
                             placeholder="Enter your answer here...",
-                            key="student_answer_text_journey",
+                            key="student_answer_text_single",
                         )
 
                         if st.button(
                             "Submit Text",
                             type="primary",
                             disabled=not AI_READY or not db_ready(),
-                            key="submit_text_btn_journey",
+                            key="submit_text_btn_single",
                         ):
                             sid = _effective_student_id(student_id)
 
-                            if not str(answer_journey).strip():
+                            if not str(answer_single).strip():
                                 st.toast("Please type an answer first.", icon="⚠️")
                             else:
                                 try:
@@ -3164,50 +3024,46 @@ if nav == "🧑‍🎓 Student":
                                     )
                                 else:
                                     increment_rate_limit(sid)
-                                    st.session_state["text_expanded_journey"] = False
+                                    st.session_state["text_expanded_single"] = False
 
                                     def task():
+                                        ms_path = (
+                                            st.session_state.get("cached_ms_path") or q_row.get("markscheme_image_path") or ""
+                                        ).strip()
+                                        ms_img = None
+                                        if ms_path:
+                                            fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
+                                            ms_bytes = cached_download_from_storage(ms_path, fp)
+                                            ms_img = bytes_to_pil(ms_bytes) if ms_bytes else None
                                         return get_gpt_feedback_from_bank(
-                                            student_answer=answer_journey,
-                                            q_row=step_q_row,
+                                            student_answer=answer_single,
+                                            q_row=q_row,
                                             is_student_image=False,
-                                            question_img=None,
-                                            markscheme_img=None,
+                                            question_img=question_img,
+                                            markscheme_img=ms_img,
                                         )
 
                                     st.session_state["feedback"] = _run_ai_with_progress(
                                         task_fn=task,
-                                        ctx={"student_id": sid, "question": q_key or "", "mode": f"journey_text_s{step_i}"},
+                                        ctx={"student_id": sid, "question": q_key or "", "mode": "text"},
                                         typical_range="5-10 seconds",
                                         est_seconds=9.0,
                                     )
-
-                                    # Store step report history
-                                    reports = st.session_state.get("journey_step_reports", [])
-                                    if not isinstance(reports, list):
-                                        reports = []
-                                    while len(reports) <= step_i:
-                                        reports.append(None)
-                                    reports[step_i] = st.session_state["feedback"]
-                                    st.session_state["journey_step_reports"] = reports
-
-                                    _update_checkpoint_notes(reports, step_i, len(steps))
 
                                     if db_ready() and q_key:
                                         insert_attempt(
                                             student_id,
                                             q_key,
                                             st.session_state["feedback"],
-                                            mode="journey_text",
+                                            mode="text",
                                             question_bank_id=qid,
-                                            step_index=step_i,
                                         )
                     else:
                         canvas_height = CANVAS_HEIGHT_EXPANDED if canvas_expanded else CANVAS_HEIGHT_DEFAULT
                         canvas_storage_key = (
-                            f"panphy_canvas_h_{SUBJECT_SITE}_journey_expanded"
+                            f"panphy_canvas_h_{SUBJECT_SITE}_single_expanded"
                             if canvas_expanded
-                            else f"panphy_canvas_h_{SUBJECT_SITE}_journey"
+                            else f"panphy_canvas_h_{SUBJECT_SITE}_single"
                         )
                         if _stylus_canvas_available():
                             tool_row = st.columns([2.2, 1.4, 1, 1])
@@ -3217,7 +3073,7 @@ if nav == "🧑‍🎓 Student":
                                     ["Pen", "Eraser"],
                                     horizontal=True,
                                     label_visibility="collapsed",
-                                    key="canvas_tool_journey",
+                                    key="canvas_tool_single",
                                 )
                             with tool_row[1]:
                                 st.checkbox(
@@ -3225,18 +3081,22 @@ if nav == "🧑‍🎓 Student":
                                     help="Best on iPad. When enabled, finger/palm touches are ignored.",
                                     key="stylus_only_enabled",
                                 )
-                            undo_clicked = tool_row[2].button("↩️ Undo", width='stretch', key="canvas_undo_journey")
-                            clear_clicked = tool_row[3].button("🗑️ Clear", width='stretch', key="canvas_clear_journey")
+                            undo_clicked = tool_row[2].button("↩️ Undo", width='stretch', key="canvas_undo_single")
+                            clear_clicked = tool_row[3].button("🗑️ Clear", width='stretch', key="canvas_clear_single")
                             cmd = None
                             if undo_clicked:
                                 st.session_state["feedback"] = None
-                                st.session_state["canvas_cmd_nonce_journey"] = int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0) + 1
+                                st.session_state["canvas_cmd_nonce_single"] = (
+                                    int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0) + 1
+                                )
                                 cmd = "undo"
                             if clear_clicked:
                                 st.session_state["feedback"] = None
-                                st.session_state["last_canvas_data_url_journey"] = None
-                                st.session_state["last_canvas_image_data_journey"] = None
-                                st.session_state["canvas_cmd_nonce_journey"] = int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0) + 1
+                                st.session_state["last_canvas_data_url_single"] = None
+                                st.session_state["last_canvas_image_data_single"] = None
+                                st.session_state["canvas_cmd_nonce_single"] = (
+                                    int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0) + 1
+                                )
                                 st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
                                 cmd = "clear"
 
@@ -3249,15 +3109,15 @@ if nav == "🧑‍🎓 Student":
                                 height=canvas_height,
                                 width=None,
                                 storage_key=canvas_storage_key,
-                                initial_data_url=st.session_state.get("last_canvas_data_url_journey"),
+                                initial_data_url=st.session_state.get("last_canvas_data_url_single"),
                                 pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
                                 tool=("pen" if tool == "Pen" else "eraser"),
                                 command=cmd,
-                                command_nonce=int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0),
-                                key=f"stylus_canvas_journey_{qid or 'none'}_{step_i}_{st.session_state['canvas_key']}",
+                                command_nonce=int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0),
+                                key=f"stylus_canvas_single_{qid or 'none'}_{st.session_state['canvas_key']}",
                             )
                             if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
-                                st.session_state["last_canvas_data_url_journey"] = canvas_value.get("data_url")
+                                st.session_state["last_canvas_data_url_single"] = canvas_value.get("data_url")
                         else:
                             tool_row = st.columns([2, 1])
                             with tool_row[0]:
@@ -3266,12 +3126,13 @@ if nav == "🧑‍🎓 Student":
                                     ["Pen", "Eraser"],
                                     horizontal=True,
                                     label_visibility="collapsed",
-                                    key="canvas_tool_journey",
+                                    key="canvas_tool_single",
                                 )
-                            clear_clicked = tool_row[1].button("🗑️ Clear", width='stretch', key="canvas_clear_journey")
+                            clear_clicked = tool_row[1].button("🗑️ Clear", width='stretch', key="canvas_clear_single")
                             if clear_clicked:
                                 st.session_state["feedback"] = None
-                                st.session_state["last_canvas_image_data_journey"] = None
+                                st.session_state["last_canvas_image_data_single"] = None
+                                st.session_state["last_canvas_data_url_single"] = None
                                 st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
                                 st.rerun()
                             stroke_width = 2 if tool == "Pen" else 30
@@ -3291,19 +3152,19 @@ if nav == "🧑‍🎓 Student":
                                     height=canvas_height,
                                     width=600,
                                     drawing_mode="freedraw",
-                                    key=f"canvas_journey_{st.session_state['canvas_key']}",
+                                    key=f"canvas_single_{st.session_state['canvas_key']}",
                                     display_toolbar=False,
                                     update_streamlit=True,
                                 )
                                 if canvas_result is not None and getattr(canvas_result, "image_data", None) is not None:
                                     if canvas_has_ink(canvas_result.image_data):
-                                        st.session_state["last_canvas_image_data_journey"] = canvas_result.image_data
+                                        st.session_state["last_canvas_image_data_single"] = canvas_result.image_data
 
                         submitted_writing = st.button(
                             "Submit Writing",
                             type="primary",
                             disabled=not AI_READY or not db_ready(),
-                            key="submit_writing_btn_journey",
+                            key="submit_writing_btn_single",
                         )
 
                         if submitted_writing:
@@ -3317,21 +3178,21 @@ if nav == "🧑‍🎓 Student":
                                 except Exception:
                                     data_url = None
                                 if not data_url:
-                                    data_url = st.session_state.get("last_canvas_data_url_journey")
+                                    data_url = st.session_state.get("last_canvas_data_url_single")
                                 if data_url:
                                     try:
                                         img_data = data_url_to_image_data(data_url)
                                         # Keep legacy cache in sync
-                                        st.session_state["last_canvas_image_data_journey"] = img_data
+                                        st.session_state["last_canvas_image_data_single"] = img_data
                                     except Exception:
                                         img_data = None
                             else:
                                 if canvas_result is not None and getattr(canvas_result, "image_data", None) is not None:
                                     img_data = canvas_result.image_data
                                 if img_data is None:
-                                    img_data = st.session_state.get("last_canvas_image_data_journey")
+                                    img_data = st.session_state.get("last_canvas_image_data_single")
                             if img_data is None:
-                                img_data = st.session_state.get("last_canvas_image_data_journey")
+                                img_data = st.session_state.get("last_canvas_image_data_single")
 
                             if img_data is None or (not canvas_has_ink(img_data)):
                                 st.toast("Canvas is blank. Write your answer first, then press Submit.", icon="⚠️")
@@ -3347,7 +3208,7 @@ if nav == "🧑‍🎓 Student":
                                 )
                                 st.stop()
 
-                            st.session_state["canvas_expanded_journey"] = False
+                            st.session_state["canvas_expanded_single"] = False
                             img_for_ai = preprocess_canvas_image(img_data)
 
                             canvas_bytes = _encode_image_bytes(img_for_ai, "JPEG", quality=80)
@@ -3364,111 +3225,540 @@ if nav == "🧑‍🎓 Student":
                             increment_rate_limit(sid)
 
                             def task():
+                                ms_path = (
+                                    st.session_state.get("cached_ms_path") or q_row.get("markscheme_image_path") or ""
+                                ).strip()
+                                ms_img = None
+                                if ms_path:
+                                    fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
+                                    ms_bytes = cached_download_from_storage(ms_path, fp)
+                                    ms_img = bytes_to_pil(ms_bytes) if ms_bytes else None
                                 return get_gpt_feedback_from_bank(
                                     student_answer=img_for_ai,
-                                    q_row=step_q_row,
+                                    q_row=q_row,
                                     is_student_image=True,
-                                    question_img=None,
-                                    markscheme_img=None,
+                                    question_img=question_img,
+                                    markscheme_img=ms_img,
                                 )
 
                             st.session_state["feedback"] = _run_ai_with_progress(
                                 task_fn=task,
-                                ctx={"student_id": sid, "question": q_key or "", "mode": f"journey_writing_s{step_i}"},
+                                ctx={"student_id": sid, "question": q_key or "", "mode": "writing"},
                                 typical_range="8-15 seconds",
                                 est_seconds=13.0,
                             )
-
-                            # Store step report history
-                            reports = st.session_state.get("journey_step_reports", [])
-                            if not isinstance(reports, list):
-                                reports = []
-                            while len(reports) <= step_i:
-                                reports.append(None)
-                            reports[step_i] = st.session_state["feedback"]
-                            st.session_state["journey_step_reports"] = reports
-
-                            _update_checkpoint_notes(reports, step_i, len(steps))
 
                             if db_ready() and q_key:
                                 insert_attempt(
                                     student_id,
                                     q_key,
                                     st.session_state["feedback"],
-                                    mode="journey_writing",
+                                    mode="writing",
                                     question_bank_id=qid,
-                                    step_index=step_i,
                                 )
 
-
-    # -------------------------
-    # RIGHT: Feedback
-    # -------------------------
-    with col2:
-        st.subheader("👨‍🏫 Feedback")
-        with st.container(border=True):
-            if st.session_state.get("feedback"):
-                render_report(st.session_state["feedback"])
-
-                # Journey checkpoint notes (if any)
-                if q_row and q_type == "journey":
-                    step_i = int(st.session_state.get("journey_step_index", 0) or 0)
-                    notes = st.session_state.get("journey_checkpoint_notes", {}) or {}
-                    note_md = notes.get(str(step_i))
-                    if note_md:
-                        st.divider()
-                        st.markdown(normalize_markdown_math(note_md))
-
-                st.divider()
-
-                if q_row and q_type == "journey":
-                    step_i = int(st.session_state.get("journey_step_index", 0) or 0)
-                    steps = (journey_obj or {}).get("steps", [])
-                    total_steps = len(steps) if isinstance(steps, list) else 0
-
-                    def _reset_answer_inputs_for_step():
-                        st.session_state["last_canvas_image_data"] = None  # legacy
-                        st.session_state["last_canvas_image_data_journey"] = None
-                        st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
-                        st.session_state["student_answer_text_journey"] = ""
-
-                    def _journey_redo_cb():
-                        st.session_state["feedback"] = None
-                        _reset_answer_inputs_for_step()
-
-                    def _journey_next_cb(step_i: int, total_steps: int):
-                        st.session_state["feedback"] = None
-                        _reset_answer_inputs_for_step()
-                        st.session_state["journey_step_index"] = min(step_i + 1, max(0, total_steps - 1))
-
-                    cbtn1, cbtn2 = st.columns(2)
-                    with cbtn1:
-                        st.button("Redo this step", width='stretch', key="journey_redo", on_click=_journey_redo_cb)
-                    with cbtn2:
-                        next_disabled = (total_steps <= 0) or (step_i >= total_steps - 1)
-                        label = "Finish" if next_disabled else "Next step"
-                        st.button(
-                            label,
-                            width='stretch',
-                            disabled=next_disabled,
-                            key="journey_next",
-                            on_click=_journey_next_cb,
-                            args=(step_i, total_steps),
-                        )
-
-                    if total_steps > 0 and step_i >= total_steps - 1:
-                        st.success("Journey complete! You can redo the final step, or choose a new assignment.")
                 else:
-                    def _new_attempt_cb():
-                        st.session_state["feedback"] = None
-                        st.session_state["last_canvas_image_data"] = None  # legacy
-                        st.session_state["last_canvas_image_data_single"] = None
-                        st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
-                        st.session_state["student_answer_text_single"] = ""
+                    # -------------------------
+                    # Topic Journey student flow (one step at a time)
+                    # -------------------------
+                    st.subheader("🧭 Topic Journey")
+                    if not isinstance(journey_obj, dict) or not journey_obj.get("steps"):
+                        st.error("This Topic Journey is missing its steps JSON.")
+                    else:
+                        steps = journey_obj.get("steps", [])
+                        if not isinstance(steps, list) or not steps:
+                            st.error("This Topic Journey has no steps.")
+                        else:
+                            step_i = int(st.session_state.get("journey_step_index", 0) or 0)
+                            step_i = max(0, min(step_i, len(steps) - 1))
+                            st.session_state["journey_step_index"] = step_i
+        
+                            checkpoint_every = int(
+                                journey_obj.get("checkpoint_every", JOURNEY_CHECKPOINT_EVERY) or JOURNEY_CHECKPOINT_EVERY
+                            )
+        
+                            st.caption(f"Step {step_i + 1} of {len(steps)}")
+                            step = steps[step_i] if step_i < len(steps) else {}
+        
+                            obj = str(step.get("objective", "") or "").strip()
+                            qtxt = str(step.get("question_text", "") or "").strip()
+                            mm = clamp_int(step.get("max_marks", 1), 1, 50, default=1)
+        
+                            with st.container(border=True):
+                                if obj:
+                                    st.markdown(normalize_markdown_math(f"**Objective:** {obj}"))
+                                if qtxt:
+                                    st.markdown(normalize_markdown_math(qtxt))
+                                else:
+                                    st.warning("This step has no question text.")
+        
+                            st.caption(f"Max Marks (this step): {mm}")
+        
+                            # Build a step-level q_row compatible with the marker
+                            step_q_row = {
+                                "max_marks": int(mm),
+                                "question_text": qtxt,
+                                "markscheme_text": str(step.get("markscheme_text", "") or "").strip(),
+                            }
+        
+                            def _update_checkpoint_notes(reports_list, idx, total_steps):
+                                # Deterministic checkpoint summary (no extra AI calls)
+                                if not isinstance(reports_list, list):
+                                    return
+                                if not (((idx + 1) % checkpoint_every == 0) or (idx == total_steps - 1)):
+                                    return
+        
+                                last_reports = [
+                                    r
+                                    for r in reports_list[max(0, idx - (checkpoint_every - 1)) : idx + 1]
+                                    if isinstance(r, dict)
+                                ]
+                                mastered, improve = [], []
+                                for r in last_reports:
+                                    if int(r.get("marks_awarded", 0)) >= int(r.get("max_marks", 1)):
+                                        mastered.extend((r.get("feedback_points", []) or [])[:2])
+                                    else:
+                                        improve.extend((r.get("next_steps", []) or [])[:3])
+        
+                                mastered = [m for m in mastered if str(m).strip()][:6]
+                                improve = [n for n in improve if str(n).strip()][:6]
+        
+                                md = "### Checkpoint\n"
+                                md += "**Mastered (recent):**\n"
+                                md += "\n".join([f"- {x}" for x in mastered]) if mastered else "- (keep going - you're building foundations)"
+                                md += "\n\n**Next improvements:**\n"
+                                md += "\n".join([f"- {x}" for x in improve]) if improve else "- (no major issues detected in recent steps)"
+        
+                                notes = st.session_state.get("journey_checkpoint_notes", {}) or {}
+                                if not isinstance(notes, dict):
+                                    notes = {}
+                                notes[str(idx)] = md
+                                st.session_state["journey_checkpoint_notes"] = notes
+        
+                            st.write("")
+                            st.markdown("**Answer in the box below.**")
+                            mode_row = st.columns([0.88, 0.12])
+                            with mode_row[0]:
+                                mode_journey = st.radio(
+                                    "Answer mode",
+                                    ["⌨️ Type answer", "✍️ Write answer"],
+                                    horizontal=True,
+                                    label_visibility="collapsed",
+                                    key="answer_mode_journey",
+                                )
+                            with mode_row[1]:
+                                if str(mode_journey).startswith("⌨️"):
+                                    text_expanded = bool(st.session_state.get("text_expanded_journey", False))
+                                    if st.button(
+                                        "⤡" if text_expanded else "⤢",
+                                        help=("Collapse working area" if text_expanded else "Expand working area"),
+                                        key="text_expand_btn_journey",
+                                    ):
+                                        st.session_state["text_expanded_journey"] = not text_expanded
+                                        text_expanded = not text_expanded
+                                else:
+                                    canvas_expanded = bool(st.session_state.get("canvas_expanded_journey", False))
+                                    if st.button(
+                                        "⤡" if canvas_expanded else "⤢",
+                                        help=("Collapse working area" if canvas_expanded else "Expand working area"),
+                                        key="canvas_expand_btn_journey",
+                                    ):
+                                        st.session_state["canvas_expanded_journey"] = not canvas_expanded
+                                        canvas_expanded = not canvas_expanded
+        
+                            if str(mode_journey).startswith("⌨️"):
+                                text_height = TEXTAREA_HEIGHT_EXPANDED if text_expanded else TEXTAREA_HEIGHT_DEFAULT
+                                answer_journey = st.text_area(
+                                    "Type your working:",
+                                    height=text_height,
+                                    placeholder="Enter your answer here...",
+                                    key="student_answer_text_journey",
+                                )
+        
+                                if st.button(
+                                    "Submit Text",
+                                    type="primary",
+                                    disabled=not AI_READY or not db_ready(),
+                                    key="submit_text_btn_journey",
+                                ):
+                                    sid = _effective_student_id(student_id)
+        
+                                    if not str(answer_journey).strip():
+                                        st.toast("Please type an answer first.", icon="⚠️")
+                                    else:
+                                        try:
+                                            allowed_now, _, reset_str = _check_rate_limit_db(sid)
+                                        except Exception:
+                                            allowed_now, reset_str = True, ""
+                                        if not allowed_now:
+                                            st.error(
+                                                f"You’ve reached the limit of {RATE_LIMIT_MAX} submissions per hour. Please try again at {reset_str}."
+                                            )
+                                        else:
+                                            increment_rate_limit(sid)
+                                            st.session_state["text_expanded_journey"] = False
+        
+                                            def task():
+                                                return get_gpt_feedback_from_bank(
+                                                    student_answer=answer_journey,
+                                                    q_row=step_q_row,
+                                                    is_student_image=False,
+                                                    question_img=None,
+                                                    markscheme_img=None,
+                                                )
+        
+                                            st.session_state["feedback"] = _run_ai_with_progress(
+                                                task_fn=task,
+                                                ctx={
+                                                    "student_id": sid,
+                                                    "question": q_key or "",
+                                                    "mode": f"journey_text_s{step_i}",
+                                                },
+                                                typical_range="5-10 seconds",
+                                                est_seconds=9.0,
+                                            )
+        
+                                            # Store step report history
+                                            reports = st.session_state.get("journey_step_reports", [])
+                                            if not isinstance(reports, list):
+                                                reports = []
+                                            while len(reports) <= step_i:
+                                                reports.append(None)
+                                            reports[step_i] = st.session_state["feedback"]
+                                            st.session_state["journey_step_reports"] = reports
+        
+                                            _update_checkpoint_notes(reports, step_i, len(steps))
+        
+                                            if db_ready() and q_key:
+                                                insert_attempt(
+                                                    student_id,
+                                                    q_key,
+                                                    st.session_state["feedback"],
+                                                    mode="journey_text",
+                                                    question_bank_id=qid,
+                                                    step_index=step_i,
+                                                )
+                            else:
+                                canvas_height = CANVAS_HEIGHT_EXPANDED if canvas_expanded else CANVAS_HEIGHT_DEFAULT
+                                canvas_storage_key = (
+                                    f"panphy_canvas_h_{SUBJECT_SITE}_journey_expanded"
+                                    if canvas_expanded
+                                    else f"panphy_canvas_h_{SUBJECT_SITE}_journey"
+                                )
+                                if _stylus_canvas_available():
+                                    tool_row = st.columns([2.2, 1.4, 1, 1])
+                                    with tool_row[0]:
+                                        tool = st.radio(
+                                            "Tool",
+                                            ["Pen", "Eraser"],
+                                            horizontal=True,
+                                            label_visibility="collapsed",
+                                            key="canvas_tool_journey",
+                                        )
+                                    with tool_row[1]:
+                                        st.checkbox(
+                                            "Stylus-only",
+                                            help="Best on iPad. When enabled, finger/palm touches are ignored.",
+                                            key="stylus_only_enabled",
+                                        )
+                                    undo_clicked = tool_row[2].button("↩️ Undo", width='stretch', key="canvas_undo_journey")
+                                    clear_clicked = tool_row[3].button("🗑️ Clear", width='stretch', key="canvas_clear_journey")
+                                    cmd = None
+                                    if undo_clicked:
+                                        st.session_state["feedback"] = None
+                                        st.session_state["canvas_cmd_nonce_journey"] = (
+                                            int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0) + 1
+                                        )
+                                        cmd = "undo"
+                                    if clear_clicked:
+                                        st.session_state["feedback"] = None
+                                        st.session_state["last_canvas_data_url_journey"] = None
+                                        st.session_state["last_canvas_image_data_journey"] = None
+                                        st.session_state["canvas_cmd_nonce_journey"] = (
+                                            int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0) + 1
+                                        )
+                                        st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
+                                        cmd = "clear"
+        
+                                    stroke_width = 2 if tool == "Pen" else 30
+                                    stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
+                                    canvas_value = stylus_canvas(
+                                        stroke_width=stroke_width,
+                                        stroke_color=stroke_color,
+                                        background_color=CANVAS_BG_HEX,
+                                        height=canvas_height,
+                                        width=None,
+                                        storage_key=canvas_storage_key,
+                                        initial_data_url=st.session_state.get("last_canvas_data_url_journey"),
+                                        pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
+                                        tool=("pen" if tool == "Pen" else "eraser"),
+                                        command=cmd,
+                                        command_nonce=int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0),
+                                        key=f"stylus_canvas_journey_{qid or 'none'}_{step_i}_{st.session_state['canvas_key']}",
+                                    )
+                                    if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
+                                        st.session_state["last_canvas_data_url_journey"] = canvas_value.get("data_url")
+                                else:
+                                    tool_row = st.columns([2, 1])
+                                    with tool_row[0]:
+                                        tool = st.radio(
+                                            "Tool",
+                                            ["Pen", "Eraser"],
+                                            horizontal=True,
+                                            label_visibility="collapsed",
+                                            key="canvas_tool_journey",
+                                        )
+                                    clear_clicked = tool_row[1].button("🗑️ Clear", width='stretch', key="canvas_clear_journey")
+                                    if clear_clicked:
+                                        st.session_state["feedback"] = None
+                                        st.session_state["last_canvas_image_data_journey"] = None
+                                        st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
+                                        st.rerun()
+                                    stroke_width = 2 if tool == "Pen" else 30
+                                    stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
+                                    try:
+                                        from streamlit_drawable_canvas import st_canvas as _st_canvas
+                                    except Exception:
+                                        _st_canvas = None
+                                    if _st_canvas is None:
+                                        st.warning("Canvas unavailable. Add components folder or install streamlit-drawable-canvas.")
+                                        canvas_result = None
+                                    else:
+                                        canvas_result = _st_canvas(
+                                            stroke_width=stroke_width,
+                                            stroke_color=stroke_color,
+                                            background_color=CANVAS_BG_HEX,
+                                            height=canvas_height,
+                                            width=600,
+                                            drawing_mode="freedraw",
+                                            key=f"canvas_journey_{st.session_state['canvas_key']}",
+                                            display_toolbar=False,
+                                            update_streamlit=True,
+                                        )
+                                        if canvas_result is not None and getattr(canvas_result, "image_data", None) is not None:
+                                            if canvas_has_ink(canvas_result.image_data):
+                                                st.session_state["last_canvas_image_data_journey"] = canvas_result.image_data
+        
+                                submitted_writing = st.button(
+                                    "Submit Writing",
+                                    type="primary",
+                                    disabled=not AI_READY or not db_ready(),
+                                    key="submit_writing_btn_journey",
+                                )
+        
+                                if submitted_writing:
+                                    sid = _effective_student_id(student_id)
+        
+                                    img_data = None
+                                    if _stylus_canvas_available():
+                                        data_url = None
+                                        try:
+                                            data_url = (canvas_value or {}).get("data_url") if isinstance(canvas_value, dict) else None
+                                        except Exception:
+                                            data_url = None
+                                        if not data_url:
+                                            data_url = st.session_state.get("last_canvas_data_url_journey")
+                                        if data_url:
+                                            try:
+                                                img_data = data_url_to_image_data(data_url)
+                                                # Keep legacy cache in sync
+                                                st.session_state["last_canvas_image_data_journey"] = img_data
+                                            except Exception:
+                                                img_data = None
+                                    else:
+                                        if canvas_result is not None and getattr(canvas_result, "image_data", None) is not None:
+                                            img_data = canvas_result.image_data
+                                        if img_data is None:
+                                            img_data = st.session_state.get("last_canvas_image_data_journey")
+                                    if img_data is None:
+                                        img_data = st.session_state.get("last_canvas_image_data_journey")
+        
+                                    if img_data is None or (not canvas_has_ink(img_data)):
+                                        st.toast("Canvas is blank. Write your answer first, then press Submit.", icon="⚠️")
+                                        st.stop()
+        
+                                    try:
+                                        allowed_now, _, reset_str = _check_rate_limit_db(sid)
+                                    except Exception:
+                                        allowed_now, reset_str = True, ""
+                                    if not allowed_now:
+                                        st.error(
+                                            f"You’ve reached the limit of {RATE_LIMIT_MAX} submissions per hour. Please try again at {reset_str}."
+                                        )
+                                        st.stop()
+        
+                                    st.session_state["canvas_expanded_journey"] = False
+                                    img_for_ai = preprocess_canvas_image(img_data)
+        
+                                    canvas_bytes = _encode_image_bytes(img_for_ai, "JPEG", quality=80)
+                                    ok_canvas, msg_canvas = validate_image_file(canvas_bytes, CANVAS_MAX_MB, "canvas")
+                                    if not ok_canvas:
+                                        okc, outb, _outct, err = _compress_bytes_to_limit(
+                                            canvas_bytes, CANVAS_MAX_MB, _purpose="canvas", prefer_fmt="JPEG"
+                                        )
+                                        if not okc:
+                                            st.error(err or msg_canvas)
+                                            st.stop()
+                                        img_for_ai = Image.open(io.BytesIO(outb)).convert("RGB")
+        
+                                    increment_rate_limit(sid)
+        
+                                    def task():
+                                        return get_gpt_feedback_from_bank(
+                                            student_answer=img_for_ai,
+                                            q_row=step_q_row,
+                                            is_student_image=True,
+                                            question_img=None,
+                                            markscheme_img=None,
+                                        )
+        
+                                    st.session_state["feedback"] = _run_ai_with_progress(
+                                        task_fn=task,
+                                        ctx={"student_id": sid, "question": q_key or "", "mode": f"journey_writing_s{step_i}"},
+                                        typical_range="8-15 seconds",
+                                        est_seconds=13.0,
+                                    )
+        
+                                    # Store step report history
+                                    reports = st.session_state.get("journey_step_reports", [])
+                                    if not isinstance(reports, list):
+                                        reports = []
+                                    while len(reports) <= step_i:
+                                        reports.append(None)
+                                    reports[step_i] = st.session_state["feedback"]
+                                    st.session_state["journey_step_reports"] = reports
+        
+                                    _update_checkpoint_notes(reports, step_i, len(steps))
+        
+                                    if db_ready() and q_key:
+                                        insert_attempt(
+                                            student_id,
+                                            q_key,
+                                            st.session_state["feedback"],
+                                            mode="journey_writing",
+                                            question_bank_id=qid,
+                                            step_index=step_i,
+                                        )
+        
+                # -------------------------
+        # RIGHT: Feedback
+        # -------------------------
+        with col2:
+            st.subheader("👨‍🏫 Feedback")
+            render_feedback_panel(q_row, q_type, journey_obj)
 
-                    st.button("Start New Attempt", width='stretch', key="new_attempt", on_click=_new_attempt_cb)
-            else:
-                st.info("Submit an answer to receive feedback.")
+    if step_index == 2:
+        st.subheader("✅ Review results")
+        if not st.session_state.get("feedback"):
+            render_empty_state("📊", "No results yet", "Submit an answer in Step 2 to unlock feedback.")
+        else:
+            render_feedback_panel(q_row, q_type, journey_obj)
+
+            md_export, json_export = build_feedback_exports(st.session_state.get("feedback", {}))
+            export_cols = st.columns([1, 1])
+            with export_cols[0]:
+                st.download_button(
+                    "Download feedback (Markdown)",
+                    data=md_export or "",
+                    file_name="panphy_feedback.md",
+                    mime="text/markdown",
+                    width='stretch',
+                    disabled=not bool(md_export),
+                )
+            with export_cols[1]:
+                st.download_button(
+                    "Download feedback (JSON)",
+                    data=json_export or "",
+                    file_name="panphy_feedback.json",
+                    mime="application/json",
+                    width='stretch',
+                    disabled=not bool(json_export),
+                )
+
+            if not premium_active():
+                render_callout(
+                    "Upgrade for shareable reports",
+                    "Unlock PDF exports, class summaries, and evidence packs.",
+                )
+                if st.button("View upgrade options", width='stretch', key="upgrade_from_review"):
+                    st.session_state["nav_page"] = "💎 Upgrade"
+                    st.rerun()
+
+        if st.button("Start another question", width='stretch', key="review_new_question"):
+            st.session_state["student_flow_step"] = 0
+            st.rerun()
+# ============================================================
+# RESULTS PAGE
+# ============================================================
+elif nav == "📊 Results":
+    st.divider()
+    st.subheader("📊 Results & recent feedback")
+
+    if not st.session_state.get("feedback"):
+        render_empty_state("📉", "No feedback yet", "Complete a practice attempt to populate your results here.")
+    else:
+        render_feedback_panel(
+            st.session_state.get("cached_q_row") or {},
+            str((st.session_state.get("cached_q_row") or {}).get("question_type", "single") or "single").strip().lower(),
+            st.session_state.get("journey_json_cache"),
+        )
+
+    if db_ready() and st.session_state.get("is_teacher"):
+        st.markdown("### Recent attempts (teacher view)")
+        df_attempts = load_attempts_df(limit=50)
+        if df_attempts.empty:
+            st.info("No attempts logged yet.")
+        else:
+            st.dataframe(df_attempts, width='stretch')
+
+# ============================================================
+# EXPORT / SHARE PAGE
+# ============================================================
+elif nav == "⬇️ Export & Share":
+    st.divider()
+    st.subheader("⬇️ Export & Share")
+    st.caption("Package feedback into shareable formats for students, parents, or evidence portfolios.")
+
+    report = st.session_state.get("feedback")
+    if not report:
+        render_empty_state("📁", "Nothing to export", "Generate feedback in Practice first.")
+    else:
+        md_export, json_export = build_feedback_exports(report)
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.download_button(
+                "Download feedback (Markdown)",
+                data=md_export or "",
+                file_name="panphy_feedback.md",
+                mime="text/markdown",
+                width='stretch',
+                disabled=not bool(md_export),
+            )
+        with col_b:
+            st.download_button(
+                "Download feedback (JSON)",
+                data=json_export or "",
+                file_name="panphy_feedback.json",
+                mime="application/json",
+                width='stretch',
+                disabled=not bool(json_export),
+            )
+
+        st.markdown("### Premium exports")
+        if premium_active():
+            render_callout(
+                "PDF reports coming soon",
+                "Premium users will export branded PDFs, bulk class reports, and progress snapshots.",
+            )
+        else:
+            render_callout(
+                "Upgrade to unlock PDF & batch exports",
+                "Premium includes branded PDFs, class summaries, and drop-off insights.",
+            )
+            if st.button("Upgrade now", type="primary", width='stretch', key="upgrade_export"):
+                st.session_state["nav_page"] = "💎 Upgrade"
+                st.rerun()
+
 # ============================================================
 # TEACHER DASHBOARD PAGE
 # ============================================================
@@ -3600,9 +3890,41 @@ elif nav == "🔒 Teacher Dashboard":
             st.caption("Enter the teacher password to view analytics.")
 
 # ============================================================
+# UPGRADE PAGE
+# ============================================================
+elif nav == "💎 Upgrade":
+    st.divider()
+    render_hero(
+        "Upgrade to PanPhy Pro",
+        "Unlock premium exports, cohort analytics, and advanced practice workflows.",
+        badge="Billing integration coming soon",
+    )
+
+    plan_cols = st.columns(3)
+    with plan_cols[0]:
+        render_card("Starter", "For small cohorts and quick practice.", "Includes: 10 AI checks/hour, basic exports.")
+    with plan_cols[1]:
+        render_card("Pro", "For teachers and departments.", "Includes: unlimited AI checks, PDF exports, class analytics.")
+    with plan_cols[2]:
+        render_card("Enterprise", "For multi-school rollouts.", "Includes: SSO, usage reporting, dedicated support.")
+
+    st.markdown("### Enable premium preview")
+    st.toggle("Preview premium features in this session", key="premium_preview")
+    st.caption("Preview mode is for UX validation only. Billing integration comes later.")
+
+    st.markdown("### Premium roadmap")
+    render_bullets(
+        [
+            "Cohort drop-off tracking and mastery heatmaps.",
+            "Bulk export of feedback as branded PDFs.",
+            "Usage governance and role-based access.",
+        ]
+    )
+
+# ============================================================
 # QUESTION BANK PAGE
 # ============================================================
-else:
+elif nav == "📚 Question Bank":
     st.divider()
     st.subheader("📚 Question Bank")
 

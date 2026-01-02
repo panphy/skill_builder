@@ -1,4 +1,8 @@
 # The "Separate" badge uses the app primary color. To make it turquoise, set theme.primaryColor in .streamlit/config.toml (e.g. #20C997)
 
 [theme]
-primaryColor = "#20C997"  # turquoise
+primaryColor = "#5B8CFF"
+backgroundColor = "#F7F8FB"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#0B1220"
+font = "sans serif"
