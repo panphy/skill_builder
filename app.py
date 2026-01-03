@@ -87,6 +87,62 @@ div[data-testid="stButton"] button[aria-label="⤡"] span {
   line-height: 1;
   font-weight: 700;
 }
+.pp-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2rem 2.5rem;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(33, 99, 255, 0.08), rgba(138, 43, 226, 0.08));
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  margin-bottom: 1.5rem;
+}
+.pp-hero-content {
+  flex: 1 1 360px;
+  min-width: 280px;
+}
+.pp-hero-kicker {
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #2563eb;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.pp-hero-title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: 0.75rem;
+}
+.pp-hero-subtitle {
+  font-size: 1.05rem;
+  color: #475569;
+  margin-bottom: 1rem;
+}
+.pp-hero-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: #334155;
+}
+.pp-hero-card {
+  flex: 0 1 260px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 18px;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
+}
+.pp-hero-card h4 {
+  margin: 0 0 0.5rem 0;
+}
+.pp-hero-metric {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -2582,6 +2638,32 @@ with header_right:
         st.caption("⚠️ System status")
         for msg in issues:
             st.caption(msg)
+
+st.markdown(
+    """
+<div class="pp-hero">
+  <div class="pp-hero-content">
+    <div class="pp-hero-kicker">Personalised practice</div>
+    <div class="pp-hero-title">Build confident GCSE physicists in minutes.</div>
+    <div class="pp-hero-subtitle">
+      Generate spec-aligned questions, capture handwritten working, and give instant feedback—
+      all in one place.
+    </div>
+    <ul class="pp-hero-list">
+      <li>AI practice questions tailored to topic and difficulty.</li>
+      <li>Topic Journeys that guide students step-by-step.</li>
+      <li>Teacher uploads with instant feedback and marks.</li>
+    </ul>
+  </div>
+  <div class="pp-hero-card">
+    <h4>Getting started</h4>
+    <div class="pp-hero-metric">3 steps</div>
+    <div>Pick a topic, choose a track, and start practicing.</div>
+  </div>
+</div>
+""",
+    unsafe_allow_html=True,
+)
 
 # ============================================================
 # STUDENT PAGE
