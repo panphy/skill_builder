@@ -3608,11 +3608,11 @@ else:
 
     # Default track eligibility tag for any question you SAVE (AI drafts, edited, uploads).
     _tt_label = st.selectbox(
-        "Track eligibility for saved items",
+        "Default eligibility for saved questions",
         ["Both (Combined + Separate)", "Separate only"],
         index=0,
         key="teacher_track_ok_label",
-        help="If set to 'Separate only', Combined students will NOT see the item. Use this for separate-only content.",
+        help="Sets the default visibility for newly saved items. Choose 'Separate only' to hide them from Combined students.",
     )
     st.session_state["teacher_track_ok"] = "both" if _tt_label.startswith("Both") else "separate_only"
 
@@ -3721,8 +3721,9 @@ else:
                         if "bank_preview_pick" in st.session_state and st.session_state["bank_preview_pick"] not in options:
                             st.session_state["bank_preview_pick"] = options[0]
 
-                        pick = st.selectbox("Select an entry to preview", options, key="bank_preview_pick")
-                        pick_id = int(df_f.loc[df_f["label"] == pick, "id"].iloc[0])
+                        with st.expander("Select an entry to preview", expanded=False):
+                            pick = st.selectbox("Question entry", options, key="bank_preview_pick")
+                            pick_id = int(df_f.loc[df_f["label"] == pick, "id"].iloc[0])
 
                         row = load_question_by_id(pick_id) or {}
                         q_text = (row.get("question_text") or "").strip()
