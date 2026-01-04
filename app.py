@@ -85,6 +85,9 @@ header[data-testid="stHeader"] {
   visibility: hidden;
   height: 0;
 }
+div[data-testid="stAppViewContainer"] > .main .block-container {
+  padding-top: 1rem;
+}
 div[data-testid="stButton"] button[aria-label="⤢"] span,
 div[data-testid="stButton"] button[aria-label="⤡"] span {
   font-size: 22px;
