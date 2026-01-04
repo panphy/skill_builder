@@ -157,6 +157,23 @@ div[data-testid="stButton"] button[aria-label="⤡"] span {
   font-weight: 700;
   margin-bottom: 0.5rem;
 }
+footer {
+  position: static;
+  font-size: 15px;
+  text-align: center;
+  padding: 7px;
+  background: transparent;
+  color: #555;
+  margin: 4px 0;
+  width: 100%;
+}
+footer a {
+  color: #ff5f1f;
+  text-decoration: none;
+}
+footer a:hover {
+  text-decoration: underline;
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -4448,3 +4465,13 @@ else:
 
             if st.session_state.get("db_last_error"):
                 st.error(f"Error: {st.session_state['db_last_error']}")
+
+st.markdown(
+    """
+<footer>
+  &copy; <a href="https://panphy.github.io/" target="_blank" rel="noopener noreferrer">PanPhy</a> |
+  <a href="https://buymeacoffee.com/panphy" target="_blank" rel="noopener noreferrer">Support My Projects</a>
+</footer>
+""",
+    unsafe_allow_html=True,
+)
