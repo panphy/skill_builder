@@ -81,6 +81,10 @@ st.set_page_config(
 st.markdown(
     """
 <style>
+header[data-testid="stHeader"] {
+  visibility: hidden;
+  height: 0;
+}
 div[data-testid="stButton"] button[aria-label="⤢"] span,
 div[data-testid="stButton"] button[aria-label="⤡"] span {
   font-size: 22px;
