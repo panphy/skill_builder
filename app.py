@@ -82,8 +82,15 @@ st.markdown(
     """
 <style>
 header[data-testid="stHeader"] {
-  visibility: hidden;
-  height: 0;
+  background: transparent;
+  border-bottom: none;
+  height: 3rem;
+}
+header[data-testid="stHeader"] .stAppToolbar {
+  background: transparent;
+}
+header[data-testid="stHeader"] button[data-testid="stSidebarCollapseButton"] {
+  visibility: visible;
 }
 div[data-testid="stAppViewContainer"] > .main .block-container {
   padding-top: 1rem;
