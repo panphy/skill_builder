@@ -5,6 +5,13 @@ from typing import Any, Dict, List
 
 import streamlit as st
 
+
+def _safe_secret(key: str, default: str | None = None) -> str | None:
+    try:
+        return st.secrets.get(key, default)
+    except Exception:
+        return default
+
 # ============================================================
 # SUBJECT CONTENT (topics + prompts)
 # ============================================================
@@ -14,7 +21,7 @@ import streamlit as st
 # Recommended deployment pattern for separate subject sites:
 #   - set SUBJECT_SITE in Streamlit Secrets (or environment variable)
 #   - e.g. SUBJECT_SITE="physics"
-SUBJECT_SITE = (st.secrets.get("SUBJECT_SITE") if hasattr(st, "secrets") else None) or os.getenv("SUBJECT_SITE", "physics")
+SUBJECT_SITE = _safe_secret("SUBJECT_SITE") or os.getenv("SUBJECT_SITE", "physics")
 SUBJECT_SITE = (SUBJECT_SITE or "physics").strip().lower()
 
 
