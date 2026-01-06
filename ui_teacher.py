@@ -15,27 +15,25 @@ from db import (
 )
 
 
-def render_teacher_page(nav_label: str):
-    import app as app_module
-
-    db_ready = app_module.db_ready
-    get_db_driver_type = app_module.get_db_driver_type
-    ensure_attempts_table = app_module.ensure_attempts_table
-    load_attempts_df = app_module.load_attempts_df
-    delete_attempt_by_id = app_module.delete_attempt_by_id
-    supabase_ready = app_module.supabase_ready
-    cached_download_from_storage = app_module.cached_download_from_storage
-    safe_bytes_to_pil = app_module.safe_bytes_to_pil
-    normalize_markdown_math = app_module.normalize_markdown_math
-    render_md_box = app_module.render_md_box
-    slugify = app_module.slugify
-    validate_image_file = app_module.validate_image_file
-    _compress_bytes_to_limit = app_module._compress_bytes_to_limit
-    upload_to_storage = app_module.upload_to_storage
-    _run_ai_with_progress = app_module._run_ai_with_progress
-    insert_question_bank_row = app_module.insert_question_bank_row
-    QUESTION_MAX_MB = app_module.QUESTION_MAX_MB
-    MARKSCHEME_MAX_MB = app_module.MARKSCHEME_MAX_MB
+def render_teacher_page(nav_label: str, helpers: dict):
+    db_ready = helpers["db_ready"]
+    get_db_driver_type = helpers["get_db_driver_type"]
+    ensure_attempts_table = helpers["ensure_attempts_table"]
+    load_attempts_df = helpers["load_attempts_df"]
+    delete_attempt_by_id = helpers["delete_attempt_by_id"]
+    supabase_ready = helpers["supabase_ready"]
+    cached_download_from_storage = helpers["cached_download_from_storage"]
+    safe_bytes_to_pil = helpers["safe_bytes_to_pil"]
+    normalize_markdown_math = helpers["normalize_markdown_math"]
+    render_md_box = helpers["render_md_box"]
+    slugify = helpers["slugify"]
+    validate_image_file = helpers["validate_image_file"]
+    _compress_bytes_to_limit = helpers["_compress_bytes_to_limit"]
+    upload_to_storage = helpers["upload_to_storage"]
+    _run_ai_with_progress = helpers["_run_ai_with_progress"]
+    insert_question_bank_row = helpers["insert_question_bank_row"]
+    QUESTION_MAX_MB = helpers["QUESTION_MAX_MB"]
+    MARKSCHEME_MAX_MB = helpers["MARKSCHEME_MAX_MB"]
 
     if nav_label == "🔒 Teacher Dashboard":
         st.divider()

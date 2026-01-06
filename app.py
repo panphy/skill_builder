@@ -1557,10 +1557,51 @@ st.markdown(
 # ============================================================
 # STUDENT / TEACHER PAGES
 # ============================================================
+_ui_helpers = {
+    "CANVAS_BG_HEX": CANVAS_BG_HEX,
+    "CANVAS_HEIGHT_DEFAULT": CANVAS_HEIGHT_DEFAULT,
+    "CANVAS_HEIGHT_EXPANDED": CANVAS_HEIGHT_EXPANDED,
+    "CANVAS_MAX_MB": CANVAS_MAX_MB,
+    "RATE_LIMIT_MAX": RATE_LIMIT_MAX,
+    "TEXTAREA_HEIGHT_DEFAULT": TEXTAREA_HEIGHT_DEFAULT,
+    "TEXTAREA_HEIGHT_EXPANDED": TEXTAREA_HEIGHT_EXPANDED,
+    "QUESTION_MAX_MB": QUESTION_MAX_MB,
+    "MARKSCHEME_MAX_MB": MARKSCHEME_MAX_MB,
+    "_check_rate_limit_db": _check_rate_limit_db,
+    "_compress_bytes_to_limit": _compress_bytes_to_limit,
+    "_effective_student_id": _effective_student_id,
+    "_encode_image_bytes": _encode_image_bytes,
+    "_run_ai_with_progress": _run_ai_with_progress,
+    "_stylus_canvas_available": _stylus_canvas_available,
+    "cached_download_from_storage": cached_download_from_storage,
+    "canvas_has_ink": canvas_has_ink,
+    "data_url_to_image_data": data_url_to_image_data,
+    "db_ready": db_ready,
+    "get_db_driver_type": get_db_driver_type,
+    "ensure_attempts_table": ensure_attempts_table,
+    "load_attempts_df": load_attempts_df,
+    "delete_attempt_by_id": delete_attempt_by_id,
+    "supabase_ready": supabase_ready,
+    "get_gpt_feedback_from_bank": get_gpt_feedback_from_bank,
+    "increment_rate_limit": increment_rate_limit,
+    "insert_attempt": insert_attempt,
+    "normalize_markdown_math": normalize_markdown_math,
+    "preprocess_canvas_image": preprocess_canvas_image,
+    "render_report": render_report,
+    "render_md_box": render_md_box,
+    "safe_bytes_to_pil": safe_bytes_to_pil,
+    "slugify": slugify,
+    "stylus_canvas": stylus_canvas,
+    "upload_to_storage": upload_to_storage,
+    "validate_image_file": validate_image_file,
+    "bytes_to_pil": bytes_to_pil,
+    "insert_question_bank_row": insert_question_bank_row,
+}
+
 if nav == "🧑‍🎓 Student":
-    render_student_page()
+    render_student_page(_ui_helpers)
 elif nav in ("🔒 Teacher Dashboard", "📚 Question Bank"):
-    render_teacher_page(nav)
+    render_teacher_page(nav, _ui_helpers)
 
 st.markdown(
     """

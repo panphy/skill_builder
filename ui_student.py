@@ -10,36 +10,34 @@ from config import SUBJECT_SITE
 from db import load_question_bank_df, load_question_by_id
 
 
-def render_student_page():
-    import app as app_module
-
-    CANVAS_BG_HEX = app_module.CANVAS_BG_HEX
-    CANVAS_HEIGHT_DEFAULT = app_module.CANVAS_HEIGHT_DEFAULT
-    CANVAS_HEIGHT_EXPANDED = app_module.CANVAS_HEIGHT_EXPANDED
-    CANVAS_MAX_MB = app_module.CANVAS_MAX_MB
-    RATE_LIMIT_MAX = app_module.RATE_LIMIT_MAX
-    TEXTAREA_HEIGHT_DEFAULT = app_module.TEXTAREA_HEIGHT_DEFAULT
-    TEXTAREA_HEIGHT_EXPANDED = app_module.TEXTAREA_HEIGHT_EXPANDED
-    _check_rate_limit_db = app_module._check_rate_limit_db
-    _compress_bytes_to_limit = app_module._compress_bytes_to_limit
-    _effective_student_id = app_module._effective_student_id
-    _encode_image_bytes = app_module._encode_image_bytes
-    _run_ai_with_progress = app_module._run_ai_with_progress
-    _stylus_canvas_available = app_module._stylus_canvas_available
-    cached_download_from_storage = app_module.cached_download_from_storage
-    canvas_has_ink = app_module.canvas_has_ink
-    data_url_to_image_data = app_module.data_url_to_image_data
-    db_ready = app_module.db_ready
-    get_gpt_feedback_from_bank = app_module.get_gpt_feedback_from_bank
-    increment_rate_limit = app_module.increment_rate_limit
-    insert_attempt = app_module.insert_attempt
-    normalize_markdown_math = app_module.normalize_markdown_math
-    preprocess_canvas_image = app_module.preprocess_canvas_image
-    render_report = app_module.render_report
-    safe_bytes_to_pil = app_module.safe_bytes_to_pil
-    stylus_canvas = app_module.stylus_canvas
-    validate_image_file = app_module.validate_image_file
-    bytes_to_pil = app_module.bytes_to_pil
+def render_student_page(helpers: dict):
+    CANVAS_BG_HEX = helpers["CANVAS_BG_HEX"]
+    CANVAS_HEIGHT_DEFAULT = helpers["CANVAS_HEIGHT_DEFAULT"]
+    CANVAS_HEIGHT_EXPANDED = helpers["CANVAS_HEIGHT_EXPANDED"]
+    CANVAS_MAX_MB = helpers["CANVAS_MAX_MB"]
+    RATE_LIMIT_MAX = helpers["RATE_LIMIT_MAX"]
+    TEXTAREA_HEIGHT_DEFAULT = helpers["TEXTAREA_HEIGHT_DEFAULT"]
+    TEXTAREA_HEIGHT_EXPANDED = helpers["TEXTAREA_HEIGHT_EXPANDED"]
+    _check_rate_limit_db = helpers["_check_rate_limit_db"]
+    _compress_bytes_to_limit = helpers["_compress_bytes_to_limit"]
+    _effective_student_id = helpers["_effective_student_id"]
+    _encode_image_bytes = helpers["_encode_image_bytes"]
+    _run_ai_with_progress = helpers["_run_ai_with_progress"]
+    _stylus_canvas_available = helpers["_stylus_canvas_available"]
+    cached_download_from_storage = helpers["cached_download_from_storage"]
+    canvas_has_ink = helpers["canvas_has_ink"]
+    data_url_to_image_data = helpers["data_url_to_image_data"]
+    db_ready = helpers["db_ready"]
+    get_gpt_feedback_from_bank = helpers["get_gpt_feedback_from_bank"]
+    increment_rate_limit = helpers["increment_rate_limit"]
+    insert_attempt = helpers["insert_attempt"]
+    normalize_markdown_math = helpers["normalize_markdown_math"]
+    preprocess_canvas_image = helpers["preprocess_canvas_image"]
+    render_report = helpers["render_report"]
+    safe_bytes_to_pil = helpers["safe_bytes_to_pil"]
+    stylus_canvas = helpers["stylus_canvas"]
+    validate_image_file = helpers["validate_image_file"]
+    bytes_to_pil = helpers["bytes_to_pil"]
 
     st.divider()
 
