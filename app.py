@@ -1069,6 +1069,10 @@ def normalize_markdown_math(md_text: str) -> str:
 
     # Normalize newlines
     s = s.replace("\r\n", "\n").replace("\r", "\n")
+    # Fix double-escaped LaTeX sequences from JSON-encoded model output.
+    # Example: "\\Delta" -> "\Delta"
+    s = re.sub(r"\\\\([A-Za-z])", r"\\\1", s)
+    s = re.sub(r"\\\\([\\[\\]{}()^_])", r"\\\1", s)
 
     protected: Dict[str, str] = {}
     s = _protect_segments(_MD_TOKEN_CODEBLOCK, s, protected, "CB")
