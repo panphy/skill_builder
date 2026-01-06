@@ -23,7 +23,7 @@ from typing import Tuple, Optional, Dict, Any, List
 
 from ai_generation import AI_READY, MODEL_NAME, client, _render_template
 from config import FEEDBACK_SYSTEM_TPL, SUBJECT_SITE
-from db import db_ready, get_db_engine
+from db import db_ready, get_db_driver_type, get_db_engine
 from ui_student import render_student_page
 from ui_teacher import render_teacher_page
 
