@@ -85,36 +85,6 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-header[data-testid="stHeader"] {
-  background: transparent;
-  border-bottom: none;
-  height: 3rem;
-}
-header[data-testid="stHeader"] .stAppToolbar {
-  background: transparent;
-}
-header[data-testid="stHeader"] button[data-testid="stSidebarCollapseButton"] {
-  visibility: visible;
-}
-header[data-testid="stHeader"] [data-testid="stToolbarActions"],
-header[data-testid="stHeader"] [data-testid="stToolbarActions"] * {
-  display: none !important;
-}
-header[data-testid="stHeader"] [data-testid="stHeaderActionButtons"],
-header[data-testid="stHeader"] [data-testid="stHeaderActionButtons"] * {
-  display: none !important;
-}
-header[data-testid="stHeader"] .stAppToolbar a,
-header[data-testid="stHeader"] .stAppToolbar [role="link"] {
-  display: none !important;
-}
-header[data-testid="stHeader"] .stAppToolbar > *:not(button[data-testid="stSidebarCollapseButton"]) {
-  display: none !important;
-}
-header[data-testid="stHeader"] .stAppToolbar button:not([data-testid="stSidebarCollapseButton"]),
-header[data-testid="stHeader"] .stAppToolbar [role="button"]:not([data-testid="stSidebarCollapseButton"]) {
-  display: none !important;
-}
 div[data-testid="stAppViewContainer"] > .main .block-container {
   padding-top: 1rem;
 }
