@@ -100,6 +100,14 @@ header[data-testid="stHeader"] [data-testid="stToolbarActions"],
 header[data-testid="stHeader"] [data-testid="stToolbarActions"] * {
   display: none !important;
 }
+header[data-testid="stHeader"] [data-testid="stHeaderActionButtons"],
+header[data-testid="stHeader"] [data-testid="stHeaderActionButtons"] * {
+  display: none !important;
+}
+header[data-testid="stHeader"] .stAppToolbar a,
+header[data-testid="stHeader"] .stAppToolbar [role="link"] {
+  display: none !important;
+}
 header[data-testid="stHeader"] .stAppToolbar > *:not(button[data-testid="stSidebarCollapseButton"]) {
   display: none !important;
 }
