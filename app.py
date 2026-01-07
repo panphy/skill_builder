@@ -95,6 +95,21 @@ header[data-testid="stHeader"] .stAppToolbar {
 }
 header[data-testid="stHeader"] button[data-testid="stSidebarCollapseButton"] {
   visibility: visible;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  color: #0f172a;
+  z-index: 10;
+}
+header[data-testid="stHeader"] button[data-testid="stSidebarCollapseButton"] svg {
+  fill: currentColor;
+  color: currentColor;
 }
 header[data-testid="stHeader"] [data-testid="stToolbarActions"],
 header[data-testid="stHeader"] [data-testid="stToolbarActions"] * {
