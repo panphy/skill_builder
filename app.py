@@ -85,6 +85,51 @@ st.set_page_config(
 st.markdown(
     """
 <style>
+header[data-testid="stHeader"] {
+  background: transparent;
+  border-bottom: none;
+  height: 3rem;
+}
+header[data-testid="stHeader"] .stAppToolbar {
+  background: transparent;
+}
+header[data-testid="stHeader"] button[data-testid="stSidebarCollapseButton"] {
+  visibility: visible;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  color: #0f172a;
+  z-index: 10;
+}
+header[data-testid="stHeader"] button[data-testid="stSidebarCollapseButton"] svg {
+  fill: currentColor;
+  color: currentColor;
+}
+header[data-testid="stHeader"] [data-testid="stToolbarActions"],
+header[data-testid="stHeader"] [data-testid="stToolbarActions"] * {
+  display: none !important;
+}
+header[data-testid="stHeader"] [data-testid="stHeaderActionButtons"],
+header[data-testid="stHeader"] [data-testid="stHeaderActionButtons"] * {
+  display: none !important;
+}
+header[data-testid="stHeader"] .stAppToolbar a,
+header[data-testid="stHeader"] .stAppToolbar [role="link"] {
+  display: none !important;
+}
+header[data-testid="stHeader"] .stAppToolbar > *:not(button[data-testid="stSidebarCollapseButton"]) {
+  display: none !important;
+}
+header[data-testid="stHeader"] .stAppToolbar button:not([data-testid="stSidebarCollapseButton"]),
+header[data-testid="stHeader"] .stAppToolbar [role="button"]:not([data-testid="stSidebarCollapseButton"]) {
+  display: none !important;
+}
 div[data-testid="stAppViewContainer"] > .main .block-container {
   padding-top: 1rem;
 }
