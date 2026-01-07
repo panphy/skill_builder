@@ -96,6 +96,12 @@ header[data-testid="stHeader"] .stAppToolbar {
 header[data-testid="stHeader"] button[data-testid="stSidebarCollapseButton"] {
   visibility: visible;
 }
+header[data-testid="stHeader"] .stAppToolbar button:not([data-testid="stSidebarCollapseButton"]) {
+  visibility: hidden;
+}
+header[data-testid="stHeader"] .stAppToolbar [role="button"]:not([data-testid="stSidebarCollapseButton"]) {
+  visibility: hidden;
+}
 div[data-testid="stAppViewContainer"] > .main .block-container {
   padding-top: 1rem;
 }
