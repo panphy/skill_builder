@@ -96,11 +96,16 @@ header[data-testid="stHeader"] .stAppToolbar {
 header[data-testid="stHeader"] button[data-testid="stSidebarCollapseButton"] {
   visibility: visible;
 }
-header[data-testid="stHeader"] .stAppToolbar button:not([data-testid="stSidebarCollapseButton"]) {
-  visibility: hidden;
+header[data-testid="stHeader"] [data-testid="stToolbarActions"],
+header[data-testid="stHeader"] [data-testid="stToolbarActions"] * {
+  display: none !important;
 }
+header[data-testid="stHeader"] .stAppToolbar > *:not(button[data-testid="stSidebarCollapseButton"]) {
+  display: none !important;
+}
+header[data-testid="stHeader"] .stAppToolbar button:not([data-testid="stSidebarCollapseButton"]),
 header[data-testid="stHeader"] .stAppToolbar [role="button"]:not([data-testid="stSidebarCollapseButton"]) {
-  visibility: hidden;
+  display: none !important;
 }
 div[data-testid="stAppViewContainer"] > .main .block-container {
   padding-top: 1rem;
