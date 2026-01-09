@@ -88,7 +88,7 @@ def render_student_page(helpers: dict):
                     topics = ["All"] + sorted(df_src["topic_display"].unique().tolist())
                     if st.session_state.get("student_topic_filter") not in topics:
                         st.session_state["student_topic_filter"] = "All"
-                    topic_filter = st.selectbox("Step 1: Topic", topics, key="student_topic_filter")
+                    topic_filter = st.selectbox("Step 1: Topic group", topics, key="student_topic_filter")
 
                     if topic_filter != "All":
                         df2 = df_src[df_src["topic_display"] == topic_filter].copy()
@@ -98,7 +98,7 @@ def render_student_page(helpers: dict):
                     sub_topics = ["All"] + sorted(df2["sub_topic_display"].unique().tolist())
                     if st.session_state.get("student_sub_topic_filter") not in sub_topics:
                         st.session_state["student_sub_topic_filter"] = "All"
-                    sub_topic_filter = st.selectbox("Step 2: Sub-topic", sub_topics, key="student_sub_topic_filter")
+                    sub_topic_filter = st.selectbox("Step 2: Topic", sub_topics, key="student_sub_topic_filter")
 
                     if sub_topic_filter != "All":
                         df3 = df2[df2["sub_topic_display"] == sub_topic_filter].copy()

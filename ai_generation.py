@@ -444,16 +444,16 @@ def generate_practice_question_with_ai(
 
         topic_val = _coerce_vocab(d.get("topic"), topic_options)
         if not topic_val:
-            reasons.append("Missing or invalid topic.")
+            reasons.append("Missing or invalid topic group.")
         elif topic_text and topic_val.lower() != str(topic_text).strip().lower():
-            reasons.append("topic must match the requested Topic.")
+            reasons.append("topic must match the requested Topic group.")
 
         sub_topic_options = get_sub_topic_names_for_group(track, topic_val or topic_text)
         sub_topic_val = _coerce_vocab(d.get("sub_topic"), sub_topic_options)
         if not sub_topic_val:
             reasons.append("Missing or invalid sub_topic.")
         elif requested_sub_topic and sub_topic_val.lower() != requested_sub_topic.lower():
-            reasons.append("sub_topic must match the requested Sub-topic.")
+            reasons.append("sub_topic must match the requested Topic.")
         else:
             expected_group = get_topic_group_for_name(sub_topic_val)
             if expected_group and topic_val and expected_group.lower() != topic_val.lower():
