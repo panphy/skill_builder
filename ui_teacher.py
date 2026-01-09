@@ -46,6 +46,9 @@ def render_teacher_page(nav_label: str, helpers: dict):
     MARKSCHEME_MAX_MB = helpers["MARKSCHEME_MAX_MB"]
     track = st.session_state.get("track", "combined")
 
+    def _clean_sub_topic_label(value: str) -> str:
+        return clean_sub_topic_label(value, track)
+
     def _index_for(options, value):
         if not options:
             return 0
@@ -504,7 +507,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         sub_topic_options,
                         index=_index_for(sub_topic_options, st.session_state.get("gen_sub_topic")),
                         key="gen_sub_topic",
-                        format_func=clean_sub_topic_label,
+                        format_func=_clean_sub_topic_label,
                     )
                 with c3:
                     qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
@@ -603,7 +606,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 (
                                     option
                                     for option in sub_topic_options
-                                    if clean_sub_topic_label(option).lower() == str(sub_topic_seed or "").strip().lower()
+                                    if _clean_sub_topic_label(option).lower() == str(sub_topic_seed or "").strip().lower()
                                 ),
                                 None,
                             )
@@ -620,7 +623,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             sub_topic_options,
                             index=_index_for(sub_topic_options, sub_topic_seed),
                             key="draft_sub_topic",
-                            format_func=clean_sub_topic_label,
+                            format_func=_clean_sub_topic_label,
                         )
                         difficulty_val = st.selectbox(
                             "Difficulty",
@@ -662,7 +665,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 max_marks=int(max_marks),
                                 tags=tags,
                                 topic=topic_val,
-                                sub_topic=clean_sub_topic_label(sub_topic_val),
+                                sub_topic=_clean_sub_topic_label(sub_topic_val),
                                 skill=skill_val,
                                 difficulty=difficulty_val,
                                 question_text=(q_text or "").strip(),
@@ -695,12 +698,12 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         "Topic",
                         sub_topic_options,
                         key="journey_topic_sub_topic",
-                        format_func=clean_sub_topic_label,
+                        format_func=_clean_sub_topic_label,
                     )
                     sel_topics = [sub_topic_val] if sub_topic_val else []
                     if sel_topics:
                         st.markdown("**Selected topic:**")
-                        st.markdown(f"- {clean_sub_topic_label(sel_topics[0])}")
+                        st.markdown(f"- {_clean_sub_topic_label(sel_topics[0])}")
                     else:
                         st.info("Choose a topic to build a journey.")
 
@@ -842,7 +845,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             index=_index_for(sub_topic_options, sub_topic_val),
                             key="jour_sub_topic_display",
                             disabled=True,
-                            format_func=clean_sub_topic_label,
+                            format_func=_clean_sub_topic_label,
                         )
                     with hc2:
                         skill_val = st.selectbox(
@@ -933,7 +936,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                     max_marks=int(total_marks) if total_marks > 0 else 1,
                                     tags=tags,
                                     topic=topic_val,
-                                    sub_topic=clean_sub_topic_label(sub_topic_val),
+                                    sub_topic=_clean_sub_topic_label(sub_topic_val),
                                     skill=skill_val,
                                     difficulty=difficulty_val,
                                     question_text=str(plan_md or "").strip(),
@@ -1004,7 +1007,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             sub_topic_options,
                             index=_index_for(sub_topic_options, selected_sub_topic),
                             key="up_sub_topic",
-                            format_func=clean_sub_topic_label,
+                            format_func=_clean_sub_topic_label,
                         )
                         difficulty_val = st.selectbox(
                             "Difficulty",
@@ -1091,7 +1094,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 max_marks=int(max_marks_in),
                                 tags=tags,
                                 topic=topic_val,
-                                sub_topic=clean_sub_topic_label(sub_topic_val),
+                                sub_topic=_clean_sub_topic_label(sub_topic_val),
                                 skill=skill_val,
                                 difficulty=difficulty_val,
                                 question_text=(q_text_opt or "").strip(),
