@@ -1065,13 +1065,35 @@ def normalize_markdown_math(md_text: str) -> str:
 
     protected: Dict[str, str] = {}
     s = _protect_segments(_MD_TOKEN_CODEBLOCK, s, protected, "CB")
-    s = _protect_segments(_MD_TOKEN_MATHBLOCK, s, protected, "MB")
-    s = _protect_segments(_MD_TOKEN_MATHINLINE, s, protected, "MI")
     s = _protect_segments(_MD_TOKEN_INLINECODE, s, protected, "IC")
 
     # Convert common LaTeX delimiters to MathJax-friendly ones
     s = re.sub(r"\\\((.*?)\\\)", r"$\1$", s, flags=re.DOTALL)
     s = re.sub(r"\\\[(.*?)\\\]", r"$$\1$$", s, flags=re.DOTALL)
+
+    def _normalize_unit_escapes(math_text: str) -> str:
+        out = math_text
+        out = re.sub(r"\\m\s*\^\s*\{?\s*-?1\s*\}?", r"\\,m^{-1}", out)
+        out = re.sub(r"\\m\b", r"\\,m", out)
+        out = re.sub(r"\\s\b", r"\\,s", out)
+        out = re.sub(r"\\kg\b", r"\\,kg", out)
+        return out
+
+    def _normalize_units_in_math(text_in: str) -> str:
+        def _fix_block(m: re.Match) -> str:
+            return f"$${_normalize_unit_escapes(m.group(1))}$$"
+
+        def _fix_inline(m: re.Match) -> str:
+            return f"${_normalize_unit_escapes(m.group(1))}$"
+
+        out = re.sub(r"\$\$(.*?)\$\$", _fix_block, text_in, flags=re.DOTALL)
+        out = re.sub(r"(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)", _fix_inline, out, flags=re.DOTALL)
+        return out
+
+    s = _normalize_units_in_math(s)
+
+    s = _protect_segments(_MD_TOKEN_MATHBLOCK, s, protected, "MB")
+    s = _protect_segments(_MD_TOKEN_MATHINLINE, s, protected, "MI")
 
     # Wrap simple math tokens not already protected
     # Examples: 3^2, v^2, a_t, a_{t}, m/s^2 (will wrap s^2)
