@@ -62,33 +62,54 @@ SUBJECT_EQUATIONS = SUBJECT_PACK.get("equations", {}) or {}
 # Topics for dropdowns (student + teacher)
 TOPICS_CATALOG = SUBJECT_TOPICS_RAW.get("topics", [])
 
-
-def get_topic_names_for_track(track: str) -> List[str]:
+def _iter_topics_for_track(track: str) -> List[Dict[str, Any]]:
     track = (track or "").strip().lower()
-    names: List[str] = []
+    topics: List[Dict[str, Any]] = []
     for t in TOPICS_CATALOG:
-        name = str(t.get("name", "")).strip()
-        if not name:
-            continue
         track_ok = str(t.get("track_ok", "both")).strip().lower() or "both"
         if track == "combined" and track_ok == "separate_only":
+            continue
+        topics.append(t)
+    return topics
+
+
+def get_topic_names_for_track(track: str) -> List[str]:
+    names: List[str] = []
+    for t in _iter_topics_for_track(track):
+        name = str(t.get("name", "")).strip()
+        if not name:
             continue
         names.append(name)
     return names
 
 
 def get_topic_groups_for_track(track: str) -> List[str]:
-    track = (track or "").strip().lower()
     groups: List[str] = []
-    for t in TOPICS_CATALOG:
+    for t in _iter_topics_for_track(track):
         group = str(t.get("group", "")).strip()
         if not group:
             continue
-        track_ok = str(t.get("track_ok", "both")).strip().lower() or "both"
-        if track == "combined" and track_ok == "separate_only":
-            continue
         groups.append(group)
     return sorted(set(groups))
+
+
+def get_topic_group_names_for_track(track: str) -> List[str]:
+    return get_topic_groups_for_track(track)
+
+
+def get_sub_topic_names_for_group(track: str, group: str) -> List[str]:
+    group_norm = (group or "").strip().lower()
+    if not group_norm:
+        return []
+    names: List[str] = []
+    for t in _iter_topics_for_track(track):
+        group_val = str(t.get("group", "")).strip().lower()
+        if group_val != group_norm:
+            continue
+        name = str(t.get("name", "")).strip()
+        if name:
+            names.append(name)
+    return names
 
 
 def get_topic_group_for_name(topic_name: str) -> str | None:

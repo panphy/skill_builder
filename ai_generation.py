@@ -19,8 +19,8 @@ from config import (
     SKILLS,
     SUBJECT_EQUATIONS,
     get_topic_group_for_name,
-    get_topic_groups_for_track,
-    get_topic_names_for_track,
+    get_topic_group_names_for_track,
+    get_sub_topic_names_for_group,
 )
 
 LOGGER = logging.getLogger("panphy")
@@ -417,8 +417,7 @@ def generate_practice_question_with_ai(
     extra_instructions: str = "",
 ) -> Dict[str, Any]:
     track = st.session_state.get("track", TRACK_DEFAULT)
-    topic_options = get_topic_names_for_track(track)
-    sub_topic_options = get_topic_groups_for_track(track)
+    topic_options = get_topic_group_names_for_track(track)
     skill_options = list(SKILLS)
     difficulty_options = list(DIFFICULTIES)
 
@@ -440,13 +439,14 @@ def generate_practice_question_with_ai(
         elif topic_text and topic_val.lower() != str(topic_text).strip().lower():
             reasons.append("topic must match the requested Topic.")
 
+        sub_topic_options = get_sub_topic_names_for_group(track, topic_val or topic_text)
         sub_topic_val = _coerce_vocab(d.get("sub_topic"), sub_topic_options)
         if not sub_topic_val:
             reasons.append("Missing or invalid sub_topic.")
         else:
-            expected_group = get_topic_group_for_name(topic_val or topic_text)
-            if expected_group and sub_topic_val.lower() != expected_group.lower():
-                reasons.append(f"sub_topic must match the topic group '{expected_group}'.")
+            expected_group = get_topic_group_for_name(sub_topic_val)
+            if expected_group and topic_val and expected_group.lower() != topic_val.lower():
+                reasons.append(f"sub_topic must match the topic group '{topic_val}'.")
 
         skill_val = _coerce_vocab(d.get("skill"), skill_options)
         if not skill_val:
@@ -500,7 +500,7 @@ def generate_practice_question_with_ai(
             "MARKS": int(marks),
             "EXTRA_INSTRUCTIONS": (extra_instructions or "").strip() or "(none)",
             "TOPIC_OPTIONS": ", ".join(topic_options) or "(none)",
-            "SUB_TOPIC_OPTIONS": ", ".join(sub_topic_options) or "(none)",
+            "SUB_TOPIC_OPTIONS": ", ".join(get_sub_topic_names_for_group(track, topic_text)) or "(none)",
             "SKILL_OPTIONS": ", ".join(skill_options) or "(none)",
             "DIFFICULTY_OPTIONS": ", ".join(difficulty_options) or "(none)",
             "TRACK": st.session_state.get("track", TRACK_DEFAULT),
@@ -551,11 +551,11 @@ def generate_practice_question_with_ai(
             data = data2 if isinstance(data2, dict) and data2 else data
             data["warnings"] = reasons2[:10]
 
+    topic_val = _coerce_vocab(data.get("topic"), topic_options) or (topic_text or "").strip()
+    sub_topic_options = get_sub_topic_names_for_group(track, topic_val)
     out = {
-        "topic": _coerce_vocab(data.get("topic"), topic_options) or (topic_text or "").strip(),
-        "sub_topic": _coerce_vocab(data.get("sub_topic"), sub_topic_options)
-        or get_topic_group_for_name(_coerce_vocab(data.get("topic"), topic_options) or topic_text)
-        or None,
+        "topic": topic_val,
+        "sub_topic": _coerce_vocab(data.get("sub_topic"), sub_topic_options),
         "skill": _coerce_vocab(data.get("skill"), skill_options),
         "difficulty": _coerce_vocab(data.get("difficulty"), difficulty_options) or str(difficulty).strip(),
         "question_text": str(data.get("question_text", "") or "").strip(),
