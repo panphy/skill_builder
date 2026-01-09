@@ -134,7 +134,6 @@ def _get_equation_regexes() -> Dict[str, re.Pattern]:
         "latex_block": re.compile(r"\\\[(.+?)\\\]", re.DOTALL),
         "latex_inline": re.compile(r"\$(.+?)\$", re.DOTALL),
         "latex_paren": re.compile(r"\\\((.+?)\\\)", re.DOTALL),
-        "latex_bracket": re.compile(r"\\\[(.+?)\\\]", re.DOTALL),
         "plain_eq": re.compile(r"([A-Za-z0-9\\_\^\+\-\*/\(\)\{\}=\s]+)"),
     }
 
@@ -242,10 +241,15 @@ def _extract_equation_candidates(text: str) -> List[str]:
         return []
     regexes = _get_equation_regexes()
     candidates: List[str] = []
-    for key in ("latex_block", "latex_inline", "latex_paren", "latex_bracket"):
+    seen: set = set()
+    for key in ("latex_block", "latex_inline", "latex_paren"):
         for match in regexes[key].finditer(text):
             cand = (match.group(1) or "").strip()
             if cand:
+                norm = _normalize_equation_text(cand)
+                if norm in seen:
+                    continue
+                seen.add(norm)
                 candidates.append(cand)
     return candidates
 
