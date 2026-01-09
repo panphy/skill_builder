@@ -15,7 +15,12 @@ from config import (
     JOURNEY_REPAIR_PREFIX_TPL,
     JOURNEY_SYSTEM_TPL,
     JOURNEY_USER_TPL,
+    DIFFICULTIES,
+    SKILLS,
     SUBJECT_EQUATIONS,
+    get_topic_group_for_name,
+    get_topic_groups_for_track,
+    get_topic_names_for_track,
 )
 
 LOGGER = logging.getLogger("panphy")
@@ -411,10 +416,47 @@ def generate_practice_question_with_ai(
     marks: int,
     extra_instructions: str = "",
 ) -> Dict[str, Any]:
+    track = st.session_state.get("track", TRACK_DEFAULT)
+    topic_options = get_topic_names_for_track(track)
+    sub_topic_options = get_topic_groups_for_track(track)
+    skill_options = list(SKILLS)
+    difficulty_options = list(DIFFICULTIES)
+
+    def _coerce_vocab(value: Any, allowed: List[str]) -> Optional[str]:
+        val = str(value or "").strip()
+        if not val:
+            return None
+        allowed_map = {str(opt).strip().lower(): str(opt).strip() for opt in allowed}
+        return allowed_map.get(val.lower())
+
     def _validate(d: Dict[str, Any]) -> Tuple[bool, List[str]]:
         qtxt = str(d.get("question_text", "") or "")
         mstxt = str(d.get("markscheme_text", "") or "")
         reasons = _auto_check_warnings(qtxt, mstxt, int(marks))
+
+        topic_val = _coerce_vocab(d.get("topic"), topic_options)
+        if not topic_val:
+            reasons.append("Missing or invalid topic.")
+        elif topic_text and topic_val.lower() != str(topic_text).strip().lower():
+            reasons.append("topic must match the requested Topic.")
+
+        sub_topic_val = _coerce_vocab(d.get("sub_topic"), sub_topic_options)
+        if not sub_topic_val:
+            reasons.append("Missing or invalid sub_topic.")
+        else:
+            expected_group = get_topic_group_for_name(topic_val or topic_text)
+            if expected_group and sub_topic_val.lower() != expected_group.lower():
+                reasons.append(f"sub_topic must match the topic group '{expected_group}'.")
+
+        skill_val = _coerce_vocab(d.get("skill"), skill_options)
+        if not skill_val:
+            reasons.append("Missing or invalid skill.")
+
+        difficulty_val = _coerce_vocab(d.get("difficulty"), difficulty_options)
+        if not difficulty_val:
+            reasons.append("Missing or invalid difficulty.")
+        elif difficulty and difficulty_val.lower() != str(difficulty).strip().lower():
+            reasons.append("difficulty must match the requested Difficulty.")
 
         mm = d.get("max_marks", None)
         try:
@@ -457,6 +499,10 @@ def generate_practice_question_with_ai(
             "QTYPE": str(qtype),
             "MARKS": int(marks),
             "EXTRA_INSTRUCTIONS": (extra_instructions or "").strip() or "(none)",
+            "TOPIC_OPTIONS": ", ".join(topic_options) or "(none)",
+            "SUB_TOPIC_OPTIONS": ", ".join(sub_topic_options) or "(none)",
+            "SKILL_OPTIONS": ", ".join(skill_options) or "(none)",
+            "DIFFICULTY_OPTIONS": ", ".join(difficulty_options) or "(none)",
             "TRACK": st.session_state.get("track", TRACK_DEFAULT),
         })
         base_user = (base_user or "").strip()
@@ -506,6 +552,12 @@ def generate_practice_question_with_ai(
             data["warnings"] = reasons2[:10]
 
     out = {
+        "topic": _coerce_vocab(data.get("topic"), topic_options) or (topic_text or "").strip(),
+        "sub_topic": _coerce_vocab(data.get("sub_topic"), sub_topic_options)
+        or get_topic_group_for_name(_coerce_vocab(data.get("topic"), topic_options) or topic_text)
+        or None,
+        "skill": _coerce_vocab(data.get("skill"), skill_options),
+        "difficulty": _coerce_vocab(data.get("difficulty"), difficulty_options) or str(difficulty).strip(),
         "question_text": str(data.get("question_text", "") or "").strip(),
         "markscheme_text": str(data.get("markscheme_text", "") or "").strip(),
         "max_marks": int(marks),

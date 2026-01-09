@@ -15,5 +15,13 @@
     "Easy",
     "Medium",
     "Hard"
+  ],
+  "skills": [
+    "Recall",
+    "Calculation",
+    "Explanation",
+    "Practical/Methods",
+    "Graph/Analysis",
+    "Mixed"
   ]
 }

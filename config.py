@@ -77,6 +77,31 @@ def get_topic_names_for_track(track: str) -> List[str]:
     return names
 
 
+def get_topic_groups_for_track(track: str) -> List[str]:
+    track = (track or "").strip().lower()
+    groups: List[str] = []
+    for t in TOPICS_CATALOG:
+        group = str(t.get("group", "")).strip()
+        if not group:
+            continue
+        track_ok = str(t.get("track_ok", "both")).strip().lower() or "both"
+        if track == "combined" and track_ok == "separate_only":
+            continue
+        groups.append(group)
+    return sorted(set(groups))
+
+
+def get_topic_group_for_name(topic_name: str) -> str | None:
+    name_norm = (topic_name or "").strip().lower()
+    if not name_norm:
+        return None
+    for t in TOPICS_CATALOG:
+        nm = str(t.get("name", "")).strip().lower()
+        if nm == name_norm:
+            return str(t.get("group", "")).strip() or None
+    return None
+
+
 
 def get_topic_track_ok(topic_name: str) -> str:
     """Return track eligibility for a topic name in TOPICS_CATALOG: 'both' or 'separate_only'."""
@@ -94,6 +119,14 @@ def get_topic_track_ok(topic_name: str) -> str:
 # UI option lists (can be overridden per subject via settings.json)
 QUESTION_TYPES = SUBJECT_SETTINGS.get("question_types") or ["Calculation", "Explanation", "Practical/Methods", "Graph/Analysis", "Mixed"]
 DIFFICULTIES = SUBJECT_SETTINGS.get("difficulties") or ["Easy", "Medium", "Hard"]
+SKILLS = SUBJECT_SETTINGS.get("skills") or [
+    "Recall",
+    "Calculation",
+    "Explanation",
+    "Practical/Methods",
+    "Graph/Analysis",
+    "Mixed",
+]
 
 # Prompt components (loaded from prompts.json)
 GCSE_ONLY_GUARDRAILS = str(SUBJECT_PROMPTS.get("gcse_only_guardrails", "") or "").strip()
