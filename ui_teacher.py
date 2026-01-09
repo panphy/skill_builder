@@ -480,7 +480,10 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             )
 
                             draft = {
-                                "topic": topic,
+                                "topic": data.get("topic", topic),
+                                "sub_topic": data.get("sub_topic"),
+                                "skill": data.get("skill"),
+                                "difficulty": data.get("difficulty", difficulty),
                                 "question_type": "single",
                                 "question_text": data.get("question_text", ""),
                                 "markscheme_text": data.get("markscheme_text", ""),
@@ -533,6 +536,10 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 question_label=question_label.strip(),
                                 max_marks=int(max_marks),
                                 tags=tags,
+                                topic=draft.get("topic"),
+                                sub_topic=draft.get("sub_topic"),
+                                skill=draft.get("skill"),
+                                difficulty=draft.get("difficulty"),
                                 question_text=(q_text or "").strip(),
                                 markscheme_text=(ms_text or "").strip(),
                                 question_image_path=None,
