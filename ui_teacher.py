@@ -536,35 +536,45 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         st.rerun()
 
                 if gen_clicked:
-                    with st.spinner("Generating question..."):
-                        try:
-                            data = generate_practice_question_with_ai(
-                                topic_text=topic,
-                                sub_topic_text=sub_topic,
-                                difficulty=difficulty,
-                                qtype=qtype,
-                                marks=int(marks),
-                                extra_instructions=extra,
-                            )
+                    def task_generate():
+                        return generate_practice_question_with_ai(
+                            topic_text=topic,
+                            sub_topic_text=sub_topic,
+                            difficulty=difficulty,
+                            qtype=qtype,
+                            marks=int(marks),
+                            extra_instructions=extra,
+                        )
 
-                            draft = {
-                                "topic": data.get("topic", topic),
-                                "sub_topic": data.get("sub_topic") or sub_topic,
-                                "skill": data.get("skill"),
-                                "difficulty": data.get("difficulty", difficulty),
-                                "question_type": "single",
-                                "question_text": data.get("question_text", ""),
-                                "markscheme_text": data.get("markscheme_text", ""),
-                                "max_marks": data.get("max_marks", int(marks)),
-                                "tags": data.get("tags", []),
-                                "warnings": data.get("warnings", []),
-                            }
+                    try:
+                        data = _run_ai_with_progress(
+                            task_fn=task_generate,
+                            ctx={"teacher": True, "mode": "ai_generator"},
+                            typical_range="15-35 seconds",
+                            est_seconds=25.0,
+                        )
 
-                            st.session_state["draft_question"] = draft
-                            st.session_state["draft_warning"] = None
-                        except Exception as e:
-                            st.session_state["draft_question"] = None
-                            st.session_state["draft_warning"] = str(e)
+                        if data is None:
+                            raise ValueError("AI returned no usable question payload.")
+
+                        draft = {
+                            "topic": data.get("topic", topic),
+                            "sub_topic": data.get("sub_topic") or sub_topic,
+                            "skill": data.get("skill"),
+                            "difficulty": data.get("difficulty", difficulty),
+                            "question_type": "single",
+                            "question_text": data.get("question_text", ""),
+                            "markscheme_text": data.get("markscheme_text", ""),
+                            "max_marks": data.get("max_marks", int(marks)),
+                            "tags": data.get("tags", []),
+                            "warnings": data.get("warnings", []),
+                        }
+
+                        st.session_state["draft_question"] = draft
+                        st.session_state["draft_warning"] = None
+                    except Exception as e:
+                        st.session_state["draft_question"] = None
+                        st.session_state["draft_warning"] = str(e)
 
                 draft = st.session_state.get("draft_question")
                 if st.session_state.get("draft_warning"):
