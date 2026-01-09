@@ -359,9 +359,9 @@ def render_student_page(helpers: dict):
             else:
                 canvas_height = CANVAS_HEIGHT_EXPANDED if canvas_expanded else CANVAS_HEIGHT_DEFAULT
                 canvas_storage_key = (
-                    f"panphy_canvas_h_{SUBJECT_SITE}_single_expanded"
+                    f"panphy_canvas_h_{SUBJECT_SITE}_single_expanded_v2"
                     if canvas_expanded
-                    else f"panphy_canvas_h_{SUBJECT_SITE}_single"
+                    else f"panphy_canvas_h_{SUBJECT_SITE}_single_v2"
                 )
                 if _stylus_canvas_available():
                     tool_row = st.columns([2.2, 1.4, 1, 1])
@@ -402,6 +402,8 @@ def render_student_page(helpers: dict):
                         background_color=CANVAS_BG_HEX,
                         height=canvas_height,
                         width=None,
+                        min_height=CANVAS_HEIGHT_DEFAULT,
+                        max_height=CANVAS_HEIGHT_EXPANDED,
                         storage_key=canvas_storage_key,
                         initial_data_url=st.session_state.get("last_canvas_data_url_single"),
                         pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
@@ -700,9 +702,9 @@ def render_student_page(helpers: dict):
                 else:
                     canvas_height = CANVAS_HEIGHT_EXPANDED if canvas_expanded else CANVAS_HEIGHT_DEFAULT
                     canvas_storage_key = (
-                        f"panphy_canvas_h_{SUBJECT_SITE}_journey_expanded"
+                        f"panphy_canvas_h_{SUBJECT_SITE}_journey_expanded_v2"
                         if canvas_expanded
-                        else f"panphy_canvas_h_{SUBJECT_SITE}_journey"
+                        else f"panphy_canvas_h_{SUBJECT_SITE}_journey_v2"
                     )
                     if _stylus_canvas_available():
                         tool_row = st.columns([2.2, 1.4, 1, 1])
@@ -743,6 +745,8 @@ def render_student_page(helpers: dict):
                             background_color=CANVAS_BG_HEX,
                             height=canvas_height,
                             width=None,
+                            min_height=CANVAS_HEIGHT_DEFAULT,
+                            max_height=CANVAS_HEIGHT_EXPANDED,
                             storage_key=canvas_storage_key,
                             initial_data_url=st.session_state.get("last_canvas_data_url_journey"),
                             pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
