@@ -379,8 +379,8 @@ def render_student_page(helpers: dict):
                             help="Best on iPad. When enabled, finger/palm touches are ignored.",
                             key="stylus_only_enabled",
                         )
-                    undo_clicked = tool_row[2].button("↩️ Undo", width='stretch', key="canvas_undo_single")
-                    clear_clicked = tool_row[3].button("🗑️ Clear", width='stretch', key="canvas_clear_single")
+                    undo_clicked = tool_row[2].button("↩️ Undo", use_container_width=True, key="canvas_undo_single")
+                    clear_clicked = tool_row[3].button("🗑️ Clear", use_container_width=True, key="canvas_clear_single")
                     cmd = None
                     if undo_clicked:
                         st.session_state["feedback"] = None
@@ -424,7 +424,7 @@ def render_student_page(helpers: dict):
                             label_visibility="collapsed",
                             key="canvas_tool_single",
                         )
-                    clear_clicked = tool_row[1].button("🗑️ Clear", width='stretch', key="canvas_clear_single")
+                    clear_clicked = tool_row[1].button("🗑️ Clear", use_container_width=True, key="canvas_clear_single")
                     if clear_clicked:
                         st.session_state["feedback"] = None
                         st.session_state["last_canvas_image_data_single"] = None
@@ -722,8 +722,8 @@ def render_student_page(helpers: dict):
                                 help="Best on iPad. When enabled, finger/palm touches are ignored.",
                                 key="stylus_only_enabled",
                             )
-                        undo_clicked = tool_row[2].button("↩️ Undo", width='stretch', key="canvas_undo_journey")
-                        clear_clicked = tool_row[3].button("🗑️ Clear", width='stretch', key="canvas_clear_journey")
+                        undo_clicked = tool_row[2].button("↩️ Undo", use_container_width=True, key="canvas_undo_journey")
+                        clear_clicked = tool_row[3].button("🗑️ Clear", use_container_width=True, key="canvas_clear_journey")
                         cmd = None
                         if undo_clicked:
                             st.session_state["feedback"] = None
@@ -767,7 +767,7 @@ def render_student_page(helpers: dict):
                                 label_visibility="collapsed",
                                 key="canvas_tool_journey",
                             )
-                        clear_clicked = tool_row[1].button("🗑️ Clear", width='stretch', key="canvas_clear_journey")
+                        clear_clicked = tool_row[1].button("🗑️ Clear", use_container_width=True, key="canvas_clear_journey")
                         if clear_clicked:
                             st.session_state["feedback"] = None
                             st.session_state["last_canvas_image_data_journey"] = None
@@ -942,13 +942,13 @@ def render_student_page(helpers: dict):
 
                     cbtn1, cbtn2 = st.columns(2)
                     with cbtn1:
-                        st.button("Redo this step", width='stretch', key="journey_redo", on_click=_journey_redo_cb)
+                        st.button("Redo this step", use_container_width=True, key="journey_redo", on_click=_journey_redo_cb)
                     with cbtn2:
                         next_disabled = (total_steps <= 0) or (step_i >= total_steps - 1)
                         label = "Finish" if next_disabled else "Next step"
                         st.button(
                             label,
-                            width='stretch',
+                            use_container_width=True,
                             disabled=next_disabled,
                             key="journey_next",
                             on_click=_journey_next_cb,
