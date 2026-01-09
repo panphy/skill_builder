@@ -258,7 +258,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
 
             st.write("### Question Bank manager")
 
-            tab_browse, tab_ai, tab_upload = st.tabs(["🔎 Browse & preview", "🤖 AI generator", "🖼️ Upload scans"])
+            tab_browse, tab_ai, tab_upload = st.tabs(["🔎 Browse & preview", "🤖 AI generation", "🖼️ Upload scans"])
 
             # -------------------------
             # Browse & preview
@@ -497,483 +497,489 @@ def render_teacher_page(nav_label: str, helpers: dict):
                 st.divider()
 
             # -------------------------
-            # AI generator
+            # AI generation
             # -------------------------
             with tab_ai:
-                st.write("## 🤖 AI Generator")
+                st.write("## 🤖 AI generation")
                 st.caption("Generate and review before saving to the bank.")
 
-                c1, c2, c3, c4, c5 = st.columns([3, 3, 2, 2, 1])
+                with st.expander("Generate Single Question", expanded=False):
+                    c1, c2, c3, c4, c5 = st.columns([3, 3, 2, 2, 1])
 
-                with c1:
-                    topic = st.selectbox(
-                        "Topic group",
-                        get_topic_group_names_for_track(track),
-                        key="gen_topic",
-                    )
-                with c2:
-                    sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic))
-                    sub_topic = st.selectbox(
-                        "Topic",
-                        sub_topic_options,
-                        index=_index_for(sub_topic_options, st.session_state.get("gen_sub_topic")),
-                        key="gen_sub_topic",
-                        format_func=_clean_sub_topic_label,
-                    )
-                with c3:
-                    qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
-                with c4:
-                    difficulty = st.selectbox("Difficulty", DIFFICULTIES, key="gen_difficulty")
-                with c5:
-                    marks = st.number_input("Marks", min_value=1, max_value=12, value=4, step=1, key="gen_marks")
-
-                extra = st.text_area(
-                    "Optional extra instructions (for the AI)",
-                    height=80,
-                    placeholder="e.g. include one tricky unit conversion, use g=9.8",
-                    key="gen_extra",
-                )
-
-                col_gen1, col_gen2 = st.columns([1, 1])
-                with col_gen1:
-                    gen_clicked = st.button("Generate draft", type="primary", width='stretch', disabled=not AI_READY, key="gen_btn")
-                with col_gen2:
-                    if st.button("Clear draft", width='stretch', key="gen_clear_btn"):
-                        st.session_state["draft_question"] = None
-                        st.session_state["draft_warning"] = None
-                        st.rerun()
-
-                if gen_clicked:
-                    def task_generate():
-                        return generate_practice_question_with_ai(
-                            topic_text=topic,
-                            sub_topic_text=sub_topic,
-                            difficulty=difficulty,
-                            qtype=qtype,
-                            marks=int(marks),
-                            extra_instructions=extra,
-                        )
-
-                    try:
-                        data = _run_ai_with_progress(
-                            task_fn=task_generate,
-                            ctx={"teacher": True, "mode": "ai_generator"},
-                            typical_range="15-35 seconds",
-                            est_seconds=25.0,
-                        )
-
-                        if data is None:
-                            raise ValueError("AI returned no usable question payload.")
-
-                        draft = {
-                            "topic": data.get("topic", topic),
-                            "sub_topic": data.get("sub_topic") or sub_topic,
-                            "skill": data.get("skill"),
-                            "difficulty": data.get("difficulty", difficulty),
-                            "question_type": "single",
-                            "question_text": data.get("question_text", ""),
-                            "markscheme_text": data.get("markscheme_text", ""),
-                            "max_marks": data.get("max_marks", int(marks)),
-                            "tags": data.get("tags", []),
-                            "warnings": data.get("warnings", []),
-                        }
-
-                        st.session_state["draft_question"] = draft
-                        st.session_state["draft_warning"] = None
-                    except Exception as e:
-                        st.session_state["draft_question"] = None
-                        st.session_state["draft_warning"] = str(e)
-
-                draft = st.session_state.get("draft_question")
-                if st.session_state.get("draft_warning"):
-                    st.error(f"AI generation failed: {st.session_state['draft_warning']}")
-
-                if draft:
-                    if draft.get("warnings"):
-                        st.warning("Draft warnings:\n\n" + "\n".join([f"- {w}" for w in draft.get("warnings", [])]))
-
-                    st.write("### ✅ Vet and edit")
-                    c1, c2 = st.columns([3, 1])
                     with c1:
-                        assignment_name = st.text_input("Assignment name", value="AI Practice", key="draft_assignment")
-                        question_label = st.text_input("Question label", value=f"{slugify(topic)[:24]}-{pysecrets.token_hex(3)}", key="draft_label")
-                        tags_str = st.text_input("Tags (comma separated)", value=", ".join(draft.get("tags", [])), key="draft_tags")
+                        topic = st.selectbox(
+                            "Topic group",
+                            get_topic_group_names_for_track(track),
+                            key="gen_topic",
+                        )
                     with c2:
-                        save_clicked = st.button("Save to Question Bank", type="primary", width='stretch', key="draft_save_btn")
-
-                    topic_options = get_topic_group_names_for_track(track)
-                    skill_options = list(SKILLS)
-                    difficulty_options = list(DIFFICULTIES)
-
-                    tc1, tc2 = st.columns(2)
-                    with tc1:
-                        topic_val = st.selectbox(
-                            "Topic group",
-                            topic_options,
-                            index=_index_for(topic_options, draft.get("topic")),
-                            key="draft_topic",
-                        )
-                        skill_val = st.selectbox(
-                            "Skill",
-                            skill_options,
-                            index=_index_for(skill_options, draft.get("skill")),
-                            key="draft_skill",
-                        )
-                    with tc2:
-                        sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_val))
-                        sub_topic_seed = draft.get("sub_topic")
-                        if sub_topic_seed not in sub_topic_options and sub_topic_options:
-                            matching = next(
-                                (
-                                    option
-                                    for option in sub_topic_options
-                                    if _clean_sub_topic_label(option).lower() == str(sub_topic_seed or "").strip().lower()
-                                ),
-                                None,
-                            )
-                            if matching:
-                                sub_topic_seed = matching
-                            else:
-                                sub_topic_seed = sub_topic_options[0]
-                                draft["sub_topic"] = sub_topic_seed
-                        elif sub_topic_seed not in sub_topic_options and not sub_topic_options:
-                            sub_topic_seed = ""
-                            draft["sub_topic"] = sub_topic_seed
-                        sub_topic_val = st.selectbox(
+                        sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic))
+                        sub_topic = st.selectbox(
                             "Topic",
                             sub_topic_options,
-                            index=_index_for(sub_topic_options, sub_topic_seed),
-                            key="draft_sub_topic",
+                            index=_index_for(sub_topic_options, st.session_state.get("gen_sub_topic")),
+                            key="gen_sub_topic",
                             format_func=_clean_sub_topic_label,
                         )
-                        difficulty_val = st.selectbox(
-                            "Difficulty",
-                            difficulty_options,
-                            index=_index_for(difficulty_options, draft.get("difficulty")),
-                            key="draft_difficulty",
-                        )
+                    with c3:
+                        qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
+                    with c4:
+                        difficulty = st.selectbox("Difficulty", DIFFICULTIES, key="gen_difficulty")
+                    with c5:
+                        marks = st.number_input("Marks", min_value=1, max_value=12, value=4, step=1, key="gen_marks")
 
-                    q_text = st.text_area("Question text", value=draft.get("question_text", ""), height=200, key="draft_q")
-                    ms_text = st.text_area("Mark scheme", value=draft.get("markscheme_text", ""), height=240, key="draft_ms")
-                    max_marks = st.number_input("Max marks", min_value=1, max_value=12, value=int(draft.get("max_marks", 4) or 4), step=1, key="draft_mm")
-
-                    render_md_box("Preview: Question", q_text, empty_text="No question text.")
-                    render_md_box("Preview: Mark scheme", ms_text, empty_text="No mark scheme.")
-
-                    if save_clicked:
-                        if not assignment_name.strip() or not question_label.strip():
-                            st.error("Assignment name and question label are required.")
-                        elif not _validate_classification_inputs(
-                            topic_val,
-                            sub_topic_val,
-                            skill_val,
-                            difficulty_val,
-                            topic_options,
-                            sub_topic_options,
-                            skill_options,
-                            difficulty_options,
-                        ):
-                            pass
-                        else:
-                            tags = [t.strip() for t in (tags_str or "").split(",") if t.strip()]
-                            ok = insert_question_bank_row(
-                                source="ai_generated",
-                                created_by="teacher",
-                                subject_site=SUBJECT_SITE,
-                                track_ok=st.session_state.get("teacher_track_ok", "both"),
-                                assignment_name=assignment_name.strip(),
-                                question_label=question_label.strip(),
-                                max_marks=int(max_marks),
-                                tags=tags,
-                                topic=topic_val,
-                                sub_topic=_clean_sub_topic_label(sub_topic_val),
-                                sub_topic_raw=sub_topic_val,
-                                skill=skill_val,
-                                difficulty=difficulty_val,
-                                question_text=(q_text or "").strip(),
-                                markscheme_text=(ms_text or "").strip(),
-                                question_image_path=None,
-                                markscheme_image_path=None,
-                            )
-                            if ok:
-                                st.success("Approved and saved. Students can now access this under AI Practice.")
-                            else:
-                                st.error("Save failed. Check database errors below.")
-
-                st.divider()
-
-                st.write("### 🧭 Topic Journey")
-                st.caption("Create a multi-step journey (fixed at 10 minutes / 5 steps).")
-
-                jc1, jc2 = st.columns([3, 1])
-
-                # --- Left column: inputs ---
-                with jc1:
-                    topic_group_options = get_topic_group_names_for_track(track)
-                    topic_group_val = st.selectbox(
-                        "Topic group",
-                        topic_group_options,
-                        key="journey_topic_group",
-                    )
-                    sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_group_val))
-                    sub_topic_val = st.selectbox(
-                        "Topic",
-                        sub_topic_options,
-                        key="journey_topic_sub_topic",
-                        format_func=_clean_sub_topic_label,
-                    )
-                    sel_topics = [sub_topic_val] if sub_topic_val else []
-                    if sel_topics:
-                        st.markdown("**Selected topic:**")
-                        st.markdown(f"- {_clean_sub_topic_label(sel_topics[0])}")
-                    else:
-                        st.info("Choose a topic to build a journey.")
-
-                    # Fixed journey size: 10 minutes, 5 steps
-                    j_duration = 10
-                    st.caption("Journey length is fixed: 10 minutes, 5 steps.")
-
-                    j_assignment = st.text_input("Assignment name for saving", value="Topic Journey", key="jour_assignment")
-                    j_tags = st.text_input("Tags (comma separated)", value="", key="jour_tags")
-                    j_extra_instr = st.text_area(
-                        "Optional constraints for the AI",
+                    extra = st.text_area(
+                        "Optional extra instructions (for the AI)",
                         height=80,
-                        placeholder="e.g. Include one tricky unit conversion. Use g = 9.8 N/kg. Require a final answer with units.",
-                        key="jour_extra"
+                        placeholder="e.g. include one tricky unit conversion, use g=9.8",
+                        key="gen_extra",
                     )
 
-                # --- Right column: actions ---
-                with jc2:
-                    gen_j = st.button(
-                        "Generate journey draft",
-                        type="primary",
-                        width='stretch',
-                        disabled=not AI_READY,
-                        key="jour_gen_btn",
-                    )
+                    col_gen1, col_gen2 = st.columns([1, 1])
+                    with col_gen1:
+                        gen_clicked = st.button("Generate draft", type="primary", width='stretch', disabled=not AI_READY, key="gen_btn")
+                    with col_gen2:
+                        if st.button("Clear draft", width='stretch', key="gen_clear_btn"):
+                            st.session_state["draft_question"] = None
+                            st.session_state["draft_warning"] = None
+                            st.rerun()
 
-                    if st.button("Clear journey draft", width='stretch', key="jour_clear_btn"):
-                        st.session_state["journey_draft"] = None
-                        st.session_state["journey_gen_error_details"] = None
-                        st.session_state["journey_show_error"] = False
-                        st.rerun()
+                    if gen_clicked:
+                        def task_generate():
+                            return generate_practice_question_with_ai(
+                                topic_text=topic,
+                                sub_topic_text=sub_topic,
+                                difficulty=difficulty,
+                                qtype=qtype,
+                                marks=int(marks),
+                                extra_instructions=extra,
+                            )
 
-                    if gen_j:
-                        # Clear previous error state for this run
-                        st.session_state["journey_gen_error_details"] = None
-                        st.session_state["journey_show_error"] = False
+                        try:
+                            data = _run_ai_with_progress(
+                                task_fn=task_generate,
+                                ctx={"teacher": True, "mode": "ai_generator"},
+                                typical_range="15-35 seconds",
+                                est_seconds=25.0,
+                            )
 
-                        if not sel_topics:
-                            st.warning("Please add at least one topic first.")
-                        else:
-                            topic_plain = " | ".join(sel_topics)
+                            if data is None:
+                                raise ValueError("AI returned no usable question payload.")
 
-                            def task_generate():
-                                # 10 minutes, 5 steps is fixed
-                                return generate_topic_journey_with_ai(
-                                    topic_plain_english=topic_plain,
-                                    duration_minutes=j_duration,
-                                    extra_instructions=j_extra_instr or "",
+                            draft = {
+                                "topic": data.get("topic", topic),
+                                "sub_topic": data.get("sub_topic") or sub_topic,
+                                "skill": data.get("skill"),
+                                "difficulty": data.get("difficulty", difficulty),
+                                "question_type": "single",
+                                "question_text": data.get("question_text", ""),
+                                "markscheme_text": data.get("markscheme_text", ""),
+                                "max_marks": data.get("max_marks", int(marks)),
+                                "tags": data.get("tags", []),
+                                "warnings": data.get("warnings", []),
+                            }
+
+                            st.session_state["draft_question"] = draft
+                            st.session_state["draft_warning"] = None
+                        except Exception as e:
+                            st.session_state["draft_question"] = None
+                            st.session_state["draft_warning"] = str(e)
+
+                    draft = st.session_state.get("draft_question")
+                    if st.session_state.get("draft_warning"):
+                        st.error(f"AI generation failed: {st.session_state['draft_warning']}")
+
+                    if draft:
+                        if draft.get("warnings"):
+                            st.warning("Draft warnings:\n\n" + "\n".join([f"- {w}" for w in draft.get("warnings", [])]))
+
+                        st.write("### ✅ Vet and edit")
+                        c1, c2 = st.columns([3, 1])
+                        with c1:
+                            assignment_name = st.text_input("Assignment name", value="AI Practice", key="draft_assignment")
+                            question_label = st.text_input("Question label", value=f"{slugify(topic)[:24]}-{pysecrets.token_hex(3)}", key="draft_label")
+                            tags_str = st.text_input("Tags (comma separated)", value=", ".join(draft.get("tags", [])), key="draft_tags")
+                        with c2:
+                            save_clicked = st.button("Save to Question Bank", type="primary", width='stretch', key="draft_save_btn")
+
+                        topic_options = get_topic_group_names_for_track(track)
+                        skill_options = list(SKILLS)
+                        difficulty_options = list(DIFFICULTIES)
+
+                        tc1, tc2 = st.columns(2)
+                        with tc1:
+                            topic_val = st.selectbox(
+                                "Topic group",
+                                topic_options,
+                                index=_index_for(topic_options, draft.get("topic")),
+                                key="draft_topic",
+                            )
+                            skill_val = st.selectbox(
+                                "Skill",
+                                skill_options,
+                                index=_index_for(skill_options, draft.get("skill")),
+                                key="draft_skill",
+                            )
+                        with tc2:
+                            sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_val))
+                            sub_topic_seed = draft.get("sub_topic")
+                            if sub_topic_seed not in sub_topic_options and sub_topic_options:
+                                matching = next(
+                                    (
+                                        option
+                                        for option in sub_topic_options
+                                        if _clean_sub_topic_label(option).lower() == str(sub_topic_seed or "").strip().lower()
+                                    ),
+                                    None,
                                 )
+                                if matching:
+                                    sub_topic_seed = matching
+                                else:
+                                    sub_topic_seed = sub_topic_options[0]
+                                    draft["sub_topic"] = sub_topic_seed
+                            elif sub_topic_seed not in sub_topic_options and not sub_topic_options:
+                                sub_topic_seed = ""
+                                draft["sub_topic"] = sub_topic_seed
+                            sub_topic_val = st.selectbox(
+                                "Topic",
+                                sub_topic_options,
+                                index=_index_for(sub_topic_options, sub_topic_seed),
+                                key="draft_sub_topic",
+                                format_func=_clean_sub_topic_label,
+                            )
+                            difficulty_val = st.selectbox(
+                                "Difficulty",
+                                difficulty_options,
+                                index=_index_for(difficulty_options, draft.get("difficulty")),
+                                key="draft_difficulty",
+                            )
 
-                            try:
-                                data = _run_ai_with_progress(
-                                    task_fn=task_generate,
-                                    ctx={"teacher": True, "mode": "topic_journey"},
-                                    typical_range="15-35 seconds",
-                                    est_seconds=25.0,
-                                )
-
-                                if data is None:
-                                    raise ValueError("AI returned no usable Journey JSON (failed to parse).")
-
-                                # Default label
-                                token = pysecrets.token_hex(3)
-                                default_label = f"JOURNEY-{slugify(topic_plain)[:24]}-{token}"
-
-                                # Track eligibility: if any chosen topic is separate_only, the whole journey is separate_only.
-                                toks = [get_topic_track_ok(t) for t in sel_topics]
-                                draft_track_ok = "separate_only" if any(tok == "separate_only" for tok in toks) else "both"
-                                sub_topic_primary = sel_topics[0]
-                                topic_primary = get_topic_group_for_name(sub_topic_primary) or topic_group_val or ""
-                                default_skill = "Mixed" if "Mixed" in SKILLS else (SKILLS[0] if SKILLS else "")
-                                default_difficulty = "Medium" if "Medium" in DIFFICULTIES else (DIFFICULTIES[0] if DIFFICULTIES else "")
-
-                                st.session_state["journey_draft"] = {
-                                    "assignment_name": (j_assignment or "").strip() or "Topic Journey",
-                                    "question_label": default_label,
-                                    "track_ok": draft_track_ok,
-                                    "tags": [t.strip() for t in (j_tags or "").split(",") if t.strip()],
-                                    "topic": topic_primary,
-                                    "sub_topic": sub_topic_primary,
-                                    "skill": default_skill,
-                                    "difficulty": default_difficulty,
-                                    "journey": data,
-                                }
-                                st.success("Journey draft generated. Vet/edit below, then save as one assignment.")
-
-                            except Exception:
-                                import traceback
-                                st.session_state["journey_draft"] = None
-                                st.session_state["journey_gen_error_details"] = traceback.format_exc()
-                                st.error("Failed to generate a Topic Journey. You can try again, or click 'Explain error'.")
-
-                    # Optional: reveal raw error details if the user wants them
-                    if st.session_state.get("journey_gen_error_details"):
-                        if st.button("Explain error", key="jour_explain_error", width='stretch'):
-                            st.session_state["journey_show_error"] = True
-
-                    if st.session_state.get("journey_show_error") and st.session_state.get("journey_gen_error_details"):
-                        with st.expander("Error details", expanded=True):
-                            st.code(st.session_state.get("journey_gen_error_details", ""))
-                            st.caption("These details help diagnose failures (model output shape, JSON errors, timeouts).")
-                if st.session_state.get("journey_draft"):
-                    d = st.session_state["journey_draft"]
-                    journey = d.get("journey", {}) if isinstance(d, dict) else {}
-                    steps = journey.get("steps", []) if isinstance(journey, dict) else []
-
-                    if journey.get("warnings"):
-                        st.warning("Journey draft warnings:\n\n" + "\n".join([f"- {w}" for w in journey.get("warnings", [])]))
-                    st.write("### ✅ Vet and edit the journey")
-                    hd1, hd2 = st.columns([2, 1])
-                    with hd1:
-                        d_assignment = st.text_input("Assignment name", value=d.get("assignment_name", "Topic Journey"), key="jour_draft_assignment")
-                        d_label = st.text_input("Journey label", value=d.get("question_label", ""), key="jour_draft_label")
-                        d_tags_str = st.text_input("Tags (comma separated)", value=", ".join(d.get("tags", [])), key="jour_draft_tags")
-
-                    with hd2:
-                        save_j = st.button("Save Topic Journey to bank", type="primary", width='stretch', key="jour_save_btn")
-                        st.caption("Saved as a single Question Bank entry (type=journey).")
-
-                    topic_options = get_topic_group_names_for_track(track)
-                    skill_options = list(SKILLS)
-                    difficulty_options = list(DIFFICULTIES)
-                    topic_val = str(d.get("topic") or "").strip()
-                    sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_val))
-                    sub_topic_val = str(d.get("sub_topic") or "").strip()
-
-                    hc1, hc2 = st.columns(2)
-                    with hc1:
-                        st.selectbox(
-                            "Topic group",
-                            topic_options,
-                            index=_index_for(topic_options, topic_val),
-                            key="jour_topic_display",
-                            disabled=True,
-                        )
-                        st.selectbox(
-                            "Topic",
-                            sub_topic_options,
-                            index=_index_for(sub_topic_options, sub_topic_val),
-                            key="jour_sub_topic_display",
-                            disabled=True,
-                            format_func=_clean_sub_topic_label,
-                        )
-                    with hc2:
-                        skill_val = st.selectbox(
-                            "Skill",
-                            skill_options,
-                            index=_index_for(skill_options, d.get("skill")),
-                            key="jour_skill",
-                        )
-                        difficulty_val = st.selectbox(
-                            "Difficulty",
-                            difficulty_options,
-                            index=_index_for(difficulty_options, d.get("difficulty")),
-                            key="jour_difficulty",
+                        q_text = st.text_area("Question text", value=draft.get("question_text", ""), height=200, key="draft_q")
+                        ms_text = st.text_area("Mark scheme", value=draft.get("markscheme_text", ""), height=240, key="draft_ms")
+                        max_marks = st.number_input(
+                            "Max marks",
+                            min_value=1,
+                            max_value=12,
+                            value=int(draft.get("max_marks", 4) or 4),
+                            step=1,
+                            key="draft_mm",
                         )
 
-                    plan_md = st.text_area("Journey plan (Markdown)", value=journey.get("plan_markdown", ""), height=140, key="jour_plan_md")
-                    render_md_box("Preview: Journey plan", plan_md, empty_text="No plan.")
+                        render_md_box("Preview: Question", q_text, empty_text="No question text.")
+                        render_md_box("Preview: Mark scheme", ms_text, empty_text="No mark scheme.")
 
-                    # Optional teacher-only spec alignment preview
-                    with st.expander("Show spec alignment (teacher only)", expanded=False):
-                        spec_align = journey.get("spec_alignment", [])
-                        if isinstance(spec_align, list) and spec_align:
-                            for sref in spec_align[:20]:
-                                st.markdown(normalize_markdown_math(f"- {sref}"))
-                        else:
-                            st.caption("No spec alignment provided.")
-
-                    st.write("### Steps")
-                    if not isinstance(steps, list) or not steps:
-                        st.error("No steps found in journey JSON.")
-                    else:
-                        total_marks = 0
-                        edited_steps = []
-                        for i, stp in enumerate(steps):
-                            stp = stp if isinstance(stp, dict) else {}
-                            with st.expander(f"Step {i+1}: {stp.get('objective','')[:80]}", expanded=(i == 0)):
-                                obj = st.text_input("Objective", value=str(stp.get("objective", "") or ""), key=f"jour_step_obj_{i}")
-                                mm = st.number_input("Max marks", min_value=1, max_value=12, value=int(stp.get("max_marks", 1) or 1), step=1, key=f"jour_step_mm_{i}")
-                                qtxt = st.text_area("Question text (Markdown + LaTeX)", value=str(stp.get("question_text", "") or ""), height=160, key=f"jour_step_q_{i}")
-                                mstxt = st.text_area("Mark scheme (ends with TOTAL = <max_marks>)", value=str(stp.get("markscheme_text", "") or ""), height=200, key=f"jour_step_ms_{i}")
-                                miscon = st.text_area("Common misconceptions (one per line)", value="\n".join([str(x) for x in (stp.get("misconceptions", []) or [])]), height=90, key=f"jour_step_mis_{i}")
-
-                                render_md_box("Preview: Question", qtxt, empty_text="No question text.")
-                                render_md_box("Preview: Mark scheme", mstxt, empty_text="No mark scheme.")
-
-                                total_marks += int(mm)
-                                edited_steps.append({
-                                    "objective": str(obj or "").strip(),
-                                    "question_text": str(qtxt or "").strip(),
-                                    "markscheme_text": str(mstxt or "").strip(),
-                                    "max_marks": int(mm),
-                                    "misconceptions": [x.strip() for x in (miscon or "").split("\n") if x.strip()][:6],
-                                    "spec_refs": [str(x).strip() for x in (stp.get("spec_refs", []) or []) if str(x).strip()][:6],
-                                })
-
-                        if save_j:
-                            if not d_assignment.strip() or not d_label.strip():
-                                st.error("Assignment name and Journey label cannot be blank.")
+                        if save_clicked:
+                            if not assignment_name.strip() or not question_label.strip():
+                                st.error("Assignment name and question label are required.")
+                            elif not _validate_classification_inputs(
+                                topic_val,
+                                sub_topic_val,
+                                skill_val,
+                                difficulty_val,
+                                topic_options,
+                                sub_topic_options,
+                                skill_options,
+                                difficulty_options,
+                            ):
+                                pass
                             else:
-                                # Validate TOTAL lines
-                                bad_total = []
-                                for i, stp in enumerate(edited_steps):
-                                    if f"TOTAL = {int(stp['max_marks'])}" not in (stp.get("markscheme_text") or ""):
-                                        bad_total.append(i + 1)
-                                if bad_total:
-                                    st.error("These steps are missing the required TOTAL line: " + ", ".join([str(x) for x in bad_total]))
-                                    st.stop()
-
-                                tags = [t.strip() for t in (d_tags_str or "").split(",") if t.strip()]
-                                tags = tags[:20]
-
-                                journey_json = {
-                                    "topic": str(topic_val or journey.get("topic", "")).strip(),
-                                    "duration_minutes": 10,
-                                    "checkpoint_every": int(journey.get("checkpoint_every", JOURNEY_CHECKPOINT_EVERY) or JOURNEY_CHECKPOINT_EVERY),
-                                    "plan_markdown": str(plan_md or "").strip(),
-                                    "spec_alignment": [str(x).strip() for x in (journey.get("spec_alignment", []) or []) if str(x).strip()][:20],
-                                    "steps": edited_steps,
-                                }
-
+                                tags = [t.strip() for t in (tags_str or "").split(",") if t.strip()]
                                 ok = insert_question_bank_row(
                                     source="ai_generated",
                                     created_by="teacher",
                                     subject_site=SUBJECT_SITE,
-                                    track_ok=d.get("track_ok", st.session_state.get("teacher_track_ok", "both")),
-                                    assignment_name=d_assignment.strip(),
-                                    question_label=d_label.strip(),
-                                    max_marks=int(total_marks) if total_marks > 0 else 1,
+                                    track_ok=st.session_state.get("teacher_track_ok", "both"),
+                                    assignment_name=assignment_name.strip(),
+                                    question_label=question_label.strip(),
+                                    max_marks=int(max_marks),
                                     tags=tags,
                                     topic=topic_val,
                                     sub_topic=_clean_sub_topic_label(sub_topic_val),
                                     sub_topic_raw=sub_topic_val,
                                     skill=skill_val,
                                     difficulty=difficulty_val,
-                                    question_text=str(plan_md or "").strip(),
-                                    markscheme_text="",
+                                    question_text=(q_text or "").strip(),
+                                    markscheme_text=(ms_text or "").strip(),
                                     question_image_path=None,
                                     markscheme_image_path=None,
-                                    question_type="journey",
-                                    journey_json=journey_json,
                                 )
                                 if ok:
-                                    st.session_state["journey_draft"] = None
-                                    st.success("Topic Journey saved. Students will see it as a single assignment and progress step-by-step.")
+                                    st.success("Approved and saved. Students can now access this under AI Practice.")
                                 else:
-                                    st.error("Failed to save journey to database. Check errors below.")
+                                    st.error("Save failed. Check database errors below.")
+
+                with st.expander("Generate Topic Journey", expanded=False):
+                    st.caption("Create a multi-step journey (fixed at 10 minutes / 5 steps).")
+
+                    jc1, jc2 = st.columns([3, 1])
+
+                    # --- Left column: inputs ---
+                    with jc1:
+                        topic_group_options = get_topic_group_names_for_track(track)
+                        topic_group_val = st.selectbox(
+                            "Topic group",
+                            topic_group_options,
+                            key="journey_topic_group",
+                        )
+                        sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_group_val))
+                        sub_topic_val = st.selectbox(
+                            "Topic",
+                            sub_topic_options,
+                            key="journey_topic_sub_topic",
+                            format_func=_clean_sub_topic_label,
+                        )
+                        sel_topics = [sub_topic_val] if sub_topic_val else []
+                        if sel_topics:
+                            st.markdown("**Selected topic:**")
+                            st.markdown(f"- {_clean_sub_topic_label(sel_topics[0])}")
+                        else:
+                            st.info("Choose a topic to build a journey.")
+
+                        # Fixed journey size: 10 minutes, 5 steps
+                        j_duration = 10
+                        st.caption("Journey length is fixed: 10 minutes, 5 steps.")
+
+                        j_assignment = st.text_input("Assignment name for saving", value="Topic Journey", key="jour_assignment")
+                        j_tags = st.text_input("Tags (comma separated)", value="", key="jour_tags")
+                        j_extra_instr = st.text_area(
+                            "Optional constraints for the AI",
+                            height=80,
+                            placeholder="e.g. Include one tricky unit conversion. Use g = 9.8 N/kg. Require a final answer with units.",
+                            key="jour_extra"
+                        )
+
+                    # --- Right column: actions ---
+                    with jc2:
+                        gen_j = st.button(
+                            "Generate journey draft",
+                            type="primary",
+                            width='stretch',
+                            disabled=not AI_READY,
+                            key="jour_gen_btn",
+                        )
+
+                        if st.button("Clear journey draft", width='stretch', key="jour_clear_btn"):
+                            st.session_state["journey_draft"] = None
+                            st.session_state["journey_gen_error_details"] = None
+                            st.session_state["journey_show_error"] = False
+                            st.rerun()
+
+                        if gen_j:
+                            # Clear previous error state for this run
+                            st.session_state["journey_gen_error_details"] = None
+                            st.session_state["journey_show_error"] = False
+
+                            if not sel_topics:
+                                st.warning("Please add at least one topic first.")
+                            else:
+                                topic_plain = " | ".join(sel_topics)
+
+                                def task_generate():
+                                    # 10 minutes, 5 steps is fixed
+                                    return generate_topic_journey_with_ai(
+                                        topic_plain_english=topic_plain,
+                                        duration_minutes=j_duration,
+                                        extra_instructions=j_extra_instr or "",
+                                    )
+
+                                try:
+                                    data = _run_ai_with_progress(
+                                        task_fn=task_generate,
+                                        ctx={"teacher": True, "mode": "topic_journey"},
+                                        typical_range="15-35 seconds",
+                                        est_seconds=25.0,
+                                    )
+
+                                    if data is None:
+                                        raise ValueError("AI returned no usable Journey JSON (failed to parse).")
+
+                                    # Default label
+                                    token = pysecrets.token_hex(3)
+                                    default_label = f"JOURNEY-{slugify(topic_plain)[:24]}-{token}"
+
+                                    # Track eligibility: if any chosen topic is separate_only, the whole journey is separate_only.
+                                    toks = [get_topic_track_ok(t) for t in sel_topics]
+                                    draft_track_ok = "separate_only" if any(tok == "separate_only" for tok in toks) else "both"
+                                    sub_topic_primary = sel_topics[0]
+                                    topic_primary = get_topic_group_for_name(sub_topic_primary) or topic_group_val or ""
+                                    default_skill = "Mixed" if "Mixed" in SKILLS else (SKILLS[0] if SKILLS else "")
+                                    default_difficulty = "Medium" if "Medium" in DIFFICULTIES else (DIFFICULTIES[0] if DIFFICULTIES else "")
+
+                                    st.session_state["journey_draft"] = {
+                                        "assignment_name": (j_assignment or "").strip() or "Topic Journey",
+                                        "question_label": default_label,
+                                        "track_ok": draft_track_ok,
+                                        "tags": [t.strip() for t in (j_tags or "").split(",") if t.strip()],
+                                        "topic": topic_primary,
+                                        "sub_topic": sub_topic_primary,
+                                        "skill": default_skill,
+                                        "difficulty": default_difficulty,
+                                        "journey": data,
+                                    }
+                                    st.success("Journey draft generated. Vet/edit below, then save as one assignment.")
+
+                                except Exception:
+                                    import traceback
+                                    st.session_state["journey_draft"] = None
+                                    st.session_state["journey_gen_error_details"] = traceback.format_exc()
+                                    st.error("Failed to generate a Topic Journey. You can try again, or click 'Explain error'.")
+
+                        # Optional: reveal raw error details if the user wants them
+                        if st.session_state.get("journey_gen_error_details"):
+                            if st.button("Explain error", key="jour_explain_error", width='stretch'):
+                                st.session_state["journey_show_error"] = True
+
+                        if st.session_state.get("journey_show_error") and st.session_state.get("journey_gen_error_details"):
+                            with st.expander("Error details", expanded=True):
+                                st.code(st.session_state.get("journey_gen_error_details", ""))
+                                st.caption("These details help diagnose failures (model output shape, JSON errors, timeouts).")
+                    if st.session_state.get("journey_draft"):
+                        d = st.session_state["journey_draft"]
+                        journey = d.get("journey", {}) if isinstance(d, dict) else {}
+                        steps = journey.get("steps", []) if isinstance(journey, dict) else []
+
+                        if journey.get("warnings"):
+                            st.warning("Journey draft warnings:\n\n" + "\n".join([f"- {w}" for w in journey.get("warnings", [])]))
+                        st.write("### ✅ Vet and edit the journey")
+                        hd1, hd2 = st.columns([2, 1])
+                        with hd1:
+                            d_assignment = st.text_input("Assignment name", value=d.get("assignment_name", "Topic Journey"), key="jour_draft_assignment")
+                            d_label = st.text_input("Journey label", value=d.get("question_label", ""), key="jour_draft_label")
+                            d_tags_str = st.text_input("Tags (comma separated)", value=", ".join(d.get("tags", [])), key="jour_draft_tags")
+
+                        with hd2:
+                            save_j = st.button("Save Topic Journey to bank", type="primary", width='stretch', key="jour_save_btn")
+                            st.caption("Saved as a single Question Bank entry (type=journey).")
+
+                        topic_options = get_topic_group_names_for_track(track)
+                        skill_options = list(SKILLS)
+                        difficulty_options = list(DIFFICULTIES)
+                        topic_val = str(d.get("topic") or "").strip()
+                        sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_val))
+                        sub_topic_val = str(d.get("sub_topic") or "").strip()
+
+                        hc1, hc2 = st.columns(2)
+                        with hc1:
+                            st.selectbox(
+                                "Topic group",
+                                topic_options,
+                                index=_index_for(topic_options, topic_val),
+                                key="jour_topic_display",
+                                disabled=True,
+                            )
+                            st.selectbox(
+                                "Topic",
+                                sub_topic_options,
+                                index=_index_for(sub_topic_options, sub_topic_val),
+                                key="jour_sub_topic_display",
+                                disabled=True,
+                                format_func=_clean_sub_topic_label,
+                            )
+                        with hc2:
+                            skill_val = st.selectbox(
+                                "Skill",
+                                skill_options,
+                                index=_index_for(skill_options, d.get("skill")),
+                                key="jour_skill",
+                            )
+                            difficulty_val = st.selectbox(
+                                "Difficulty",
+                                difficulty_options,
+                                index=_index_for(difficulty_options, d.get("difficulty")),
+                                key="jour_difficulty",
+                            )
+
+                        plan_md = st.text_area("Journey plan (Markdown)", value=journey.get("plan_markdown", ""), height=140, key="jour_plan_md")
+                        render_md_box("Preview: Journey plan", plan_md, empty_text="No plan.")
+
+                        # Optional teacher-only spec alignment preview
+                        with st.expander("Show spec alignment (teacher only)", expanded=False):
+                            spec_align = journey.get("spec_alignment", [])
+                            if isinstance(spec_align, list) and spec_align:
+                                for sref in spec_align[:20]:
+                                    st.markdown(normalize_markdown_math(f"- {sref}"))
+                            else:
+                                st.caption("No spec alignment provided.")
+
+                        st.write("### Steps")
+                        if not isinstance(steps, list) or not steps:
+                            st.error("No steps found in journey JSON.")
+                        else:
+                            total_marks = 0
+                            edited_steps = []
+                            for i, stp in enumerate(steps):
+                                stp = stp if isinstance(stp, dict) else {}
+                                with st.expander(f"Step {i+1}: {stp.get('objective','')[:80]}", expanded=(i == 0)):
+                                    obj = st.text_input("Objective", value=str(stp.get("objective", "") or ""), key=f"jour_step_obj_{i}")
+                                    mm = st.number_input("Max marks", min_value=1, max_value=12, value=int(stp.get("max_marks", 1) or 1), step=1, key=f"jour_step_mm_{i}")
+                                    qtxt = st.text_area("Question text (Markdown + LaTeX)", value=str(stp.get("question_text", "") or ""), height=160, key=f"jour_step_q_{i}")
+                                    mstxt = st.text_area("Mark scheme (ends with TOTAL = <max_marks>)", value=str(stp.get("markscheme_text", "") or ""), height=200, key=f"jour_step_ms_{i}")
+                                    miscon = st.text_area("Common misconceptions (one per line)", value="\n".join([str(x) for x in (stp.get("misconceptions", []) or [])]), height=90, key=f"jour_step_mis_{i}")
+
+                                    render_md_box("Preview: Question", qtxt, empty_text="No question text.")
+                                    render_md_box("Preview: Mark scheme", mstxt, empty_text="No mark scheme.")
+
+                                    total_marks += int(mm)
+                                    edited_steps.append({
+                                        "objective": str(obj or "").strip(),
+                                        "question_text": str(qtxt or "").strip(),
+                                        "markscheme_text": str(mstxt or "").strip(),
+                                        "max_marks": int(mm),
+                                        "misconceptions": [x.strip() for x in (miscon or "").split("\n") if x.strip()][:6],
+                                        "spec_refs": [str(x).strip() for x in (stp.get("spec_refs", []) or []) if str(x).strip()][:6],
+                                    })
+
+                            if save_j:
+                                if not d_assignment.strip() or not d_label.strip():
+                                    st.error("Assignment name and Journey label cannot be blank.")
+                                else:
+                                    # Validate TOTAL lines
+                                    bad_total = []
+                                    for i, stp in enumerate(edited_steps):
+                                        if f"TOTAL = {int(stp['max_marks'])}" not in (stp.get("markscheme_text") or ""):
+                                            bad_total.append(i + 1)
+                                    if bad_total:
+                                        st.error("These steps are missing the required TOTAL line: " + ", ".join([str(x) for x in bad_total]))
+                                        st.stop()
+
+                                    tags = [t.strip() for t in (d_tags_str or "").split(",") if t.strip()]
+                                    tags = tags[:20]
+
+                                    journey_json = {
+                                        "topic": str(topic_val or journey.get("topic", "")).strip(),
+                                        "duration_minutes": 10,
+                                        "checkpoint_every": int(journey.get("checkpoint_every", JOURNEY_CHECKPOINT_EVERY) or JOURNEY_CHECKPOINT_EVERY),
+                                        "plan_markdown": str(plan_md or "").strip(),
+                                        "spec_alignment": [str(x).strip() for x in (journey.get("spec_alignment", []) or []) if str(x).strip()][:20],
+                                        "steps": edited_steps,
+                                    }
+
+                                    ok = insert_question_bank_row(
+                                        source="ai_generated",
+                                        created_by="teacher",
+                                        subject_site=SUBJECT_SITE,
+                                        track_ok=d.get("track_ok", st.session_state.get("teacher_track_ok", "both")),
+                                        assignment_name=d_assignment.strip(),
+                                        question_label=d_label.strip(),
+                                        max_marks=int(total_marks) if total_marks > 0 else 1,
+                                        tags=tags,
+                                        topic=topic_val,
+                                        sub_topic=_clean_sub_topic_label(sub_topic_val),
+                                        sub_topic_raw=sub_topic_val,
+                                        skill=skill_val,
+                                        difficulty=difficulty_val,
+                                        question_text=str(plan_md or "").strip(),
+                                        markscheme_text="",
+                                        question_image_path=None,
+                                        markscheme_image_path=None,
+                                        question_type="journey",
+                                        journey_json=journey_json,
+                                    )
+                                    if ok:
+                                        st.session_state["journey_draft"] = None
+                                        st.success("Topic Journey saved. Students will see it as a single assignment and progress step-by-step.")
+                                    else:
+                                        st.error("Failed to save journey to database. Check errors below.")
 
                 st.divider()
 
