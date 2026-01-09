@@ -237,7 +237,7 @@ _ss_init("ai_draft", None)
 _ss_init("journey_step_index", 0)          # 0-based
 _ss_init("journey_step_reports", [])       # list of per-step reports
 _ss_init("journey_checkpoint_notes", {})   # step_index -> markdown
-_ss_init("journey_active_id", None)        # question_bank_v1.id of current journey
+_ss_init("journey_active_id", None)        # question_bank_v2.id of current journey
 _ss_init("journey_json_cache", None)       # parsed journey JSON for current selection
 
 # Topic Journey draft (teacher)
@@ -1361,7 +1361,7 @@ def delete_attempt_by_id(attempt_id: int) -> bool:
         return False
 
 # ============================================================
-# MARKING (unified for question_bank_v1 rows)
+# MARKING (unified for question_bank_v2 rows)
 # ============================================================
 def _mk_system_schema(max_marks: int, question_text: str = "") -> str:
     qt = f"\nQuestion (student-facing):\n{question_text}\n" if question_text else "\n"
