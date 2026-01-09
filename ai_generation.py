@@ -28,6 +28,23 @@ LOGGER = logging.getLogger("panphy")
 MODEL_NAME = "gpt-5-mini"
 TRACK_DEFAULT = "combined"
 
+ATOMS_ISOTOPES_SUB_TOPIC = "Atomic structure: Atoms and isotopes"
+ATOMS_ISOTOPES_PHYSICS_ONLY = (
+    "For 'Atoms and isotopes' (GCSE Physics), keep it physics-only: protons, neutrons, "
+    "electrons, isotopes, atomic number/mass number, nuclear charge, and atomic models. "
+    "Do NOT ask about electron shell arrangements, electron configuration, chemical bonding, "
+    "the periodic table, or chemical properties."
+)
+
+
+def _append_instruction(extra_instructions: str, instruction: str) -> str:
+    extra_instructions = (extra_instructions or "").strip()
+    if not instruction:
+        return extra_instructions
+    if extra_instructions:
+        return f"{extra_instructions}\n{instruction}"
+    return instruction
+
 
 @st.cache_resource
 def get_client():
@@ -434,10 +451,9 @@ def generate_practice_question_with_ai(
     extra_instructions = (extra_instructions or "").strip()
     if requested_sub_topic:
         extra_hint = f"Requested sub-topic: {requested_sub_topic}"
-        if extra_instructions:
-            extra_instructions = f"{extra_instructions}\n{extra_hint}"
-        else:
-            extra_instructions = extra_hint
+        extra_instructions = _append_instruction(extra_instructions, extra_hint)
+    if requested_sub_topic.lower() == ATOMS_ISOTOPES_SUB_TOPIC.lower():
+        extra_instructions = _append_instruction(extra_instructions, ATOMS_ISOTOPES_PHYSICS_ONLY)
     topic_options = get_topic_group_names_for_track(track)
     skill_options = list(SKILLS)
     difficulty_options = list(DIFFICULTIES)
@@ -613,6 +629,8 @@ def generate_topic_journey_with_ai(
     steps_n = DURATION_TO_STEPS.get(int(duration_minutes), 8)
     topic_plain_english = (topic_plain_english or "").strip()
     extra_instructions = (extra_instructions or "").strip()
+    if ATOMS_ISOTOPES_SUB_TOPIC.lower() in topic_plain_english.lower():
+        extra_instructions = _append_instruction(extra_instructions, ATOMS_ISOTOPES_PHYSICS_ONLY)
     def _validate(d: Dict[str, Any]) -> Tuple[bool, List[str]]:
         reasons: List[str] = []
         if not isinstance(d, dict):
