@@ -70,7 +70,10 @@ def render_teacher_page(nav_label: str, helpers: dict):
             st.error("Please select a valid sub-topic.")
             return False
         expected_group = get_topic_group_for_name(sub_topic_value)
-        if expected_group and topic_value != expected_group:
+        if not expected_group:
+            st.error("Please select a valid sub-topic.")
+            return False
+        if topic_value != expected_group:
             st.error(
                 f"Sub-topic '{sub_topic_value}' does not match the topic group for '{topic_value}'."
             )
@@ -951,7 +954,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                     uc1, uc2 = st.columns(2)
                     with uc1:
                         topic_val = st.selectbox(
-                            "Topic",
+                            "Topic group",
                             topic_options,
                             index=0,
                             key="up_topic",
@@ -964,10 +967,23 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         )
                     with uc2:
                         sub_topic_options = get_sub_topic_names_for_group(track, topic_val)
+                        if st.session_state.get("up_topic_group") != topic_val:
+                            st.session_state["up_topic_group"] = topic_val
+                            if sub_topic_options:
+                                st.session_state["up_sub_topic"] = sub_topic_options[0]
+                            else:
+                                st.session_state["up_sub_topic"] = ""
+                        if sub_topic_options:
+                            selected_sub_topic = st.session_state.get("up_sub_topic")
+                            if selected_sub_topic not in sub_topic_options:
+                                selected_sub_topic = sub_topic_options[0]
+                                st.session_state["up_sub_topic"] = selected_sub_topic
+                        else:
+                            selected_sub_topic = ""
                         sub_topic_val = st.selectbox(
                             "Sub-topic",
                             sub_topic_options,
-                            index=0,
+                            index=_index_for(sub_topic_options, selected_sub_topic),
                             key="up_sub_topic",
                         )
                         difficulty_val = st.selectbox(
