@@ -428,6 +428,12 @@ def _exec_sql_many(conn, sql_blob: str):
         conn.execute(text(stmt))
 
 
+ATTEMPTS_TABLE = "attempts_v1"
+# Naming strategy: use a shared attempts_v1 table and filter by subject_site.
+# Migration note (from legacy physics_attempts_v1):
+#   INSERT INTO public.attempts_v1 SELECT * FROM public.physics_attempts_v1;
+
+
 def ensure_attempts_table():
     if st.session_state.get("db_table_ready", False):
         return
@@ -435,8 +441,8 @@ def ensure_attempts_table():
     if eng is None:
         return
 
-    ddl_create = """
-    create table if not exists public.physics_attempts_v1 (
+    ddl_create = f"""
+    create table if not exists public.{ATTEMPTS_TABLE} (
       id bigserial primary key,
       created_at timestamptz not null default now(),
       student_id text not null,
@@ -453,20 +459,20 @@ def ensure_attempts_table():
     """
 
     ddl_alter = f"""
-    alter table public.physics_attempts_v1
+    alter table public.{ATTEMPTS_TABLE}
       add column if not exists question_bank_id bigint;
-    alter table public.physics_attempts_v1
+    alter table public.{ATTEMPTS_TABLE}
       add column if not exists step_index int;
 
-    alter table public.physics_attempts_v1
+    alter table public.{ATTEMPTS_TABLE}
       add column if not exists readback_type text;
-    alter table public.physics_attempts_v1
+    alter table public.{ATTEMPTS_TABLE}
       add column if not exists readback_markdown text;
-    alter table public.physics_attempts_v1
+    alter table public.{ATTEMPTS_TABLE}
       add column if not exists readback_warnings jsonb;
-    alter table public.physics_attempts_v1
+    alter table public.{ATTEMPTS_TABLE}
       add column if not exists subject_site text not null default '{SUBJECT_SITE}';
-    alter table public.physics_attempts_v1
+    alter table public.{ATTEMPTS_TABLE}
       add column if not exists track text not null default 'combined';
 
 """
@@ -477,7 +483,7 @@ def ensure_attempts_table():
             _exec_sql_many(conn, ddl_alter)
         st.session_state["db_last_error"] = ""
         st.session_state["db_table_ready"] = True
-        LOGGER.info("Attempts table ready", extra={"ctx": {"component": "db", "table": "physics_attempts_v1"}})
+        LOGGER.info("Attempts table ready", extra={"ctx": {"component": "db", "table": ATTEMPTS_TABLE}})
     except Exception as e:
         st.session_state["db_last_error"] = f"Table Creation Error: {type(e).__name__}: {e}"
         st.session_state["db_table_ready"] = False
@@ -1292,8 +1298,8 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str, 
     rb_md = str(report.get("readback_markdown", "") or "")[:8000]
     rb_warn = json.dumps(report.get("readback_warnings", [])[:6])
 
-    query = """
-        insert into public.physics_attempts_v1
+    query = f"""
+        insert into public.{ATTEMPTS_TABLE}
         (subject_site, track, student_id, question_key, question_bank_id, step_index, mode, marks_awarded, max_marks, summary, feedback_points, next_steps,
          readback_type, readback_markdown, readback_warnings)
         values
@@ -1334,10 +1340,10 @@ def load_attempts_df_cached(_fp: str, subject_site: str, limit: int = 5000) -> p
     subject_site = (subject_site or "").strip().lower() or SUBJECT_SITE
     with eng.connect() as conn:
         df = pd.read_sql(
-            text("""
+            text(f"""
                 select id, created_at, student_id, question_key, question_bank_id, step_index, mode,
                        marks_awarded, max_marks, readback_type
-                from public.physics_attempts_v1
+                from public.{ATTEMPTS_TABLE}
                 where subject_site = :subject_site
                 order by created_at desc
                 limit :limit
@@ -1369,7 +1375,7 @@ def delete_attempt_by_id(attempt_id: int) -> bool:
     try:
         with eng.begin() as conn:
             res = conn.execute(
-                text("delete from public.physics_attempts_v1 where id = :id and subject_site = :subject_site"),
+                text(f"delete from public.{ATTEMPTS_TABLE} where id = :id and subject_site = :subject_site"),
                 {"id": int(attempt_id), "subject_site": SUBJECT_SITE},
             )
         st.session_state["db_last_error"] = ""
