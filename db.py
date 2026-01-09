@@ -132,8 +132,8 @@ def _exec_sql_many(conn, sql_blob: str):
 # DATABASE DDLs
 #   IMPORTANT: avoid $$ PL/pgSQL blocks inside app DDL to prevent split/execution issues.
 # ============================================================
-QUESTION_BANK_DDL = """
-create table if not exists public.question_bank_v1 (
+QUESTION_BANK_DDL = f"""
+create table if not exists public.question_bank_v2 (
   id bigserial primary key,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -144,6 +144,10 @@ create table if not exists public.question_bank_v1 (
   assignment_name text not null,
   question_label text not null,
   max_marks int not null check (max_marks > 0),
+  topic text,
+  sub_topic text,
+  skill text,
+  difficulty text,
   tags jsonb,
 
   question_text text,
@@ -152,38 +156,29 @@ create table if not exists public.question_bank_v1 (
   markscheme_text text,
   markscheme_image_path text,
 
+  question_type text not null default 'single',
+  journey_json jsonb,
+  subject_site text not null default '{SUBJECT_SITE}',
+  track_ok text not null default 'both',
+
   is_active boolean not null default true
 );
 
-create unique index if not exists uq_question_bank_source_assignment_label
-  on public.question_bank_v1 (source, assignment_name, question_label);
+create unique index if not exists uq_question_bank_subject_source_assignment_label
+  on public.question_bank_v2 (subject_site, source, assignment_name, question_label);
 
 create index if not exists idx_question_bank_assignment
-  on public.question_bank_v1 (assignment_name);
+  on public.question_bank_v2 (assignment_name);
 
 create index if not exists idx_question_bank_source
-  on public.question_bank_v1 (source);
+  on public.question_bank_v2 (source);
 
 create index if not exists idx_question_bank_active
-  on public.question_bank_v1 (is_active);
+  on public.question_bank_v2 (is_active);
 """.strip()
 
 
-QUESTION_BANK_ALTER_DDL = f"""
-alter table public.question_bank_v1
-  add column if not exists question_type text default 'single';
-alter table public.question_bank_v1
-  add column if not exists journey_json jsonb;
-alter table public.question_bank_v1
-  add column if not exists subject_site text not null default '{SUBJECT_SITE}';
-alter table public.question_bank_v1
-  add column if not exists track_ok text not null default 'both';
-
-drop index if exists public.uq_question_bank_source_assignment_label;
-create unique index if not exists uq_question_bank_subject_source_assignment_label
-  on public.question_bank_v1 (subject_site, source, assignment_name, question_label);
-
-"""
+QUESTION_BANK_ALTER_DDL = ""
 
 
 @st.cache_resource
@@ -194,7 +189,7 @@ def _ensure_question_bank_table_cached(_fp: str) -> None:
     with eng.begin() as conn:
         _exec_sql_many(conn, QUESTION_BANK_DDL)
         _exec_sql_many(conn, QUESTION_BANK_ALTER_DDL)
-    LOGGER.info("Question bank table ready", extra={"ctx": {"component": "db", "table": "question_bank_v1"}})
+    LOGGER.info("Question bank table ready", extra={"ctx": {"component": "db", "table": "question_bank_v2"}})
 
 
 def ensure_question_bank_table():
@@ -237,9 +232,11 @@ def load_question_bank_df_cached(_fp: str, track: str, subject_site: str, limit:
                 select
                   id, created_at, updated_at,
                   source, assignment_name, question_label,
-                  max_marks, question_type, tags, question_text,
+                  max_marks, question_type,
+                  topic, sub_topic, skill, difficulty,
+                  tags, question_text,
                   subject_site, track_ok, is_active
-                from public.question_bank_v1
+                from public.question_bank_v2
                 {where}
                 order by created_at desc
                 limit :limit
@@ -269,7 +266,7 @@ def load_question_by_id_cached(_fp: str, qid: int) -> Dict[str, Any]:
     ensure_question_bank_table()
     with eng.connect() as conn:
         row = conn.execute(
-            text("select * from public.question_bank_v1 where id = :id and subject_site = :subject_site limit 1"),
+            text("select * from public.question_bank_v2 where id = :id and subject_site = :subject_site limit 1"),
             {"id": int(qid), "subject_site": SUBJECT_SITE}
         ).mappings().first()
     return dict(row) if row else {}
@@ -293,6 +290,10 @@ def insert_question_bank_row(
     question_label: str,
     max_marks: int,
     tags: List[str],
+    topic: Optional[str] = None,
+    sub_topic: Optional[str] = None,
+    skill: Optional[str] = None,
+    difficulty: Optional[str] = None,
     question_text: str = "",
     markscheme_text: str = "",
     question_image_path: Optional[str] = None,
@@ -317,13 +318,17 @@ def insert_question_bank_row(
         qtype = "single"
 
     query = """
-    insert into public.question_bank_v1
-      (source, created_by, subject_site, track_ok, assignment_name, question_label, max_marks, question_type, journey_json, tags,
+    insert into public.question_bank_v2
+      (source, created_by, subject_site, track_ok, assignment_name, question_label, max_marks,
+       topic, sub_topic, skill, difficulty,
+       question_type, journey_json, tags,
        question_text, question_image_path,
        markscheme_text, markscheme_image_path,
        is_active, updated_at)
     values
-      (:source, :created_by, :subject_site, :track_ok, :assignment_name, :question_label, :max_marks, :question_type, CAST(:journey_json AS jsonb),
+      (:source, :created_by, :subject_site, :track_ok, :assignment_name, :question_label, :max_marks,
+       :topic, :sub_topic, :skill, :difficulty,
+       :question_type, CAST(:journey_json AS jsonb),
        CAST(:tags AS jsonb),
        :question_text, :question_image_path,
        :markscheme_text, :markscheme_image_path,
@@ -333,6 +338,10 @@ def insert_question_bank_row(
        subject_site = excluded.subject_site,
        track_ok = excluded.track_ok,
        max_marks = excluded.max_marks,
+       topic = excluded.topic,
+       sub_topic = excluded.sub_topic,
+       skill = excluded.skill,
+       difficulty = excluded.difficulty,
        question_type = excluded.question_type,
        journey_json = excluded.journey_json,
        tags = excluded.tags,
@@ -353,6 +362,10 @@ def insert_question_bank_row(
                 "assignment_name": assignment_name.strip(),
                 "question_label": question_label.strip(),
                 "max_marks": int(max_marks),
+                "topic": (topic or "").strip() or None,
+                "sub_topic": (sub_topic or "").strip() or None,
+                "skill": (skill or "").strip() or None,
+                "difficulty": (difficulty or "").strip() or None,
                 "question_type": qtype,
                 "journey_json": json.dumps(journey_json or {}) if qtype == "journey" else None,
                 "tags": json.dumps(tags or []),
@@ -384,7 +397,7 @@ def delete_question_bank_by_id(qid: int) -> bool:
     try:
         with eng.begin() as conn:
             res = conn.execute(
-                text("delete from public.question_bank_v1 where id = :id and subject_site = :subject_site"),
+                text("delete from public.question_bank_v2 where id = :id and subject_site = :subject_site"),
                 {"id": int(qid), "subject_site": SUBJECT_SITE},
             )
         st.session_state["db_last_error"] = ""
