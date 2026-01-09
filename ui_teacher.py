@@ -526,7 +526,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                     with c4:
                         difficulty = st.selectbox("Difficulty", DIFFICULTIES, key="gen_difficulty")
                     with c5:
-                        marks = st.number_input("Marks", min_value=1, max_value=12, value=4, step=1, key="gen_marks")
+                        marks = st.number_input("Marks", min_value=1, max_value=12, value=3, step=1, key="gen_marks")
 
                     extra = st.text_area(
                         "Optional extra instructions (for the AI)",
