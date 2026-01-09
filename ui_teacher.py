@@ -12,6 +12,7 @@ from config import (
     SKILLS,
     SUBJECT_SITE,
     get_topic_groups_for_track,
+    get_topic_group_for_name,
     get_topic_names_for_track,
     get_topic_track_ok,
 )
@@ -67,6 +68,13 @@ def render_teacher_page(nav_label: str, helpers: dict):
             return False
         if not sub_topic_value or sub_topic_value not in sub_topic_options:
             st.error("Please select a valid sub-topic.")
+            return False
+        expected_sub_topic = get_topic_group_for_name(topic_value)
+        if expected_sub_topic and sub_topic_value != expected_sub_topic:
+            st.error(
+                f"Sub-topic '{sub_topic_value}' does not match the topic group for '{topic_value}' "
+                f"(expected '{expected_sub_topic}')."
+            )
             return False
         if not skill_value or skill_value not in skill_options:
             st.error("Please select a valid skill.")
