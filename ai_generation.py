@@ -411,12 +411,21 @@ def _auto_check_warnings(question_text: str, markscheme_text: str, max_marks: in
 
 def generate_practice_question_with_ai(
     topic_text: str,
+    sub_topic_text: str | None,
     difficulty: str,
     qtype: str,
     marks: int,
     extra_instructions: str = "",
 ) -> Dict[str, Any]:
     track = st.session_state.get("track", TRACK_DEFAULT)
+    requested_sub_topic = str(sub_topic_text or "").strip()
+    extra_instructions = (extra_instructions or "").strip()
+    if requested_sub_topic:
+        extra_hint = f"Requested sub-topic: {requested_sub_topic}"
+        if extra_instructions:
+            extra_instructions = f"{extra_instructions}\n{extra_hint}"
+        else:
+            extra_instructions = extra_hint
     topic_options = get_topic_group_names_for_track(track)
     skill_options = list(SKILLS)
     difficulty_options = list(DIFFICULTIES)
@@ -443,6 +452,8 @@ def generate_practice_question_with_ai(
         sub_topic_val = _coerce_vocab(d.get("sub_topic"), sub_topic_options)
         if not sub_topic_val:
             reasons.append("Missing or invalid sub_topic.")
+        elif requested_sub_topic and sub_topic_val.lower() != requested_sub_topic.lower():
+            reasons.append("sub_topic must match the requested Sub-topic.")
         else:
             expected_group = get_topic_group_for_name(sub_topic_val)
             if expected_group and topic_val and expected_group.lower() != topic_val.lower():
@@ -495,10 +506,11 @@ def generate_practice_question_with_ai(
 
         base_user = _render_template(QGEN_USER_TPL, {
             "TOPIC": (topic_text or "").strip(),
+            "SUB_TOPIC": requested_sub_topic,
             "DIFFICULTY": str(difficulty),
             "QTYPE": str(qtype),
             "MARKS": int(marks),
-            "EXTRA_INSTRUCTIONS": (extra_instructions or "").strip() or "(none)",
+            "EXTRA_INSTRUCTIONS": extra_instructions or "(none)",
             "TOPIC_OPTIONS": ", ".join(topic_options) or "(none)",
             "SUB_TOPIC_OPTIONS": ", ".join(get_sub_topic_names_for_group(track, topic_text)) or "(none)",
             "SKILL_OPTIONS": ", ".join(skill_options) or "(none)",

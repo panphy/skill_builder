@@ -485,7 +485,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                 st.write("## 🤖 AI Generator")
                 st.caption("Generate and review before saving to the bank.")
 
-                c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
+                c1, c2, c3, c4, c5 = st.columns([3, 3, 2, 2, 1])
 
                 with c1:
                     topic = st.selectbox(
@@ -494,10 +494,18 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         key="gen_topic",
                     )
                 with c2:
-                    qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
+                    sub_topic_options = get_sub_topic_names_for_group(track, topic)
+                    sub_topic = st.selectbox(
+                        "Sub-topic",
+                        sub_topic_options,
+                        index=_index_for(sub_topic_options, st.session_state.get("gen_sub_topic")),
+                        key="gen_sub_topic",
+                    )
                 with c3:
-                    difficulty = st.selectbox("Difficulty", DIFFICULTIES, key="gen_difficulty")
+                    qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
                 with c4:
+                    difficulty = st.selectbox("Difficulty", DIFFICULTIES, key="gen_difficulty")
+                with c5:
                     marks = st.number_input("Marks", min_value=1, max_value=12, value=4, step=1, key="gen_marks")
 
                 extra = st.text_area(
@@ -521,6 +529,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         try:
                             data = generate_practice_question_with_ai(
                                 topic_text=topic,
+                                sub_topic_text=sub_topic,
                                 difficulty=difficulty,
                                 qtype=qtype,
                                 marks=int(marks),
@@ -529,7 +538,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
 
                             draft = {
                                 "topic": data.get("topic", topic),
-                                "sub_topic": data.get("sub_topic"),
+                                "sub_topic": data.get("sub_topic") or sub_topic,
                                 "skill": data.get("skill"),
                                 "difficulty": data.get("difficulty", difficulty),
                                 "question_type": "single",
@@ -583,10 +592,14 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         )
                     with tc2:
                         sub_topic_options = get_sub_topic_names_for_group(track, topic_val)
+                        sub_topic_seed = draft.get("sub_topic")
+                        if sub_topic_seed not in sub_topic_options and sub_topic_options:
+                            sub_topic_seed = sub_topic_options[0]
+                            draft["sub_topic"] = sub_topic_seed
                         sub_topic_val = st.selectbox(
                             "Sub-topic",
                             sub_topic_options,
-                            index=_index_for(sub_topic_options, draft.get("sub_topic")),
+                            index=_index_for(sub_topic_options, sub_topic_seed),
                             key="draft_sub_topic",
                         )
                         difficulty_val = st.selectbox(
