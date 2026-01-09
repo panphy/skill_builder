@@ -809,7 +809,10 @@ def _compress_bytes_to_limit(
     size_bytes = len(file_bytes)
 
     if size_bytes > int(max_bytes * 1.30):
-        return False, b"", "", f"Image too large ({_human_mb(size_bytes)}). Please use an image under {max_mb:.0f}MB."
+        LOGGER.info(
+            "Large image received; attempting compression",
+            extra={"ctx": {"component": "image", "size": _human_mb(size_bytes), "limit": f"{max_mb:.0f}MB"}},
+        )
 
     try:
         img = Image.open(io.BytesIO(file_bytes))
