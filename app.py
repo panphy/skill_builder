@@ -587,16 +587,6 @@ def _check_rate_limit_db(student_id: str) -> Tuple[bool, int, str]:
         return allowed, remaining, reset_str
 
 
-@st.cache_data(ttl=15)
-def check_rate_limit_cached(student_id: str, _fp: str) -> Tuple[bool, int, str]:
-    # Cached "display" check only (not used for enforcement).
-    try:
-        return _check_rate_limit_db(student_id)
-    except Exception:
-        return True, RATE_LIMIT_MAX, ""
-
-
-
 def increment_rate_limit(student_id: str):
     if st.session_state.get("is_teacher", False):
         return
@@ -626,11 +616,6 @@ def increment_rate_limit(student_id: str):
                 """),
                 {"sid": sid},
             )
-    except Exception:
-        pass
-
-    try:
-        check_rate_limit_cached.clear()
     except Exception:
         pass
 
