@@ -990,6 +990,53 @@ def render_teacher_page(nav_label: str, helpers: dict):
                 st.write("## 🖼️ Upload a teacher question (images)")
                 st.caption("Optional question text supports Markdown and LaTeX.")
 
+                topic_options = get_topic_group_names_for_track(track)
+                skill_options = list(SKILLS)
+                difficulty_options = list(DIFFICULTIES)
+
+                uc1, uc2 = st.columns(2)
+                with uc1:
+                    topic_val = st.selectbox(
+                        "Topic group",
+                        topic_options,
+                        index=_index_for(topic_options, st.session_state.get("up_topic")),
+                        key="up_topic",
+                    )
+                    skill_val = st.selectbox(
+                        "Skill",
+                        skill_options,
+                        index=_index_for(skill_options, st.session_state.get("up_skill")),
+                        key="up_skill",
+                    )
+                with uc2:
+                    sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_val))
+                    if st.session_state.get("up_topic_group") != topic_val:
+                        st.session_state["up_topic_group"] = topic_val
+                        if sub_topic_options:
+                            st.session_state["up_sub_topic"] = sub_topic_options[0]
+                        else:
+                            st.session_state["up_sub_topic"] = ""
+                    if sub_topic_options:
+                        selected_sub_topic = st.session_state.get("up_sub_topic")
+                        if selected_sub_topic not in sub_topic_options:
+                            selected_sub_topic = sub_topic_options[0]
+                            st.session_state["up_sub_topic"] = selected_sub_topic
+                    else:
+                        selected_sub_topic = ""
+                    sub_topic_val = st.selectbox(
+                        "Topic",
+                        sub_topic_options,
+                        index=_index_for(sub_topic_options, selected_sub_topic),
+                        key="up_sub_topic",
+                        format_func=_clean_sub_topic_label,
+                    )
+                    difficulty_val = st.selectbox(
+                        "Difficulty",
+                        difficulty_options,
+                        index=_index_for(difficulty_options, st.session_state.get("up_difficulty")),
+                        key="up_difficulty",
+                    )
+
                 with st.form("upload_q_form", clear_on_submit=True):
                     c1, c2 = st.columns([2, 1])
                     with c1:
@@ -997,53 +1044,6 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         question_label = st.text_input("Question label", placeholder="e.g. Q3b", key="up_label")
                     with c2:
                         max_marks_in = st.number_input("Max marks", min_value=1, max_value=50, value=3, step=1, key="up_marks")
-
-                    topic_options = get_topic_group_names_for_track(track)
-                    skill_options = list(SKILLS)
-                    difficulty_options = list(DIFFICULTIES)
-
-                    uc1, uc2 = st.columns(2)
-                    with uc1:
-                        topic_val = st.selectbox(
-                            "Topic group",
-                            topic_options,
-                            index=0,
-                            key="up_topic",
-                        )
-                        skill_val = st.selectbox(
-                            "Skill",
-                            skill_options,
-                            index=0,
-                            key="up_skill",
-                        )
-                    with uc2:
-                        sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_val))
-                        if st.session_state.get("up_topic_group") != topic_val:
-                            st.session_state["up_topic_group"] = topic_val
-                            if sub_topic_options:
-                                st.session_state["up_sub_topic"] = sub_topic_options[0]
-                            else:
-                                st.session_state["up_sub_topic"] = ""
-                        if sub_topic_options:
-                            selected_sub_topic = st.session_state.get("up_sub_topic")
-                            if selected_sub_topic not in sub_topic_options:
-                                selected_sub_topic = sub_topic_options[0]
-                                st.session_state["up_sub_topic"] = selected_sub_topic
-                        else:
-                            selected_sub_topic = ""
-                        sub_topic_val = st.selectbox(
-                            "Topic",
-                            sub_topic_options,
-                            index=_index_for(sub_topic_options, selected_sub_topic),
-                            key="up_sub_topic",
-                            format_func=_clean_sub_topic_label,
-                        )
-                        difficulty_val = st.selectbox(
-                            "Difficulty",
-                            difficulty_options,
-                            index=0,
-                            key="up_difficulty",
-                        )
 
                     tags_str = st.text_input("Tags (comma separated)", placeholder="forces, resultant, newton", key="up_tags")
                     q_text_opt = st.text_area("Optional: question text (Markdown + LaTeX supported)", height=100, key="up_qtext")
