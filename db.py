@@ -146,6 +146,7 @@ create table if not exists public.question_bank_v2 (
   max_marks int not null check (max_marks > 0),
   topic text,
   sub_topic text,
+  sub_topic_raw text,
   skill text,
   difficulty text,
   tags jsonb,
@@ -178,7 +179,10 @@ create index if not exists idx_question_bank_active
 """.strip()
 
 
-QUESTION_BANK_ALTER_DDL = ""
+QUESTION_BANK_ALTER_DDL = """
+alter table public.question_bank_v2
+  add column if not exists sub_topic_raw text;
+""".strip()
 
 
 @st.cache_resource
@@ -233,7 +237,7 @@ def load_question_bank_df_cached(_fp: str, track: str, subject_site: str, limit:
                   id, created_at, updated_at,
                   source, assignment_name, question_label,
                   max_marks, question_type,
-                  topic, sub_topic, skill, difficulty,
+                  topic, sub_topic, sub_topic_raw, skill, difficulty,
                   tags, question_text,
                   subject_site, track_ok, is_active
                 from public.question_bank_v2
@@ -292,6 +296,7 @@ def insert_question_bank_row(
     tags: List[str],
     topic: Optional[str] = None,
     sub_topic: Optional[str] = None,
+    sub_topic_raw: Optional[str] = None,
     skill: Optional[str] = None,
     difficulty: Optional[str] = None,
     question_text: str = "",
@@ -320,14 +325,14 @@ def insert_question_bank_row(
     query = """
     insert into public.question_bank_v2
       (source, created_by, subject_site, track_ok, assignment_name, question_label, max_marks,
-       topic, sub_topic, skill, difficulty,
+       topic, sub_topic, sub_topic_raw, skill, difficulty,
        question_type, journey_json, tags,
        question_text, question_image_path,
        markscheme_text, markscheme_image_path,
        is_active, updated_at)
     values
       (:source, :created_by, :subject_site, :track_ok, :assignment_name, :question_label, :max_marks,
-       :topic, :sub_topic, :skill, :difficulty,
+       :topic, :sub_topic, :sub_topic_raw, :skill, :difficulty,
        :question_type, CAST(:journey_json AS jsonb),
        CAST(:tags AS jsonb),
        :question_text, :question_image_path,
@@ -340,6 +345,7 @@ def insert_question_bank_row(
        max_marks = excluded.max_marks,
        topic = excluded.topic,
        sub_topic = excluded.sub_topic,
+       sub_topic_raw = excluded.sub_topic_raw,
        skill = excluded.skill,
        difficulty = excluded.difficulty,
        question_type = excluded.question_type,
@@ -364,6 +370,7 @@ def insert_question_bank_row(
                 "max_marks": int(max_marks),
                 "topic": (topic or "").strip() or None,
                 "sub_topic": (sub_topic or "").strip() or None,
+                "sub_topic_raw": (sub_topic_raw or sub_topic or "").strip() or None,
                 "skill": (skill or "").strip() or None,
                 "difficulty": (difficulty or "").strip() or None,
                 "question_type": qtype,
