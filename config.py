@@ -112,12 +112,26 @@ def get_sub_topic_names_for_group(track: str, group: str) -> List[str]:
     return names
 
 
-def clean_sub_topic_label(name: str) -> str:
+def get_all_topic_group_names() -> List[str]:
+    groups: List[str] = []
+    for t in TOPICS_CATALOG:
+        group = str(t.get("group", "")).strip()
+        if not group:
+            continue
+        groups.append(group)
+    return sorted(set(groups))
+
+
+def clean_sub_topic_label(name: str, track: str | None = None) -> str:
     raw = str(name or "").strip()
     if not raw:
         return ""
     raw_lower = raw.lower()
-    for group in get_topic_group_names_for_track("combined"):
+    if track:
+        groups = get_topic_group_names_for_track(track)
+    else:
+        groups = get_all_topic_group_names()
+    for group in groups:
         group = str(group or "").strip()
         if not group:
             continue

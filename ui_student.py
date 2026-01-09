@@ -51,8 +51,10 @@ def render_student_page(helpers: dict):
         text = str(value).strip()
         return text if text else fallback
 
+    track = st.session_state.get("track", "combined")
+
     def _display_sub_topic(value: Any, fallback: str = "Uncategorized") -> str:
-        return clean_sub_topic_label(_display_classification(value, fallback))
+        return clean_sub_topic_label(_display_classification(value, fallback), track)
 
     with st.expander("Question selection", expanded=expand_by_default):
         sel1, sel2 = st.columns([2, 2])
