@@ -112,6 +112,21 @@ def get_sub_topic_names_for_group(track: str, group: str) -> List[str]:
     return names
 
 
+def clean_sub_topic_label(name: str) -> str:
+    raw = str(name or "").strip()
+    if not raw:
+        return ""
+    raw_lower = raw.lower()
+    for group in get_topic_group_names_for_track("combined"):
+        group = str(group or "").strip()
+        if not group:
+            continue
+        prefix = f"{group}:"
+        if raw_lower.startswith(prefix.lower()):
+            return raw[len(prefix):].lstrip()
+    return raw
+
+
 def get_topic_group_for_name(topic_name: str) -> str | None:
     name_norm = (topic_name or "").strip().lower()
     if not name_norm:
