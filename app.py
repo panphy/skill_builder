@@ -1,7 +1,11 @@
 import streamlit as st
+import logging
+
+LOGGER = logging.getLogger("panphy")
 try:
     from components.panphy_stylus_canvas import stylus_canvas
 except Exception:
+    LOGGER.exception("Failed to import stylus_canvas; canvas features disabled.")
     stylus_canvas = None  # fallback handled later
 from PIL import Image
 import io
@@ -12,7 +16,6 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import text
 
-import logging
 from logging.handlers import RotatingFileHandler
 import os
 import time
