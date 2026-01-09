@@ -583,44 +583,33 @@ def _check_rate_limit_db(student_id: str) -> Tuple[bool, int, str]:
             submission_count = 0
             window_start = now_utc
 
+        updated = conn.execute(
+            text("""
+                update public.rate_limits
+                set submission_count = submission_count + 1
+                where student_id = :sid
+                  and submission_count < :limit
+                returning submission_count, window_start_time
+            """),
+            {"sid": sid, "limit": RATE_LIMIT_MAX},
+        ).mappings().first()
+
+        allowed = updated is not None
+        if updated:
+            submission_count = int(updated["submission_count"] or 0)
+            window_start = updated["window_start_time"] or window_start
+            if isinstance(window_start, datetime):
+                if window_start.tzinfo is None:
+                    window_start = window_start.replace(tzinfo=timezone.utc)
+                else:
+                    window_start = window_start.astimezone(timezone.utc)
+            else:
+                window_start = now_utc
+
         remaining = max(0, RATE_LIMIT_MAX - submission_count)
         reset_time_utc = window_start + timedelta(seconds=RATE_LIMIT_WINDOW_SECONDS)
-        allowed = submission_count < RATE_LIMIT_MAX
         reset_str = _format_reset_time(reset_time_utc)
         return allowed, remaining, reset_str
-
-
-def increment_rate_limit(student_id: str):
-    if st.session_state.get("is_teacher", False):
-        return
-
-    eng = get_db_engine()
-    if eng is None:
-        return
-
-    ensure_rate_limits_table()
-    sid = (student_id or "").strip() or f"anon_{st.session_state['anon_id']}"
-
-    try:
-        with eng.begin() as conn:
-            conn.execute(
-                text("""
-                    insert into public.rate_limits (student_id, submission_count, window_start_time)
-                    values (:sid, 0, now())
-                    on conflict (student_id) do nothing
-                """),
-                {"sid": sid},
-            )
-            conn.execute(
-                text("""
-                    update public.rate_limits
-                    set submission_count = submission_count + 1
-                    where student_id = :sid
-                """),
-                {"sid": sid},
-            )
-    except Exception:
-        pass
 
 # ============================================================
 # =========================
@@ -1660,7 +1649,6 @@ _ui_helpers = {
     "delete_attempt_by_id": delete_attempt_by_id,
     "supabase_ready": supabase_ready,
     "get_gpt_feedback_from_bank": get_gpt_feedback_from_bank,
-    "increment_rate_limit": increment_rate_limit,
     "insert_attempt": insert_attempt,
     "normalize_markdown_math": normalize_markdown_math,
     "preprocess_canvas_image": preprocess_canvas_image,

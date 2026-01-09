@@ -30,7 +30,6 @@ def render_student_page(helpers: dict):
     data_url_to_image_data = helpers["data_url_to_image_data"]
     db_ready = helpers["db_ready"]
     get_gpt_feedback_from_bank = helpers["get_gpt_feedback_from_bank"]
-    increment_rate_limit = helpers["increment_rate_limit"]
     insert_attempt = helpers["insert_attempt"]
     normalize_markdown_math = helpers["normalize_markdown_math"]
     preprocess_canvas_image = helpers["preprocess_canvas_image"]
@@ -323,7 +322,6 @@ def render_student_page(helpers: dict):
                                 f"You’ve reached the limit of {RATE_LIMIT_MAX} submissions per hour. Please try again at {reset_str}."
                             )
                         else:
-                            increment_rate_limit(sid)
                             st.session_state["text_expanded_single"] = False
 
                             def task():
@@ -517,8 +515,6 @@ def render_student_page(helpers: dict):
                             st.stop()
                         img_for_ai = Image.open(io.BytesIO(outb)).convert("RGB")
 
-                    increment_rate_limit(sid)
-
                     def task():
                         return get_gpt_feedback_from_bank(
                             student_answer=img_for_ai,
@@ -660,7 +656,6 @@ def render_student_page(helpers: dict):
                                     f"You’ve reached the limit of {RATE_LIMIT_MAX} submissions per hour. Please try again at {reset_str}."
                                 )
                             else:
-                                increment_rate_limit(sid)
                                 st.session_state["text_expanded_journey"] = False
 
                                 def task():
@@ -859,8 +854,6 @@ def render_student_page(helpers: dict):
                                 st.error(err or msg_canvas)
                                 st.stop()
                             img_for_ai = Image.open(io.BytesIO(outb)).convert("RGB")
-
-                        increment_rate_limit(sid)
 
                         def task():
                             return get_gpt_feedback_from_bank(
