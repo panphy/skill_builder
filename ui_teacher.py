@@ -131,7 +131,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         .assign(percent=lambda x: (100 * x["marks_awarded"] / x["max_marks"].replace(0, np.nan)).round(1))
                         .sort_values("percent", ascending=False)
                     )
-                    st.dataframe(by_student, width='stretch')
+                    st.dataframe(by_student, use_container_width=True)
 
                     st.write("### By topic (overall %)")
                     by_topic = (
@@ -140,10 +140,10 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         .assign(percent=lambda x: (100 * x["marks_awarded"] / x["max_marks"].replace(0, np.nan)).round(1))
                         .sort_values("percent", ascending=False)
                     )
-                    st.dataframe(by_topic, width='stretch')
+                    st.dataframe(by_topic, use_container_width=True)
 
                     st.write("### Recent attempts")
-                    st.dataframe(df.head(50), width='stretch')
+                    st.dataframe(df.head(50), use_container_width=True)
 
                     attempt_delete_open = bool(st.session_state.get("attempt_delete_picks")) or bool(
                         st.session_state.get("confirm_delete_attempt")
@@ -210,7 +210,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             if st.button(
                                 "Delete selected attempts",
                                 type="primary",
-                                width='stretch',
+                                use_container_width=True,
                                 disabled=not (confirm_delete and attempt_picks),
                                 key="delete_attempt_btn",
                                 on_click=_request_attempt_delete,
