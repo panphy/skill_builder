@@ -56,9 +56,19 @@ def safe_parse_json(text_str: str):
         pass
 
     try:
-        m = re.search(r"\{.*\}", text_str or "", flags=re.DOTALL)
-        if m:
-            return json.loads(m.group(0))
+        # Scan for the first balanced-brace JSON object to avoid greedy regex capture.
+        s = text_str or ""
+        start = s.find("{")
+        if start != -1:
+            depth = 0
+            for idx in range(start, len(s)):
+                ch = s[idx]
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        return json.loads(s[start : idx + 1])
     except Exception:
         pass
     return None
