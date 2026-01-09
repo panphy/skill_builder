@@ -2,6 +2,7 @@ import io
 import json
 from typing import Any, Dict
 
+import pandas as pd
 import streamlit as st
 from PIL import Image
 
@@ -45,7 +46,9 @@ def render_student_page(helpers: dict):
     expand_by_default = st.session_state.get("selected_qid") is None
 
     def _display_classification(value: Any, fallback: str = "Uncategorized") -> str:
-        text = str(value or "").strip()
+        if pd.isna(value):
+            return fallback
+        text = str(value).strip()
         return text if text else fallback
 
     with st.expander("Question selection", expanded=expand_by_default):
