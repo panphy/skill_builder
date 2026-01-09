@@ -1450,9 +1450,10 @@ def get_gpt_feedback_from_bank(
         content.append({"type": "text", "text": "Mark scheme image (confidential):"})
         content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encode_image(markscheme_img)}"}})
 
+    if question_text:
+        content.append({"type": "text", "text": f"Question text (if present):\n{question_text}"})
+
     if not is_student_image:
-        if question_text and question_img is None:
-            content.append({"type": "text", "text": f"Question text:\n{question_text}"})
         content.append({"type": "text", "text": f"Student Answer (text):\n{student_answer}\n(readback_markdown can be empty for typed answers)"})
     else:
         sa_b64 = encode_image(student_answer)
