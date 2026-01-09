@@ -109,7 +109,7 @@ def get_sub_topic_names_for_group(track: str, group: str) -> List[str]:
         name = str(t.get("name", "")).strip()
         if name:
             names.append(name)
-    return names
+    return sorted(names, key=lambda value: clean_sub_topic_label(value, track).lower())
 
 
 def get_all_topic_group_names() -> List[str]:

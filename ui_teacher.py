@@ -57,6 +57,9 @@ def render_teacher_page(nav_label: str, helpers: dict):
         except ValueError:
             return 0
 
+    def _sorted_sub_topic_options(options):
+        return sorted(options, key=lambda value: _clean_sub_topic_label(value).lower())
+
     def _validate_classification_inputs(
         topic_value,
         sub_topic_value,
@@ -501,7 +504,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         key="gen_topic",
                     )
                 with c2:
-                    sub_topic_options = get_sub_topic_names_for_group(track, topic)
+                    sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic))
                     sub_topic = st.selectbox(
                         "Topic",
                         sub_topic_options,
@@ -599,7 +602,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             key="draft_skill",
                         )
                     with tc2:
-                        sub_topic_options = get_sub_topic_names_for_group(track, topic_val)
+                        sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_val))
                         sub_topic_seed = draft.get("sub_topic")
                         if sub_topic_seed not in sub_topic_options and sub_topic_options:
                             matching = next(
@@ -694,7 +697,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         topic_group_options,
                         key="journey_topic_group",
                     )
-                    sub_topic_options = get_sub_topic_names_for_group(track, topic_group_val)
+                    sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_group_val))
                     sub_topic_val = st.selectbox(
                         "Topic",
                         sub_topic_options,
@@ -828,7 +831,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                     skill_options = list(SKILLS)
                     difficulty_options = list(DIFFICULTIES)
                     topic_val = str(d.get("topic") or "").strip()
-                    sub_topic_options = get_sub_topic_names_for_group(track, topic_val)
+                    sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_val))
                     sub_topic_val = str(d.get("sub_topic") or "").strip()
 
                     hc1, hc2 = st.columns(2)
@@ -990,7 +993,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             key="up_skill",
                         )
                     with uc2:
-                        sub_topic_options = get_sub_topic_names_for_group(track, topic_val)
+                        sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_val))
                         if st.session_state.get("up_topic_group") != topic_val:
                             st.session_state["up_topic_group"] = topic_val
                             if sub_topic_options:
