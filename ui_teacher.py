@@ -64,18 +64,18 @@ def render_teacher_page(nav_label: str, helpers: dict):
         difficulty_options,
     ):
         if not topic_value or topic_value not in topic_options:
-            st.error("Please select a valid topic.")
+            st.error("Please select a valid topic group.")
             return False
         if not sub_topic_value or sub_topic_value not in sub_topic_options:
-            st.error("Please select a valid sub-topic.")
+            st.error("Please select a valid topic.")
             return False
         expected_group = get_topic_group_for_name(sub_topic_value)
         if not expected_group:
-            st.error("Please select a valid sub-topic.")
+            st.error("Please select a valid topic.")
             return False
         if topic_value != expected_group:
             st.error(
-                f"Sub-topic '{sub_topic_value}' does not match the topic group for '{topic_value}'."
+                f"Topic '{sub_topic_value}' does not match the topic group for '{topic_value}'."
             )
             return False
         if not skill_value or skill_value not in skill_options:
@@ -492,14 +492,14 @@ def render_teacher_page(nav_label: str, helpers: dict):
 
                 with c1:
                     topic = st.selectbox(
-                        "Topic",
+                        "Topic group",
                         get_topic_group_names_for_track(track),
                         key="gen_topic",
                     )
                 with c2:
                     sub_topic_options = get_sub_topic_names_for_group(track, topic)
                     sub_topic = st.selectbox(
-                        "Sub-topic",
+                        "Topic",
                         sub_topic_options,
                         index=_index_for(sub_topic_options, st.session_state.get("gen_sub_topic")),
                         key="gen_sub_topic",
@@ -582,7 +582,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                     tc1, tc2 = st.columns(2)
                     with tc1:
                         topic_val = st.selectbox(
-                            "Topic",
+                            "Topic group",
                             topic_options,
                             index=_index_for(topic_options, draft.get("topic")),
                             key="draft_topic",
@@ -600,7 +600,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             sub_topic_seed = sub_topic_options[0]
                             draft["sub_topic"] = sub_topic_seed
                         sub_topic_val = st.selectbox(
-                            "Sub-topic",
+                            "Topic",
                             sub_topic_options,
                             index=_index_for(sub_topic_options, sub_topic_seed),
                             key="draft_sub_topic",
@@ -675,7 +675,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                     )
                     sub_topic_options = get_sub_topic_names_for_group(track, topic_group_val)
                     sub_topic_val = st.selectbox(
-                        "Sub-topic",
+                        "Topic",
                         sub_topic_options,
                         key="journey_topic_sub_topic",
                     )
@@ -812,14 +812,14 @@ def render_teacher_page(nav_label: str, helpers: dict):
                     hc1, hc2 = st.columns(2)
                     with hc1:
                         st.selectbox(
-                            "Topic",
+                            "Topic group",
                             topic_options,
                             index=_index_for(topic_options, topic_val),
                             key="jour_topic_display",
                             disabled=True,
                         )
                         st.selectbox(
-                            "Sub-topic",
+                            "Topic",
                             sub_topic_options,
                             index=_index_for(sub_topic_options, sub_topic_val),
                             key="jour_sub_topic_display",
@@ -981,7 +981,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         else:
                             selected_sub_topic = ""
                         sub_topic_val = st.selectbox(
-                            "Sub-topic",
+                            "Topic",
                             sub_topic_options,
                             index=_index_for(sub_topic_options, selected_sub_topic),
                             key="up_sub_topic",
