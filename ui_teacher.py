@@ -154,6 +154,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         if df_del.empty:
                             st.info("No attempts available for deletion.")
                         else:
+                            df_del["id"] = df_del["id"].astype(int)
                             def _request_attempt_delete():
                                 st.session_state["attempt_delete_requested"] = True
 
@@ -173,29 +174,34 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 return f"{created_at} | {student_id} | {question_key} | {mode} | {marks} [id {aid}]"
 
                             df_del["label"] = df_del.apply(_fmt_attempt, axis=1)
+                            attempt_labels = dict(zip(df_del["id"], df_del["label"]))
                             delete_status: Optional[str] = None
                             if st.session_state.get("attempt_delete_requested"):
                                 attempt_picks = st.session_state.get("attempt_delete_picks", [])
                                 confirm_delete = st.session_state.get("confirm_delete_attempt", False)
                                 if confirm_delete and attempt_picks:
-                                    delete_ok = True
-                                    for attempt_pick in attempt_picks:
-                                        attempt_id = int(df_del.loc[df_del["label"] == attempt_pick, "id"].iloc[0])
-                                        delete_ok = delete_attempt_by_id(attempt_id) and delete_ok
-                                    if delete_ok:
-                                        delete_status = "success"
-                                        st.session_state["attempt_delete_picks"] = []
-                                        st.session_state["confirm_delete_attempt"] = False
+                                    missing_ids = [attempt_id for attempt_id in attempt_picks if attempt_id not in attempt_labels]
+                                    if missing_ids:
+                                        delete_status = "missing_ids"
                                     else:
-                                        delete_status = "failed"
+                                        delete_ok = True
+                                        for attempt_id in attempt_picks:
+                                            delete_ok = delete_attempt_by_id(attempt_id) and delete_ok
+                                        if delete_ok:
+                                            delete_status = "success"
+                                            st.session_state["attempt_delete_picks"] = []
+                                            st.session_state["confirm_delete_attempt"] = False
+                                        else:
+                                            delete_status = "failed"
                                 else:
                                     delete_status = "missing"
                                 st.session_state["attempt_delete_requested"] = False
 
                             attempt_picks = st.multiselect(
                                 "Select attempts to delete",
-                                df_del["label"].tolist(),
+                                df_del["id"].tolist(),
                                 key="attempt_delete_picks",
+                                format_func=lambda attempt_id: attempt_labels.get(attempt_id, f"id {attempt_id}"),
                             )
                             confirm_delete = st.checkbox(
                                 "I understand this will permanently delete the selected attempts.",
@@ -215,6 +221,8 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 st.rerun()
                             elif delete_status == "failed":
                                 st.error("Delete failed. Check database errors above.")
+                            elif delete_status == "missing_ids":
+                                st.warning("One or more selected attempts are no longer available.")
                             elif delete_status == "missing":
                                 st.warning("Select attempts and confirm deletion to proceed.")
             else:
