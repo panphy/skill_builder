@@ -247,11 +247,6 @@ def _extract_equation_candidates(text: str) -> List[str]:
             cand = (match.group(1) or "").strip()
             if cand:
                 candidates.append(cand)
-    for line in (text or "").splitlines():
-        for match in regexes["plain_eq"].finditer(line):
-            cand = (match.group(1) or "").strip()
-            if cand:
-                candidates.append(cand)
     return candidates
 
 
