@@ -1434,6 +1434,19 @@ def get_gpt_feedback_from_bank(
     question_img: Optional[Image.Image],
     markscheme_img: Optional[Image.Image],
 ) -> dict:
+    if client is None or not AI_READY:
+        max_marks = int(q_row.get("max_marks", 1))
+        return {
+            "readback_type": "",
+            "readback_markdown": "",
+            "readback_warnings": [],
+            "marks_awarded": 0,
+            "max_marks": max_marks,
+            "summary": "The examiner could not process this attempt (AI unavailable).",
+            "feedback_points": ["Please configure the OpenAI API key in Streamlit Secrets and try again."],
+            "next_steps": []
+        }
+
     max_marks = int(q_row.get("max_marks", 1))
     question_text = (q_row.get("question_text") or "").strip()
     markscheme_text = (q_row.get("markscheme_text") or "").strip()
