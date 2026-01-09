@@ -6,7 +6,15 @@ import numpy as np
 import streamlit as st
 
 from ai_generation import AI_READY, JOURNEY_CHECKPOINT_EVERY, generate_practice_question_with_ai, generate_topic_journey_with_ai
-from config import DIFFICULTIES, QUESTION_TYPES, SUBJECT_SITE, get_topic_names_for_track, get_topic_track_ok
+from config import (
+    DIFFICULTIES,
+    QUESTION_TYPES,
+    SKILLS,
+    SUBJECT_SITE,
+    get_topic_groups_for_track,
+    get_topic_names_for_track,
+    get_topic_track_ok,
+)
 from db import (
     delete_question_bank_by_id,
     ensure_question_bank_table,
@@ -34,6 +42,39 @@ def render_teacher_page(nav_label: str, helpers: dict):
     insert_question_bank_row = helpers["insert_question_bank_row"]
     QUESTION_MAX_MB = helpers["QUESTION_MAX_MB"]
     MARKSCHEME_MAX_MB = helpers["MARKSCHEME_MAX_MB"]
+    track = st.session_state.get("track", "combined")
+
+    def _index_for(options, value):
+        if not options:
+            return 0
+        try:
+            return options.index(value)
+        except ValueError:
+            return 0
+
+    def _validate_classification_inputs(
+        topic_value,
+        sub_topic_value,
+        skill_value,
+        difficulty_value,
+        topic_options,
+        sub_topic_options,
+        skill_options,
+        difficulty_options,
+    ):
+        if not topic_value or topic_value not in topic_options:
+            st.error("Please select a valid topic.")
+            return False
+        if not sub_topic_value or sub_topic_value not in sub_topic_options:
+            st.error("Please select a valid sub-topic.")
+            return False
+        if not skill_value or skill_value not in skill_options:
+            st.error("Please select a valid skill.")
+            return False
+        if not difficulty_value or difficulty_value not in difficulty_options:
+            st.error("Please select a valid difficulty.")
+            return False
+        return True
 
     if nav_label == "🔒 Teacher Dashboard":
         st.divider()
@@ -442,7 +483,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                 with c1:
                     topic = st.selectbox(
                         "Topic",
-                        get_topic_names_for_track(st.session_state.get("track", "combined")),
+                        get_topic_names_for_track(track),
                         key="gen_topic",
                     )
                 with c2:
@@ -515,6 +556,39 @@ def render_teacher_page(nav_label: str, helpers: dict):
                     with c2:
                         save_clicked = st.button("Save to Question Bank", type="primary", width='stretch', key="draft_save_btn")
 
+                    topic_options = get_topic_names_for_track(track)
+                    sub_topic_options = get_topic_groups_for_track(track)
+                    skill_options = list(SKILLS)
+                    difficulty_options = list(DIFFICULTIES)
+
+                    tc1, tc2 = st.columns(2)
+                    with tc1:
+                        topic_val = st.selectbox(
+                            "Topic",
+                            topic_options,
+                            index=_index_for(topic_options, draft.get("topic")),
+                            key="draft_topic",
+                        )
+                        skill_val = st.selectbox(
+                            "Skill",
+                            skill_options,
+                            index=_index_for(skill_options, draft.get("skill")),
+                            key="draft_skill",
+                        )
+                    with tc2:
+                        sub_topic_val = st.selectbox(
+                            "Sub-topic",
+                            sub_topic_options,
+                            index=_index_for(sub_topic_options, draft.get("sub_topic")),
+                            key="draft_sub_topic",
+                        )
+                        difficulty_val = st.selectbox(
+                            "Difficulty",
+                            difficulty_options,
+                            index=_index_for(difficulty_options, draft.get("difficulty")),
+                            key="draft_difficulty",
+                        )
+
                     q_text = st.text_area("Question text", value=draft.get("question_text", ""), height=200, key="draft_q")
                     ms_text = st.text_area("Mark scheme", value=draft.get("markscheme_text", ""), height=240, key="draft_ms")
                     max_marks = st.number_input("Max marks", min_value=1, max_value=12, value=int(draft.get("max_marks", 4) or 4), step=1, key="draft_mm")
@@ -525,6 +599,17 @@ def render_teacher_page(nav_label: str, helpers: dict):
                     if save_clicked:
                         if not assignment_name.strip() or not question_label.strip():
                             st.error("Assignment name and question label are required.")
+                        elif not _validate_classification_inputs(
+                            topic_val,
+                            sub_topic_val,
+                            skill_val,
+                            difficulty_val,
+                            topic_options,
+                            sub_topic_options,
+                            skill_options,
+                            difficulty_options,
+                        ):
+                            pass
                         else:
                             tags = [t.strip() for t in (tags_str or "").split(",") if t.strip()]
                             ok = insert_question_bank_row(
@@ -536,10 +621,10 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 question_label=question_label.strip(),
                                 max_marks=int(max_marks),
                                 tags=tags,
-                                topic=draft.get("topic"),
-                                sub_topic=draft.get("sub_topic"),
-                                skill=draft.get("skill"),
-                                difficulty=draft.get("difficulty"),
+                                topic=topic_val,
+                                sub_topic=sub_topic_val,
+                                skill=skill_val,
+                                difficulty=difficulty_val,
                                 question_text=(q_text or "").strip(),
                                 markscheme_text=(ms_text or "").strip(),
                                 question_image_path=None,
@@ -561,7 +646,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                 with jc1:
                     st.multiselect(
                         "Select one topic (you may pick several, but only the first is used to generate)",
-                        get_topic_names_for_track(st.session_state.get("track", "combined")),
+                        get_topic_names_for_track(track),
                         key="journey_topics_selected",
                         max_selections=1,
                     )
@@ -785,6 +870,39 @@ def render_teacher_page(nav_label: str, helpers: dict):
                     with c2:
                         max_marks_in = st.number_input("Max marks", min_value=1, max_value=50, value=3, step=1, key="up_marks")
 
+                    topic_options = get_topic_names_for_track(track)
+                    sub_topic_options = get_topic_groups_for_track(track)
+                    skill_options = list(SKILLS)
+                    difficulty_options = list(DIFFICULTIES)
+
+                    uc1, uc2 = st.columns(2)
+                    with uc1:
+                        topic_val = st.selectbox(
+                            "Topic",
+                            topic_options,
+                            index=0,
+                            key="up_topic",
+                        )
+                        skill_val = st.selectbox(
+                            "Skill",
+                            skill_options,
+                            index=0,
+                            key="up_skill",
+                        )
+                    with uc2:
+                        sub_topic_val = st.selectbox(
+                            "Sub-topic",
+                            sub_topic_options,
+                            index=0,
+                            key="up_sub_topic",
+                        )
+                        difficulty_val = st.selectbox(
+                            "Difficulty",
+                            difficulty_options,
+                            index=0,
+                            key="up_difficulty",
+                        )
+
                     tags_str = st.text_input("Tags (comma separated)", placeholder="forces, resultant, newton", key="up_tags")
                     q_text_opt = st.text_area("Optional: question text (Markdown + LaTeX supported)", height=100, key="up_qtext")
 
@@ -799,6 +917,17 @@ def render_teacher_page(nav_label: str, helpers: dict):
                 if submitted:
                     if not assignment_name.strip() or not question_label.strip():
                         st.warning("Please fill in Assignment name and Question label.")
+                    elif not _validate_classification_inputs(
+                        topic_val,
+                        sub_topic_val,
+                        skill_val,
+                        difficulty_val,
+                        topic_options,
+                        sub_topic_options,
+                        skill_options,
+                        difficulty_options,
+                    ):
+                        pass
                     elif q_file is None or ms_file is None:
                         st.warning("Please upload both the question screenshot and the mark scheme screenshot.")
                     else:
@@ -851,6 +980,10 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 question_label=question_label.strip(),
                                 max_marks=int(max_marks_in),
                                 tags=tags,
+                                topic=topic_val,
+                                sub_topic=sub_topic_val,
+                                skill=skill_val,
+                                difficulty=difficulty_val,
                                 question_text=(q_text_opt or "").strip(),
                                 markscheme_text="",
                                 question_image_path=q_path,
