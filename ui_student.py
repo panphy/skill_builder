@@ -7,7 +7,7 @@ import streamlit as st
 from PIL import Image
 
 from ai_generation import AI_READY, JOURNEY_CHECKPOINT_EVERY
-from config import SUBJECT_SITE
+from config import clean_sub_topic_label, SUBJECT_SITE
 from db import load_question_bank_df, load_question_by_id
 
 
@@ -51,6 +51,9 @@ def render_student_page(helpers: dict):
         text = str(value).strip()
         return text if text else fallback
 
+    def _display_sub_topic(value: Any, fallback: str = "Uncategorized") -> str:
+        return clean_sub_topic_label(_display_classification(value, fallback))
+
     with st.expander("Question selection", expanded=expand_by_default):
         sel1, sel2 = st.columns([2, 2])
         with sel1:
@@ -81,7 +84,7 @@ def render_student_page(helpers: dict):
                     st.info("No questions available for this source yet.")
                 else:
                     df_src["topic_display"] = df_src["topic"].apply(_display_classification)
-                    df_src["sub_topic_display"] = df_src["sub_topic"].apply(_display_classification)
+                    df_src["sub_topic_display"] = df_src["sub_topic"].apply(_display_sub_topic)
                     df_src["skill_display"] = df_src["skill"].apply(_display_classification)
                     df_src["difficulty_display"] = df_src["difficulty"].apply(_display_classification)
 
@@ -188,7 +191,7 @@ def render_student_page(helpers: dict):
     if st.session_state.get("cached_q_row"):
         _qr = st.session_state["cached_q_row"]
         topic_label = _display_classification(_qr.get("topic"))
-        sub_topic_label = _display_classification(_qr.get("sub_topic"))
+        sub_topic_label = _display_sub_topic(_qr.get("sub_topic"))
         skill_label = _display_classification(_qr.get("skill"))
         difficulty_label = _display_classification(_qr.get("difficulty"))
         st.caption(

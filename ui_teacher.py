@@ -7,6 +7,7 @@ import streamlit as st
 
 from ai_generation import AI_READY, JOURNEY_CHECKPOINT_EVERY, generate_practice_question_with_ai, generate_topic_journey_with_ai
 from config import (
+    clean_sub_topic_label,
     DIFFICULTIES,
     QUESTION_TYPES,
     SKILLS,
@@ -503,6 +504,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         sub_topic_options,
                         index=_index_for(sub_topic_options, st.session_state.get("gen_sub_topic")),
                         key="gen_sub_topic",
+                        format_func=clean_sub_topic_label,
                     )
                 with c3:
                     qtype = st.selectbox("Question type", QUESTION_TYPES, key="gen_qtype")
@@ -597,13 +599,28 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         sub_topic_options = get_sub_topic_names_for_group(track, topic_val)
                         sub_topic_seed = draft.get("sub_topic")
                         if sub_topic_seed not in sub_topic_options and sub_topic_options:
-                            sub_topic_seed = sub_topic_options[0]
+                            matching = next(
+                                (
+                                    option
+                                    for option in sub_topic_options
+                                    if clean_sub_topic_label(option).lower() == str(sub_topic_seed or "").strip().lower()
+                                ),
+                                None,
+                            )
+                            if matching:
+                                sub_topic_seed = matching
+                            else:
+                                sub_topic_seed = sub_topic_options[0]
+                                draft["sub_topic"] = sub_topic_seed
+                        elif sub_topic_seed not in sub_topic_options and not sub_topic_options:
+                            sub_topic_seed = ""
                             draft["sub_topic"] = sub_topic_seed
                         sub_topic_val = st.selectbox(
                             "Topic",
                             sub_topic_options,
                             index=_index_for(sub_topic_options, sub_topic_seed),
                             key="draft_sub_topic",
+                            format_func=clean_sub_topic_label,
                         )
                         difficulty_val = st.selectbox(
                             "Difficulty",
@@ -645,7 +662,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 max_marks=int(max_marks),
                                 tags=tags,
                                 topic=topic_val,
-                                sub_topic=sub_topic_val,
+                                sub_topic=clean_sub_topic_label(sub_topic_val),
                                 skill=skill_val,
                                 difficulty=difficulty_val,
                                 question_text=(q_text or "").strip(),
@@ -678,11 +695,12 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         "Topic",
                         sub_topic_options,
                         key="journey_topic_sub_topic",
+                        format_func=clean_sub_topic_label,
                     )
                     sel_topics = [sub_topic_val] if sub_topic_val else []
                     if sel_topics:
                         st.markdown("**Selected topic:**")
-                        st.markdown(f"- {sel_topics[0]}")
+                        st.markdown(f"- {clean_sub_topic_label(sel_topics[0])}")
                     else:
                         st.info("Choose a topic to build a journey.")
 
@@ -824,6 +842,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             index=_index_for(sub_topic_options, sub_topic_val),
                             key="jour_sub_topic_display",
                             disabled=True,
+                            format_func=clean_sub_topic_label,
                         )
                     with hc2:
                         skill_val = st.selectbox(
@@ -914,7 +933,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                     max_marks=int(total_marks) if total_marks > 0 else 1,
                                     tags=tags,
                                     topic=topic_val,
-                                    sub_topic=sub_topic_val,
+                                    sub_topic=clean_sub_topic_label(sub_topic_val),
                                     skill=skill_val,
                                     difficulty=difficulty_val,
                                     question_text=str(plan_md or "").strip(),
@@ -985,6 +1004,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             sub_topic_options,
                             index=_index_for(sub_topic_options, selected_sub_topic),
                             key="up_sub_topic",
+                            format_func=clean_sub_topic_label,
                         )
                         difficulty_val = st.selectbox(
                             "Difficulty",
@@ -1071,7 +1091,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 max_marks=int(max_marks_in),
                                 tags=tags,
                                 topic=topic_val,
-                                sub_topic=sub_topic_val,
+                                sub_topic=clean_sub_topic_label(sub_topic_val),
                                 skill=skill_val,
                                 difficulty=difficulty_val,
                                 question_text=(q_text_opt or "").strip(),
