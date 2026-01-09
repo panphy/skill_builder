@@ -34,10 +34,12 @@ def get_client():
     return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 
+client: Optional[OpenAI] = None
 try:
     client = get_client()
     AI_READY = True
 except Exception as e:
+    client = None
     st.error("⚠️ OpenAI API Key missing or invalid in Streamlit Secrets!")
     AI_READY = False
     LOGGER.error("OpenAI client init failed", extra={"ctx": {"component": "openai", "error": type(e).__name__}})
