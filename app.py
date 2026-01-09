@@ -1604,8 +1604,9 @@ with header_right:
         for msg in issues:
             st.caption(msg)
 
-st.markdown(
-    """
+if nav == "🧑‍🎓 Student":
+    st.markdown(
+        """
 <div class="pp-hero">
   <div class="pp-hero-content">
     <div class="pp-hero-kicker">Personalised practice</div>
@@ -1627,8 +1628,8 @@ st.markdown(
   </div>
 </div>
 """,
-    unsafe_allow_html=True,
-)
+        unsafe_allow_html=True,
+    )
 
 # ============================================================
 # STUDENT / TEACHER PAGES
