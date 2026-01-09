@@ -731,12 +731,20 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 # Track eligibility: if any chosen topic is separate_only, the whole journey is separate_only.
                                 toks = [get_topic_track_ok(t) for t in sel_topics]
                                 draft_track_ok = "separate_only" if any(tok == "separate_only" for tok in toks) else "both"
+                                topic_primary = sel_topics[0]
+                                sub_topic_primary = get_topic_group_for_name(topic_primary) or ""
+                                default_skill = "Mixed" if "Mixed" in SKILLS else (SKILLS[0] if SKILLS else "")
+                                default_difficulty = "Medium" if "Medium" in DIFFICULTIES else (DIFFICULTIES[0] if DIFFICULTIES else "")
 
                                 st.session_state["journey_draft"] = {
                                     "assignment_name": (j_assignment or "").strip() or "Topic Journey",
                                     "question_label": default_label,
                                     "track_ok": draft_track_ok,
                                     "tags": [t.strip() for t in (j_tags or "").split(",") if t.strip()],
+                                    "topic": topic_primary,
+                                    "sub_topic": sub_topic_primary,
+                                    "skill": default_skill,
+                                    "difficulty": default_difficulty,
                                     "journey": data,
                                 }
                                 st.success("Journey draft generated. Vet/edit below, then save as one assignment.")
@@ -773,6 +781,43 @@ def render_teacher_page(nav_label: str, helpers: dict):
                     with hd2:
                         save_j = st.button("Save Topic Journey to bank", type="primary", width='stretch', key="jour_save_btn")
                         st.caption("Saved as a single Question Bank entry (type=journey).")
+
+                    topic_options = get_topic_names_for_track(track)
+                    sub_topic_options = get_topic_groups_for_track(track)
+                    skill_options = list(SKILLS)
+                    difficulty_options = list(DIFFICULTIES)
+                    topic_val = str(d.get("topic") or "").strip()
+                    sub_topic_val = get_topic_group_for_name(topic_val) or str(d.get("sub_topic") or "").strip()
+
+                    hc1, hc2 = st.columns(2)
+                    with hc1:
+                        st.selectbox(
+                            "Topic",
+                            topic_options,
+                            index=_index_for(topic_options, topic_val),
+                            key="jour_topic_display",
+                            disabled=True,
+                        )
+                        st.selectbox(
+                            "Sub-topic",
+                            sub_topic_options,
+                            index=_index_for(sub_topic_options, sub_topic_val),
+                            key="jour_sub_topic_display",
+                            disabled=True,
+                        )
+                    with hc2:
+                        skill_val = st.selectbox(
+                            "Skill",
+                            skill_options,
+                            index=_index_for(skill_options, d.get("skill")),
+                            key="jour_skill",
+                        )
+                        difficulty_val = st.selectbox(
+                            "Difficulty",
+                            difficulty_options,
+                            index=_index_for(difficulty_options, d.get("difficulty")),
+                            key="jour_difficulty",
+                        )
 
                     plan_md = st.text_area("Journey plan (Markdown)", value=journey.get("plan_markdown", ""), height=140, key="jour_plan_md")
                     render_md_box("Preview: Journey plan", plan_md, empty_text="No plan.")
@@ -831,7 +876,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 tags = tags[:20]
 
                                 journey_json = {
-                                    "topic": str(journey.get("topic", "")).strip(),
+                                    "topic": str(topic_val or journey.get("topic", "")).strip(),
                                     "duration_minutes": 10,
                                     "checkpoint_every": int(journey.get("checkpoint_every", JOURNEY_CHECKPOINT_EVERY) or JOURNEY_CHECKPOINT_EVERY),
                                     "plan_markdown": str(plan_md or "").strip(),
@@ -848,6 +893,10 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                     question_label=d_label.strip(),
                                     max_marks=int(total_marks) if total_marks > 0 else 1,
                                     tags=tags,
+                                    topic=topic_val,
+                                    sub_topic=sub_topic_val,
+                                    skill=skill_val,
+                                    difficulty=difficulty_val,
                                     question_text=str(plan_md or "").strip(),
                                     markscheme_text="",
                                     question_image_path=None,
