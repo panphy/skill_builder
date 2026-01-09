@@ -11,9 +11,9 @@ from config import (
     QUESTION_TYPES,
     SKILLS,
     SUBJECT_SITE,
-    get_topic_groups_for_track,
     get_topic_group_for_name,
-    get_topic_names_for_track,
+    get_topic_group_names_for_track,
+    get_sub_topic_names_for_group,
     get_topic_track_ok,
 )
 from db import (
@@ -69,11 +69,10 @@ def render_teacher_page(nav_label: str, helpers: dict):
         if not sub_topic_value or sub_topic_value not in sub_topic_options:
             st.error("Please select a valid sub-topic.")
             return False
-        expected_sub_topic = get_topic_group_for_name(topic_value)
-        if expected_sub_topic and sub_topic_value != expected_sub_topic:
+        expected_group = get_topic_group_for_name(sub_topic_value)
+        if expected_group and topic_value != expected_group:
             st.error(
-                f"Sub-topic '{sub_topic_value}' does not match the topic group for '{topic_value}' "
-                f"(expected '{expected_sub_topic}')."
+                f"Sub-topic '{sub_topic_value}' does not match the topic group for '{topic_value}'."
             )
             return False
         if not skill_value or skill_value not in skill_options:
@@ -491,7 +490,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                 with c1:
                     topic = st.selectbox(
                         "Topic",
-                        get_topic_names_for_track(track),
+                        get_topic_group_names_for_track(track),
                         key="gen_topic",
                     )
                 with c2:
@@ -564,8 +563,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                     with c2:
                         save_clicked = st.button("Save to Question Bank", type="primary", width='stretch', key="draft_save_btn")
 
-                    topic_options = get_topic_names_for_track(track)
-                    sub_topic_options = get_topic_groups_for_track(track)
+                    topic_options = get_topic_group_names_for_track(track)
                     skill_options = list(SKILLS)
                     difficulty_options = list(DIFFICULTIES)
 
@@ -584,6 +582,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             key="draft_skill",
                         )
                     with tc2:
+                        sub_topic_options = get_sub_topic_names_for_group(track, topic_val)
                         sub_topic_val = st.selectbox(
                             "Sub-topic",
                             sub_topic_options,
@@ -652,13 +651,19 @@ def render_teacher_page(nav_label: str, helpers: dict):
 
                 # --- Left column: inputs ---
                 with jc1:
-                    st.multiselect(
-                        "Select one topic (you may pick several, but only the first is used to generate)",
-                        get_topic_names_for_track(track),
-                        key="journey_topics_selected",
-                        max_selections=1,
+                    topic_group_options = get_topic_group_names_for_track(track)
+                    topic_group_val = st.selectbox(
+                        "Topic group",
+                        topic_group_options,
+                        key="journey_topic_group",
                     )
-                    sel_topics = list(st.session_state.get("journey_topics_selected", []) or [])
+                    sub_topic_options = get_sub_topic_names_for_group(track, topic_group_val)
+                    sub_topic_val = st.selectbox(
+                        "Sub-topic",
+                        sub_topic_options,
+                        key="journey_topic_sub_topic",
+                    )
+                    sel_topics = [sub_topic_val] if sub_topic_val else []
                     if sel_topics:
                         st.markdown("**Selected topic:**")
                         st.markdown(f"- {sel_topics[0]}")
@@ -699,7 +704,6 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         st.session_state["journey_gen_error_details"] = None
                         st.session_state["journey_show_error"] = False
 
-                        sel_topics = list(st.session_state.get("journey_topics_selected", []) or [])
                         if not sel_topics:
                             st.warning("Please add at least one topic first.")
                         else:
@@ -731,8 +735,8 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 # Track eligibility: if any chosen topic is separate_only, the whole journey is separate_only.
                                 toks = [get_topic_track_ok(t) for t in sel_topics]
                                 draft_track_ok = "separate_only" if any(tok == "separate_only" for tok in toks) else "both"
-                                topic_primary = sel_topics[0]
-                                sub_topic_primary = get_topic_group_for_name(topic_primary) or ""
+                                sub_topic_primary = sel_topics[0]
+                                topic_primary = get_topic_group_for_name(sub_topic_primary) or topic_group_val or ""
                                 default_skill = "Mixed" if "Mixed" in SKILLS else (SKILLS[0] if SKILLS else "")
                                 default_difficulty = "Medium" if "Medium" in DIFFICULTIES else (DIFFICULTIES[0] if DIFFICULTIES else "")
 
@@ -782,12 +786,12 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         save_j = st.button("Save Topic Journey to bank", type="primary", width='stretch', key="jour_save_btn")
                         st.caption("Saved as a single Question Bank entry (type=journey).")
 
-                    topic_options = get_topic_names_for_track(track)
-                    sub_topic_options = get_topic_groups_for_track(track)
+                    topic_options = get_topic_group_names_for_track(track)
                     skill_options = list(SKILLS)
                     difficulty_options = list(DIFFICULTIES)
                     topic_val = str(d.get("topic") or "").strip()
-                    sub_topic_val = get_topic_group_for_name(topic_val) or str(d.get("sub_topic") or "").strip()
+                    sub_topic_options = get_sub_topic_names_for_group(track, topic_val)
+                    sub_topic_val = str(d.get("sub_topic") or "").strip()
 
                     hc1, hc2 = st.columns(2)
                     with hc1:
@@ -927,8 +931,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                     with c2:
                         max_marks_in = st.number_input("Max marks", min_value=1, max_value=50, value=3, step=1, key="up_marks")
 
-                    topic_options = get_topic_names_for_track(track)
-                    sub_topic_options = get_topic_groups_for_track(track)
+                    topic_options = get_topic_group_names_for_track(track)
                     skill_options = list(SKILLS)
                     difficulty_options = list(DIFFICULTIES)
 
@@ -947,6 +950,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             key="up_skill",
                         )
                     with uc2:
+                        sub_topic_options = get_sub_topic_names_for_group(track, topic_val)
                         sub_topic_val = st.selectbox(
                             "Sub-topic",
                             sub_topic_options,
