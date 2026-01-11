@@ -29,6 +29,7 @@ import secrets as pysecrets
 from ai_generation import AI_READY, MODEL_NAME, client, _render_template
 from config import FEEDBACK_SYSTEM_TPL, SUBJECT_SITE
 from db import db_ready, get_db_driver_type, get_db_engine, insert_question_bank_row
+from image_utils import _compress_bytes_to_limit, _encode_image_bytes, validate_image_file
 from ui_student import render_student_page
 from ui_teacher import render_teacher_page
 
@@ -193,7 +194,6 @@ RATE_LIMIT_MAX = 10
 RATE_LIMIT_WINDOW_SECONDS = 60 * 60  # 1 hour
 
 # Image limits
-MAX_DIM_PX = 4000
 QUESTION_MAX_MB = 5.0
 MARKSCHEME_MAX_MB = 5.0
 CANVAS_MAX_MB = 2.0
@@ -776,111 +776,6 @@ def safe_bytes_to_pil(img_bytes: bytes) -> Optional[Image.Image]:
             extra={"ctx": {"component": "image", "error": type(e).__name__}},
         )
         return None
-
-# ============================================================
-# FILE SIZE VALIDATION + COMPRESSION
-# ============================================================
-def _human_mb(num_bytes: int) -> str:
-    return f"{(num_bytes / (1024 * 1024)):.1f}MB"
-
-
-def validate_image_file(file_bytes: bytes, max_mb: float, _purpose: str) -> Tuple[bool, str]:
-    if not file_bytes:
-        return False, "No image data received."
-
-    size_bytes = len(file_bytes)
-    max_bytes = int(max_mb * 1024 * 1024)
-
-    try:
-        img = Image.open(io.BytesIO(file_bytes))
-        w, h = img.size
-    except Exception:
-        return False, "Invalid image file. Please upload a valid PNG/JPG."
-
-    if w > MAX_DIM_PX or h > MAX_DIM_PX:
-        return False, f"Image dimensions too large ({w}x{h}). Max allowed is {MAX_DIM_PX}x{MAX_DIM_PX}px."
-
-    if size_bytes <= max_bytes:
-        return True, ""
-
-    return False, f"Image too large ({_human_mb(size_bytes)}). Please use an image under {max_mb:.0f}MB."
-
-
-def _encode_image_bytes(img: Image.Image, fmt: str, quality: int = 85) -> bytes:
-    buf = io.BytesIO()
-    if fmt.upper() == "JPEG":
-        if img.mode != "RGB":
-            img = img.convert("RGB")
-        img.save(buf, format="JPEG", quality=int(quality), optimize=True)
-    else:
-        img.save(buf, format="PNG", optimize=True)
-    return buf.getvalue()
-
-
-def _compress_bytes_to_limit(
-    file_bytes: bytes,
-    max_mb: float,
-    _purpose: str,
-    prefer_fmt: Optional[str] = None,
-) -> Tuple[bool, bytes, str, str]:
-    max_bytes = int(max_mb * 1024 * 1024)
-    size_bytes = len(file_bytes)
-
-    if size_bytes > int(max_bytes * 1.30):
-        LOGGER.info(
-            "Large image received; attempting compression",
-            extra={"ctx": {"component": "image", "size": _human_mb(size_bytes), "limit": f"{max_mb:.0f}MB"}},
-        )
-
-    try:
-        img = Image.open(io.BytesIO(file_bytes))
-        img.load()
-    except Exception:
-        return False, b"", "", "Invalid image file. Please upload a valid PNG/JPG."
-
-    w, h = img.size
-    if w > MAX_DIM_PX or h > MAX_DIM_PX:
-        return False, b"", "", f"Image dimensions too large ({w}x{h}). Max allowed is {MAX_DIM_PX}x{MAX_DIM_PX}px."
-
-    in_fmt = (img.format or "").upper()
-    target_fmt = (prefer_fmt or "JPEG").upper()
-    if in_fmt in ("JPG", "JPEG"):
-        target_fmt = "JPEG"
-
-    best_bytes = None
-    best_quality = None
-    for q in [85, 80, 75, 70, 65, 60, 55, 50]:
-        out = _encode_image_bytes(img, target_fmt, quality=q)
-        if len(out) <= max_bytes:
-            best_bytes = out
-            best_quality = q
-            break
-
-    if best_bytes is None:
-        w, h = img.size
-        scale = 0.9
-        for _ in range(4):
-            img2 = img.resize((max(1, int(w * scale)), max(1, int(h * scale))))
-            for q in [75, 70, 65, 60, 55, 50]:
-                out = _encode_image_bytes(img2, target_fmt, quality=q)
-                if len(out) <= max_bytes:
-                    best_bytes = out
-                    best_quality = q
-                    img = img2
-                    break
-            if best_bytes is not None:
-                break
-            scale *= 0.9
-
-    if best_bytes is None:
-        return False, b"", "", f"Image too large ({_human_mb(size_bytes)}) and could not be compressed under {max_mb:.0f}MB."
-
-    ct = "image/jpeg" if target_fmt == "JPEG" else "image/png"
-    LOGGER.warning(
-        "Image compression applied",
-        extra={"ctx": {"component": "image", "from": _human_mb(size_bytes), "to": _human_mb(len(best_bytes)), "quality": best_quality}},
-    )
-    return True, best_bytes, ct, ""
 
 # ============================================================
 # CANVAS HELPERS
