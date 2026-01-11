@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import streamlit as st
 from openai import OpenAI
+from utils.json_utils import safe_parse_json
 
 from config import (
     GCSE_ONLY_GUARDRAILS,
@@ -65,33 +66,6 @@ except Exception as e:
 # ============================================================
 # --- JSON / PROMPT UTILS ---
 # ============================================================
-
-def safe_parse_json(text_str: str):
-    try:
-        return json.loads(text_str)
-    except Exception:
-        pass
-
-    try:
-        # Scan for the first balanced-brace JSON object to avoid greedy regex capture.
-        s = text_str or ""
-        start = s.find("{")
-        if start != -1:
-            depth = 0
-            for idx in range(start, len(s)):
-                ch = s[idx]
-                if ch == "{":
-                    depth += 1
-                elif ch == "}":
-                    depth -= 1
-                    if depth == 0:
-                        return json.loads(s[start : idx + 1])
-    except Exception:
-        pass
-    return None
-
-
-
 def _render_template(tpl: str, mapping: Dict[str, Any]) -> str:
     # Simple token replacement. Tokens look like: <<TOKEN_NAME>>
     out = str(tpl or "")

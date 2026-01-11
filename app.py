@@ -32,6 +32,7 @@ from db import db_ready, get_db_driver_type, get_db_engine, insert_question_bank
 from image_utils import _compress_bytes_to_limit, _encode_image_bytes, validate_image_file
 from ui_student import render_student_page
 from ui_teacher import render_teacher_page
+from utils.json_utils import safe_parse_json
 
 # ============================================================
 # LOGGING
@@ -825,89 +826,6 @@ def encode_image(image_pil: Image.Image) -> str:
     buffered = io.BytesIO()
     image_pil.save(buffered, format="PNG", optimize=True)
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-
-def safe_parse_json(text_str: str):
-    """Best-effort extractor for a JSON object from an LLM response.
-
-    Priority:
-    1) Parse entire string as JSON
-    2) Parse any fenced ```json ... ``` blocks (prefer ones containing 'steps')
-    3) Parse balanced JSON objects found in the text (prefer ones containing 'steps')
-    """
-    s = (text_str or "").strip()
-    if not s:
-        return None
-
-    # 1) Direct parse
-    try:
-        return json.loads(s)
-    except Exception:
-        pass
-
-    def _prefer(obj_list):
-        """Prefer dicts containing a 'steps' list; else first dict."""
-        for o in obj_list:
-            if isinstance(o, dict) and isinstance(o.get("steps"), list) and len(o.get("steps")) > 0:
-                return o
-        for o in obj_list:
-            if isinstance(o, dict):
-                return o
-        return obj_list[0] if obj_list else None
-
-    # 2) Fenced json blocks
-    objs = []
-    for m in re.finditer(r"```json\s*(\{.*?\})\s*```", s, flags=re.DOTALL | re.IGNORECASE):
-        try:
-            objs.append(json.loads(m.group(1)))
-        except Exception:
-            continue
-    picked = _prefer(objs)
-    if picked is not None:
-        return picked
-
-    # 3) Balanced braces extraction: collect all top-level {...} objects
-    candidates = []
-    depth = 0
-    in_str = False
-    esc = False
-    start = None
-    for i, ch in enumerate(s):
-        if in_str:
-            if esc:
-                esc = False
-            elif ch == "\\":
-                esc = True
-            elif ch == '"':
-                in_str = False
-            continue
-        else:
-            if ch == '"':
-                in_str = True
-                continue
-            if ch == "{":
-                if depth == 0:
-                    start = i
-                depth += 1
-            elif ch == "}" and depth > 0:
-                depth -= 1
-                if depth == 0 and start is not None:
-                    candidates.append(s[start:i+1])
-                    start = None
-
-    parsed = []
-    for cand in candidates:
-        try:
-            parsed.append(json.loads(cand))
-        except Exception:
-            continue
-
-    picked = _prefer(parsed)
-    if picked is not None:
-        return picked
-
-    return None
-
 
 
 def clamp_int(value, lo, hi, default=0):
