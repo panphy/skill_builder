@@ -29,7 +29,7 @@ Students can:
 
 While the AI is working, the UI is locked with a translucent overlay and a progress bar to prevent accidental changes.
 
-To keep submissions fair and responsive, AI feedback requests are rate-limited per student ID (default: 10 submissions per hour).
+To keep submissions fair and responsive, AI feedback requests are rate-limited per student ID, with tighter limits applied to anonymous users (default: 10 submissions per hour).
 
 ### Question quality safeguards
 To improve consistency and correctness in AI-generated questions, the app enforces:
@@ -39,7 +39,7 @@ To improve consistency and correctness in AI-generated questions, the app enforc
 ### Teacher view
 Teachers can:
 - Browse and preview the question bank (AI + teacher uploads)
-- Generate AI question drafts, edit them, and save them to the database
+- Generate AI question drafts, edit them, and save them to the database (teacher vetting is compulsory for quality assurance)
 - Upload scanned question and mark scheme images to storage and index them in the database
 - Create Topic Journey assignments (fixed at ~10 minutes / 5 steps) and save them as a single bank entry
 - Control visibility for Combined vs Separate-only topics when saving new content
