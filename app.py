@@ -342,9 +342,11 @@ init_track_state()
 # ============================================================
 RATE_LIMITS_DDL = """
 create table if not exists public.rate_limits (
-  student_id text primary key,
+  subject_site text not null default '{SUBJECT_SITE}',
+  student_id text not null,
   submission_count int not null default 0,
-  window_start_time timestamptz not null default now()
+  window_start_time timestamptz not null default now(),
+  primary key (subject_site, student_id)
 );
 create index if not exists idx_rate_limits_window_start_time
   on public.rate_limits (window_start_time);
@@ -497,9 +499,21 @@ def ensure_rate_limits_table():
     eng = get_db_engine()
     if eng is None:
         return
+    ddl_migrate = f"""
+    alter table public.rate_limits
+      add column if not exists subject_site text not null default '{SUBJECT_SITE}';
+    update public.rate_limits
+      set subject_site = '{SUBJECT_SITE}'
+      where subject_site is null or subject_site = '';
+    alter table public.rate_limits
+      drop constraint if exists rate_limits_pkey;
+    alter table public.rate_limits
+      add primary key (subject_site, student_id);
+    """
     try:
         with eng.begin() as conn:
             _exec_sql_many(conn, RATE_LIMITS_DDL)
+            _exec_sql_many(conn, ddl_migrate)
         LOGGER.info("Rate limits table ready", extra={"ctx": {"component": "db", "table": "rate_limits"}})
     except Exception as e:
         st.session_state["db_last_error"] = f"Rate Limits Table Error: {type(e).__name__}: {e}"
@@ -535,26 +549,28 @@ def _check_rate_limit_db(student_id: str) -> Tuple[bool, int, str]:
     ensure_rate_limits_table()
 
     sid = (student_id or "").strip() or f"anon_{st.session_state['anon_id']}"
+    subject_site = SUBJECT_SITE
     now_utc = datetime.now(timezone.utc)
 
     with eng.begin() as conn:
         row = conn.execute(
             text("""
-                select student_id, submission_count, window_start_time
+                select subject_site, student_id, submission_count, window_start_time
                 from public.rate_limits
-                where student_id = :sid
+                where subject_site = :subject_site
+                  and student_id = :sid
                 for update
             """),
-            {"sid": sid},
+            {"subject_site": subject_site, "sid": sid},
         ).mappings().first()
 
         if not row:
             conn.execute(
                 text("""
-                    insert into public.rate_limits (student_id, submission_count, window_start_time)
-                    values (:sid, 0, now())
+                    insert into public.rate_limits (subject_site, student_id, submission_count, window_start_time)
+                    values (:subject_site, :sid, 0, now())
                 """),
-                {"sid": sid},
+                {"subject_site": subject_site, "sid": sid},
             )
             submission_count = 0
             window_start = now_utc
@@ -576,9 +592,10 @@ def _check_rate_limit_db(student_id: str) -> Tuple[bool, int, str]:
                     update public.rate_limits
                     set submission_count = 0,
                         window_start_time = now()
-                    where student_id = :sid
+                    where subject_site = :subject_site
+                      and student_id = :sid
                 """),
-                {"sid": sid},
+                {"subject_site": subject_site, "sid": sid},
             )
             submission_count = 0
             window_start = now_utc
@@ -587,11 +604,12 @@ def _check_rate_limit_db(student_id: str) -> Tuple[bool, int, str]:
             text("""
                 update public.rate_limits
                 set submission_count = submission_count + 1
-                where student_id = :sid
+                where subject_site = :subject_site
+                  and student_id = :sid
                   and submission_count < :limit
                 returning submission_count, window_start_time
             """),
-            {"sid": sid, "limit": RATE_LIMIT_MAX},
+            {"subject_site": subject_site, "sid": sid, "limit": RATE_LIMIT_MAX},
         ).mappings().first()
 
         allowed = updated is not None
