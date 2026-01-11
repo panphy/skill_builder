@@ -7,7 +7,13 @@ import streamlit as st
 from PIL import Image
 
 from ai_generation import AI_READY, JOURNEY_CHECKPOINT_EVERY
-from config import clean_sub_topic_label, SUBJECT_SITE
+from config import (
+    clean_sub_topic_label,
+    get_sub_topic_names_for_group,
+    get_topic_group_names_for_track,
+    get_topic_names_for_track,
+    SUBJECT_SITE,
+)
 from db import load_question_bank_df, load_question_by_id
 
 
@@ -42,7 +48,7 @@ def render_student_page(helpers: dict):
     st.divider()
 
     source_options = ["AI Practice", "Teacher Uploads", "All"]
-    expand_by_default = st.session_state.get("selected_qid") is None
+    expand_by_default = False
 
     def _display_classification(value: Any, fallback: str = "Uncategorized") -> str:
         if pd.isna(value):
@@ -58,6 +64,16 @@ def render_student_page(helpers: dict):
             return clean_sub_topic_label(primary, track)
         secondary = _display_classification(raw_value, fallback)
         return clean_sub_topic_label(secondary, track)
+
+    def _unique_ordered(values: list[str]) -> list[str]:
+        seen: set[str] = set()
+        out: list[str] = []
+        for value in values:
+            if value in seen:
+                continue
+            seen.add(value)
+            out.append(value)
+        return out
 
     with st.expander("Question selection", expanded=expand_by_default):
         sel1, sel2 = st.columns([2, 2])
@@ -96,20 +112,39 @@ def render_student_page(helpers: dict):
                     df_src["skill_display"] = df_src["skill"].apply(_display_classification)
                     df_src["difficulty_display"] = df_src["difficulty"].apply(_display_classification)
 
-                    topics = ["All"] + sorted(df_src["topic_display"].unique().tolist())
+                    topic_group_catalog = get_topic_group_names_for_track(track)
+                    topics = ["All"] + topic_group_catalog
+                    topic_extras = sorted(
+                        {topic for topic in df_src["topic_display"].unique().tolist() if topic not in topics}
+                    )
+                    topics.extend(topic_extras)
                     if st.session_state.get("student_topic_filter") not in topics:
                         st.session_state["student_topic_filter"] = "All"
-                    topic_filter = st.selectbox("Step 1: Topic group", topics, key="student_topic_filter")
+                    topic_cols = st.columns(2)
+                    with topic_cols[0]:
+                        topic_filter = st.selectbox("Step 1: Topic group", topics, key="student_topic_filter")
 
                     if topic_filter != "All":
                         df2 = df_src[df_src["topic_display"] == topic_filter].copy()
                     else:
                         df2 = df_src.copy()
 
-                    sub_topics = ["All"] + sorted(df2["sub_topic_display"].unique().tolist())
+                    if topic_filter != "All":
+                        base_sub_topics = get_sub_topic_names_for_group(track, topic_filter)
+                    else:
+                        base_sub_topics = get_topic_names_for_track(track)
+                    base_sub_topics = [
+                        clean_sub_topic_label(name, track) for name in base_sub_topics if name
+                    ]
+                    sub_topics = ["All"] + _unique_ordered(base_sub_topics)
+                    sub_topic_extras = sorted(
+                        {topic for topic in df2["sub_topic_display"].unique().tolist() if topic not in sub_topics}
+                    )
+                    sub_topics.extend(sub_topic_extras)
                     if st.session_state.get("student_sub_topic_filter") not in sub_topics:
                         st.session_state["student_sub_topic_filter"] = "All"
-                    sub_topic_filter = st.selectbox("Step 2: Topic", sub_topics, key="student_sub_topic_filter")
+                    with topic_cols[1]:
+                        sub_topic_filter = st.selectbox("Step 2: Topic", sub_topics, key="student_sub_topic_filter")
 
                     if sub_topic_filter != "All":
                         df3 = df2[df2["sub_topic_display"] == sub_topic_filter].copy()
@@ -119,7 +154,9 @@ def render_student_page(helpers: dict):
                     skills = ["All"] + sorted(df3["skill_display"].unique().tolist())
                     if st.session_state.get("student_skill_filter") not in skills:
                         st.session_state["student_skill_filter"] = "All"
-                    skill_filter = st.selectbox("Step 3: Skill", skills, key="student_skill_filter")
+                    skill_cols = st.columns(2)
+                    with skill_cols[0]:
+                        skill_filter = st.selectbox("Step 3: Skill", skills, key="student_skill_filter")
 
                     if skill_filter != "All":
                         df4 = df3[df3["skill_display"] == skill_filter].copy()
@@ -129,7 +166,8 @@ def render_student_page(helpers: dict):
                     difficulties = ["All"] + sorted(df4["difficulty_display"].unique().tolist())
                     if st.session_state.get("student_difficulty_filter") not in difficulties:
                         st.session_state["student_difficulty_filter"] = "All"
-                    difficulty_filter = st.selectbox("Step 4: Difficulty", difficulties, key="student_difficulty_filter")
+                    with skill_cols[1]:
+                        difficulty_filter = st.selectbox("Step 4: Difficulty", difficulties, key="student_difficulty_filter")
 
                     if difficulty_filter != "All":
                         df_filtered = df4[df4["difficulty_display"] == difficulty_filter].copy()
@@ -137,7 +175,14 @@ def render_student_page(helpers: dict):
                         df_filtered = df4.copy()
 
                     if df_filtered.empty:
-                        st.info("No questions available for this selection.")
+                        empty_choice = "No questions yet for this selection."
+                        st.selectbox(
+                            "Question",
+                            [empty_choice],
+                            key=f"student_question_choice::empty::{source}::{topic_filter}::{sub_topic_filter}::{skill_filter}::{difficulty_filter}",
+                            disabled=True,
+                        )
+                        st.info("No questions yet for this selection. Try a different topic or check back later.")
                     else:
                         df_filtered = df_filtered.sort_values(
                             ["topic_display", "sub_topic_display", "skill_display", "difficulty_display", "question_label", "id"],
