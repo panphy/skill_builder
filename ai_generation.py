@@ -590,6 +590,34 @@ def generate_practice_question_with_ai(
                 data = data2 if isinstance(data2, dict) and data2 else data
                 data["warnings"] = reasons2[:10]
 
+    def _ensure_complete_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+        attempt_data = payload
+        for _ in range(2):
+            qtxt = str(attempt_data.get("question_text", "") or "").strip()
+            mstxt = str(attempt_data.get("markscheme_text", "") or "").strip()
+            if qtxt and mstxt:
+                break
+            reasons_missing = []
+            if not qtxt:
+                reasons_missing.append("Missing question_text.")
+            if not mstxt:
+                reasons_missing.append("Missing markscheme_text.")
+            extra_hint = (
+                "Return a complete JSON object with non-empty question_text and markscheme_text. "
+                "Include topic, sub_topic, skill, difficulty, max_marks, and tags. "
+                f"Ensure markscheme_text ends with 'TOTAL = {int(marks)}' and includes part-by-part marks like '(a) ... [2]'."
+            )
+            attempt_data = _call_model(repair=True, reasons=reasons_missing, extra_hint=extra_hint)
+
+        ok_final, reasons_final = _validate(attempt_data)
+        if ok_final:
+            attempt_data["warnings"] = []
+        else:
+            attempt_data["warnings"] = reasons_final[:10]
+        return attempt_data
+
+    data = _ensure_complete_payload(data if isinstance(data, dict) else {})
+
     topic_val = _coerce_vocab(data.get("topic"), topic_options) or (topic_text or "").strip()
     sub_topic_options = get_sub_topic_names_for_group(track, topic_val)
     out = {
