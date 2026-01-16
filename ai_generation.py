@@ -403,6 +403,8 @@ def _auto_check_warnings(question_text: str, markscheme_text: str, max_marks: in
 
     if "$" in qtxt and "\\(" in qtxt:
         reasons.append("Use $...$ for LaTeX, avoid \\( ... \\).")
+    if "$" in mstxt and "\\(" in mstxt:
+        reasons.append("Use $...$ for LaTeX, avoid \\( ... \\).")
 
     return reasons
 
@@ -487,7 +489,7 @@ def generate_practice_question_with_ai(
                     rx = str(fp.get("regex", "") or "").strip()
                     rs = str(fp.get("reason", "") or "").strip()
                     if rx and rs and re.search(rx, t_all, flags=re.IGNORECASE):
-                        reasons.append(f"Journey contains forbidden content: {rs}")
+                        reasons.append(f"Question contains forbidden content: {rs}")
         except Exception:
             pass
 
@@ -686,8 +688,14 @@ def generate_topic_journey_with_ai(
             if mm <= 0 or mm > 12:
                 reasons.append(f"Step {i+1}: max_marks must be 1-12.")
             ms = str(stp.get("markscheme_text", "") or "")
-            if f"TOTAL = {mm}" not in ms:
+            if not ms.rstrip().endswith(f"TOTAL = {mm}"):
                 reasons.append(f"Step {i+1}: markscheme_text must end with 'TOTAL = {mm}'.")
+            forbidden_hits = _forbidden_found(
+                str(stp.get("question_text", "") or ""),
+                str(stp.get("markscheme_text", "") or ""),
+            )
+            for hit in forbidden_hits:
+                reasons.append(f"Step {i+1}: question contains forbidden content: {hit}")
             non_whitelisted = _find_non_whitelisted_equations(
                 f"{stp.get('question_text', '')}\n{stp.get('markscheme_text', '')}"
             )
