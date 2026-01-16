@@ -436,6 +436,7 @@ def _exec_sql_many(conn, sql_blob: str):
 
 
 ATTEMPTS_TABLE = "attempts_v1"
+AI_TIMINGS_TABLE = "ai_timings_v1"
 # Naming strategy: use a shared attempts_v1 table and filter by subject_site.
 # Migration note (from legacy physics_attempts_v1):
 #   INSERT INTO public.attempts_v1 SELECT * FROM public.physics_attempts_v1;
@@ -495,6 +496,98 @@ def ensure_attempts_table():
         st.session_state["db_last_error"] = f"Table Creation Error: {type(e).__name__}: {e}"
         st.session_state["db_table_ready"] = False
         LOGGER.error("Attempts table ensure failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
+
+
+def ensure_ai_timings_table():
+    if st.session_state.get("db_ai_timings_ready", False):
+        return
+    eng = get_db_engine()
+    if eng is None:
+        return
+
+    ddl_create = f"""
+    create table if not exists public.{AI_TIMINGS_TABLE} (
+      id bigserial primary key,
+      created_at timestamptz not null default now(),
+      subject_site text not null default '{SUBJECT_SITE}',
+      timing_type text not null,
+      duration_seconds double precision not null,
+      success boolean not null default true
+    );
+
+    create index if not exists idx_ai_timings_subject_type_created
+      on public.{AI_TIMINGS_TABLE} (subject_site, timing_type, created_at desc);
+    """
+    try:
+        with eng.begin() as conn:
+            _exec_sql_many(conn, ddl_create)
+        st.session_state["db_ai_timings_ready"] = True
+        st.session_state["db_last_error"] = ""
+        LOGGER.info("AI timings table ready", extra={"ctx": {"component": "db", "table": AI_TIMINGS_TABLE}})
+    except Exception as e:
+        st.session_state["db_last_error"] = f"Table Creation Error: {type(e).__name__}: {e}"
+        st.session_state["db_ai_timings_ready"] = False
+        LOGGER.error("AI timings table ensure failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
+
+
+def insert_ai_timing(timing_type: str, duration_seconds: float, success: bool = True) -> None:
+    eng = get_db_engine()
+    if eng is None:
+        return
+    ensure_ai_timings_table()
+    timing_type = (timing_type or "").strip().lower()
+    if not timing_type:
+        return
+    query = f"""
+        insert into public.{AI_TIMINGS_TABLE}
+        (subject_site, timing_type, duration_seconds, success)
+        values
+        (:subject_site, :timing_type, :duration_seconds, :success)
+    """
+    try:
+        with eng.begin() as conn:
+            conn.execute(text(query), {
+                "subject_site": SUBJECT_SITE,
+                "timing_type": timing_type,
+                "duration_seconds": float(duration_seconds),
+                "success": bool(success),
+            })
+        st.session_state["db_last_error"] = ""
+    except Exception as e:
+        st.session_state["db_last_error"] = f"Insert Error: {type(e).__name__}: {e}"
+
+
+@st.cache_data(ttl=120)
+def load_ai_timing_average_cached(_fp: str, subject_site: str, timing_type: str, min_samples: int = 5) -> tuple[Optional[float], int]:
+    eng = get_db_engine()
+    if eng is None:
+        return None, 0
+    ensure_ai_timings_table()
+    subject_site = (subject_site or "").strip().lower() or SUBJECT_SITE
+    timing_type = (timing_type or "").strip().lower()
+    if not timing_type:
+        return None, 0
+    query = text(
+        f"""
+        select avg(duration_seconds) as avg_s, count(*) as n
+        from public.{AI_TIMINGS_TABLE}
+        where subject_site = :subject_site
+          and timing_type = :timing_type
+          and success = true
+        """
+    )
+    with eng.connect() as conn:
+        row = conn.execute(
+            query,
+            {"subject_site": subject_site, "timing_type": timing_type},
+        ).fetchone()
+    if not row:
+        return None, 0
+    avg_s = float(row[0]) if row[0] is not None else None
+    count = int(row[1] or 0)
+    if avg_s is None or count < max(1, int(min_samples)):
+        return None, count
+    return avg_s, count
 
 
 def ensure_rate_limits_table():
@@ -950,6 +1043,19 @@ def render_md_box(title: str, md_text: str, caption: str = "", empty_text: str =
 # ============================================================
 # PROGRESS INDICATORS
 # ============================================================
+def _resolve_timing_type(ctx: dict) -> Optional[str]:
+    mode = str((ctx or {}).get("mode", "") or "").strip().lower()
+    if not mode:
+        return None
+    if mode in {"text", "writing"} or mode.startswith("journey_"):
+        return "ai_marking"
+    if mode == "ai_generator":
+        return "single_question_generation"
+    if mode == "topic_journey":
+        return "topic_journey_generation"
+    return None
+
+
 def _run_ai_with_progress(
     task_fn,
     ctx: dict,
@@ -965,6 +1071,18 @@ def _run_ai_with_progress(
     """
     overlay = st.empty()
     start_t = time.monotonic()
+    timing_type = _resolve_timing_type(ctx)
+    effective_est_seconds = est_seconds
+    estimate_label = typical_range
+    if timing_type and db_ready():
+        avg_s, _count = load_ai_timing_average_cached(
+            _safe_secret("DATABASE_URL", "") or "",
+            SUBJECT_SITE,
+            timing_type,
+        )
+        if avg_s is not None:
+            effective_est_seconds = avg_s
+            estimate_label = f"{avg_s:.0f} seconds (avg)"
 
     def _render_overlay(subtitle: str, percent: int):
         step_label = ""
@@ -1094,7 +1212,7 @@ def _run_ai_with_progress(
       <div>
         <div class="pp-title">AI is working. Please wait...</div>
         <div class="pp-subtitle">{subtitle}</div>
-        <div class="pp-meta">{percent}% • Typical: {typical_range}</div>
+        <div class="pp-meta">{percent}% • Estimate: {estimate_label}</div>
         <div class="pp-note">May take longer for complex tasks.</div>
       </div>
     </div>
@@ -1111,12 +1229,14 @@ def _run_ai_with_progress(
     def _calc_percent(elapsed_s: float, done: bool = False) -> int:
         if done:
             return 100
-        if est_seconds <= 0:
+        if effective_est_seconds <= 0:
             return 0
-        return min(95, max(0, int((elapsed_s / est_seconds) * 100)))
+        return min(95, max(0, int((elapsed_s / effective_est_seconds) * 100)))
 
     _render_overlay(subtitle or "", 0)
 
+    report = None
+    success = False
     try:
         with ThreadPoolExecutor(max_workers=1) as ex:
             fut = ex.submit(task_fn)
@@ -1127,12 +1247,15 @@ def _run_ai_with_progress(
                 time.sleep(0.35)
 
             report = fut.result()
+            success = True
 
         done_subtitle = "Done. Updating the page…"
         _render_overlay(done_subtitle, _calc_percent(time.monotonic() - start_t, done=True))
         time.sleep(0.08)
         return report
     finally:
+        if timing_type and success and report is not None:
+            insert_ai_timing(timing_type, time.monotonic() - start_t, success=True)
         # Always remove the overlay, even if the AI call errors.
         overlay.empty()
 

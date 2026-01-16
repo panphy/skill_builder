@@ -198,6 +198,8 @@ def render_student_page(helpers: dict):
                         )
                         choices = df_filtered["label"].tolist()
                         labels_map = dict(zip(df_filtered["label"], df_filtered["id"]))
+                        id_sequence = [int(x) for x in df_filtered["id"].tolist()]
+                        label_by_id = {int(row_id): label for row_id, label in zip(df_filtered["id"], df_filtered["label"])}
 
                         choice_key = f"student_question_choice::{source}::{topic_filter}::{sub_topic_filter}::{skill_filter}::{difficulty_filter}"
                         if st.session_state.get(choice_key) not in choices:
@@ -205,6 +207,9 @@ def render_student_page(helpers: dict):
 
                         choice = st.selectbox("Question", choices, key=choice_key)
                         chosen_id = int(labels_map.get(choice, 0)) if choice else 0
+                        st.session_state["student_question_sequence"] = id_sequence
+                        st.session_state["student_question_label_by_id"] = label_by_id
+                        st.session_state["student_question_choice_key"] = choice_key
 
                         if chosen_id:
                             if st.session_state.get("selected_qid") != chosen_id:
@@ -306,6 +311,28 @@ def render_student_page(helpers: dict):
                     st.markdown(normalize_markdown_math(q_text))
                 if (question_img is None) and (not q_text):
                     st.warning("This question has no question text or image.")
+            question_sequence = st.session_state.get("student_question_sequence") or []
+            label_by_id = st.session_state.get("student_question_label_by_id") or {}
+            choice_key = st.session_state.get("student_question_choice_key")
+            if qid and choice_key and len(question_sequence) > 1:
+                try:
+                    current_index = question_sequence.index(qid)
+                except ValueError:
+                    current_index = -1
+                next_disabled = current_index == -1
+                if st.button(
+                    "Next Question",
+                    disabled=next_disabled,
+                    use_container_width=True,
+                    key="student_next_question_btn",
+                ):
+                    next_index = (current_index + 1) % len(question_sequence)
+                    next_id = question_sequence[next_index]
+                    next_label = label_by_id.get(next_id)
+                    if next_label:
+                        st.session_state[choice_key] = next_label
+                        st.session_state["selected_qid"] = None
+                        st.rerun()
             st.caption(f"Max Marks: {max_marks}")
 
             st.write("")
