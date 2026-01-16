@@ -528,12 +528,10 @@ def render_teacher_page(nav_label: str, helpers: dict):
                     with c5:
                         marks = st.number_input("Marks", min_value=1, max_value=12, value=3, step=1, key="gen_marks")
                     with c6:
-                        question_count = st.number_input(
+                        question_count = st.selectbox(
                             "Questions",
-                            min_value=1,
-                            max_value=5,
-                            value=1,
-                            step=1,
+                            options=[1, 2, 3, 4, 5],
+                            index=0,
                             key="gen_question_count",
                         )
 
@@ -571,6 +569,9 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 data = _run_ai_with_progress(
                                     task_fn=task_generate,
                                     ctx={"teacher": True, "mode": "ai_generator"},
+                                    subtitle=f"Generating question {idx + 1} of {int(question_count)}",
+                                    step_index=idx + 1,
+                                    total_steps=int(question_count),
                                     typical_range="15-35 seconds",
                                     est_seconds=25.0,
                                 )
@@ -838,6 +839,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                     data = _run_ai_with_progress(
                                         task_fn=task_generate,
                                         ctx={"teacher": True, "mode": "topic_journey"},
+                                        subtitle="Generating the topic journey steps",
                                         typical_range="15-35 seconds",
                                         est_seconds=25.0,
                                     )
