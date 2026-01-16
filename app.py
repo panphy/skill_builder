@@ -28,7 +28,7 @@ from typing import Tuple, Optional, Dict, Any, List
 import secrets as pysecrets
 
 from ai_generation import AI_READY, MODEL_NAME, client, _render_template
-from config import FEEDBACK_SYSTEM_TPL, SUBJECT_SITE
+from config import FEEDBACK_SYSTEM_TPL, SUBJECT_SITE, _safe_secret
 from db import db_ready, get_db_driver_type, get_db_engine, insert_question_bank_row
 from image_utils import _compress_bytes_to_limit, _encode_image_bytes, validate_image_file
 from ui_student import render_student_page
@@ -637,8 +637,8 @@ def _check_rate_limit_db(student_id: str) -> Tuple[bool, int, str]:
 # =========================
 @st.cache_resource
 def get_supabase_client():
-    url = (st.secrets.get("SUPABASE_URL", "") or "").strip()
-    key = (st.secrets.get("SUPABASE_SERVICE_ROLE_KEY", "") or "").strip()
+    url = (_safe_secret("SUPABASE_URL", "") or "").strip()
+    key = (_safe_secret("SUPABASE_SERVICE_ROLE_KEY", "") or "").strip()
     if not url or not key:
         return None
     try:
@@ -1216,7 +1216,7 @@ def load_attempts_df_cached(_fp: str, subject_site: str, limit: int = 5000) -> p
 
 
 def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
-    fp = (st.secrets.get("DATABASE_URL", "") or "")[:40]
+    fp = (_safe_secret("DATABASE_URL", "") or "")[:40]
     subject_site = (SUBJECT_SITE or "").strip().lower()
     try:
         return load_attempts_df_cached(fp, subject_site=subject_site, limit=limit)

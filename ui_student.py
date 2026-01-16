@@ -13,6 +13,7 @@ from config import (
     get_topic_group_names_for_track,
     get_topic_names_for_track,
     SUBJECT_SITE,
+    _safe_secret,
 )
 from db import load_question_bank_df, load_question_by_id
 
@@ -217,7 +218,7 @@ def render_student_page(helpers: dict):
 
                                 q_path = (st.session_state.get("cached_q_path") or "").strip()
                                 if q_path:
-                                    fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
+                                    fp = (_safe_secret("SUPABASE_URL", "") or "")[:40]
                                     q_bytes = cached_download_from_storage(q_path, fp)
                                     st.session_state["cached_question_img"] = safe_bytes_to_pil(q_bytes)
                                 else:
@@ -373,7 +374,7 @@ def render_student_page(helpers: dict):
                                 ms_path = (st.session_state.get("cached_ms_path") or q_row.get("markscheme_image_path") or "").strip()
                                 ms_img = None
                                 if ms_path:
-                                    fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
+                                    fp = (_safe_secret("SUPABASE_URL", "") or "")[:40]
                                     ms_bytes = cached_download_from_storage(ms_path, fp)
                                     ms_img = bytes_to_pil(ms_bytes) if ms_bytes else None
                                 return get_gpt_feedback_from_bank(

@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import create_engine, text
 
-from config import SUBJECT_SITE
+from config import SUBJECT_SITE, _safe_secret
 
 LOGGER = logging.getLogger("panphy")
 
@@ -49,7 +49,7 @@ def _cached_engine(url: str):
 
 
 def get_db_engine():
-    raw_url = st.secrets.get("DATABASE_URL", "")
+    raw_url = _safe_secret("DATABASE_URL", "") or ""
     url = _normalize_db_url(raw_url)
     if not url:
         return None
@@ -202,7 +202,7 @@ def _ensure_question_bank_table_cached(_fp: str) -> None:
 def ensure_question_bank_table():
     if st.session_state.get("bank_table_ready", False):
         return
-    fp = (st.secrets.get("DATABASE_URL", "") or "")[:40]
+    fp = (_safe_secret("DATABASE_URL", "") or "")[:40]
     try:
         _ensure_question_bank_table_cached(fp)
         st.session_state["bank_table_ready"] = True
@@ -256,7 +256,7 @@ def load_question_bank_df_cached(_fp: str, track: str, subject_site: str, limit:
 
 
 def load_question_bank_df(limit: int = 5000, include_inactive: bool = False) -> pd.DataFrame:
-    fp = (st.secrets.get("DATABASE_URL", "") or "")[:40]
+    fp = (_safe_secret("DATABASE_URL", "") or "")[:40]
     try:
         return load_question_bank_df_cached(fp, track=st.session_state.get('track','combined'), subject_site=SUBJECT_SITE, limit=limit, include_inactive=include_inactive)
     except Exception as e:
@@ -281,7 +281,7 @@ def load_question_by_id_cached(_fp: str, qid: int) -> Dict[str, Any]:
 
 
 def load_question_by_id(qid: int) -> Dict[str, Any]:
-    fp = (st.secrets.get("DATABASE_URL", "") or "")[:40]
+    fp = (_safe_secret("DATABASE_URL", "") or "")[:40]
     try:
         return load_question_by_id_cached(fp, int(qid))
     except Exception as e:

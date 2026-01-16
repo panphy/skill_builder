@@ -12,6 +12,7 @@ from config import (
     QUESTION_TYPES,
     SKILLS,
     SUBJECT_SITE,
+    _safe_secret,
     get_topic_group_for_name,
     get_topic_group_names_for_track,
     get_sub_topic_names_for_group,
@@ -97,7 +98,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
         st.divider()
         st.subheader("🔒 Teacher Dashboard")
 
-        if not (st.secrets.get("DATABASE_URL", "") or "").strip():
+        if not (_safe_secret("DATABASE_URL", "") or "").strip():
             st.info("Database not configured in secrets.")
         elif not db_ready():
             st.error("Database Connection Failed. Check drivers and URL.")
@@ -107,7 +108,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                 st.caption(st.session_state["db_last_error"])
         else:
             teacher_pw = st.text_input("Teacher password", type="password", key="pw_teacher_dash")
-            if teacher_pw and teacher_pw == st.secrets.get("TEACHER_PASSWORD", ""):
+            if teacher_pw and teacher_pw == (_safe_secret("TEACHER_PASSWORD", "") or ""):
                 st.session_state["is_teacher"] = True
                 ensure_attempts_table()
 
@@ -250,7 +251,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
         st.caption("Also ensure the Python package 'supabase' is installed.")
     else:
         teacher_pw2 = st.text_input("Teacher password (to manage question bank)", type="password", key="pw_bank")
-        if not (teacher_pw2 and teacher_pw2 == st.secrets.get("TEACHER_PASSWORD", "")):
+        if not (teacher_pw2 and teacher_pw2 == (_safe_secret("TEACHER_PASSWORD", "") or "")):
             st.caption("Enter the teacher password to generate/upload/manage questions.")
         else:
             st.session_state["is_teacher"] = True
