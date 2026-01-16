@@ -664,6 +664,24 @@ def generate_topic_journey_with_ai(
     extra_instructions = (extra_instructions or "").strip()
     if ATOMS_ISOTOPES_SUB_TOPIC.lower() in topic_plain_english.lower():
         extra_instructions = _append_instruction(extra_instructions, ATOMS_ISOTOPES_PHYSICS_ONLY)
+    def _coerce_int(value: Any, default: int) -> int:
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return default
+        if isinstance(value, (int, float)):
+            return int(value)
+        s = str(value).strip()
+        if not s:
+            return default
+        m = re.search(r"-?\d+", s)
+        if not m:
+            return default
+        try:
+            return int(m.group(0))
+        except Exception:
+            return default
+
     def _validate(d: Dict[str, Any]) -> Tuple[bool, List[str]]:
         reasons: List[str] = []
         if not isinstance(d, dict):
@@ -755,6 +773,8 @@ def generate_topic_journey_with_ai(
         return safe_parse_json(raw) or {}
 
     data = _call_model(repair=False)
+    if not isinstance(data, dict):
+        data = {}
     ok, reasons = _validate(data)
     steps_for_check = data.get("steps", []) if isinstance(data, dict) else []
     if isinstance(steps_for_check, list):
@@ -796,10 +816,10 @@ def generate_topic_journey_with_ai(
                 if ok3:
                     data = data3
                 else:
-                    data = data3 if isinstance(data3, dict) and data3 else data2
+                    data = data3 if isinstance(data3, dict) and data3 else (data2 if isinstance(data2, dict) else {})
                     data["warnings"] = reasons3[:12]
             else:
-                data = data2 if isinstance(data2, dict) and data2 else data
+                data = data2 if isinstance(data2, dict) and data2 else (data if isinstance(data, dict) else {})
                 data["warnings"] = reasons2[:12]
 
     # Final clean-up / normalization (display-time normalization will still run)
@@ -821,7 +841,10 @@ def generate_topic_journey_with_ai(
 
     data["steps"] = steps
     data["topic"] = (data.get("topic") or topic_plain_english).strip()
-    data["checkpoint_every"] = int(data.get("checkpoint_every", JOURNEY_CHECKPOINT_EVERY) or JOURNEY_CHECKPOINT_EVERY)
+    data["checkpoint_every"] = _coerce_int(
+        data.get("checkpoint_every", JOURNEY_CHECKPOINT_EVERY),
+        JOURNEY_CHECKPOINT_EVERY,
+    )
     if data["checkpoint_every"] <= 0:
         data["checkpoint_every"] = JOURNEY_CHECKPOINT_EVERY
 
