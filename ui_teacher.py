@@ -695,18 +695,14 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                     key=f"draft_difficulty_{draft_id}",
                                 )
 
-                            q_text = st.text_area(
-                                "Question text",
-                                value=draft.get("question_text", ""),
-                                height=200,
-                                key=f"draft_q_{draft_id}",
-                            )
-                            ms_text = st.text_area(
-                                "Mark scheme",
-                                value=draft.get("markscheme_text", ""),
-                                height=240,
-                                key=f"draft_ms_{draft_id}",
-                            )
+                            q_key = f"draft_q_{draft_id}"
+                            ms_key = f"draft_ms_{draft_id}"
+                            if q_key not in st.session_state:
+                                st.session_state[q_key] = draft.get("question_text", "")
+                            if ms_key not in st.session_state:
+                                st.session_state[ms_key] = draft.get("markscheme_text", "")
+                            q_text = st.session_state.get(q_key, "")
+                            ms_text = st.session_state.get(ms_key, "")
                             max_marks = st.number_input(
                                 "Max marks",
                                 min_value=1,
@@ -718,6 +714,44 @@ def render_teacher_page(nav_label: str, helpers: dict):
 
                             render_md_box("Preview: Question", q_text, empty_text="No question text.")
                             render_md_box("Preview: Mark scheme", ms_text, empty_text="No mark scheme.")
+
+                            edit_q_key = f"draft_edit_q_{draft_id}"
+                            edit_ms_key = f"draft_edit_ms_{draft_id}"
+                            if edit_q_key not in st.session_state:
+                                st.session_state[edit_q_key] = False
+                            if edit_ms_key not in st.session_state:
+                                st.session_state[edit_ms_key] = False
+
+                            ec1, ec2 = st.columns(2)
+                            with ec1:
+                                if st.button(
+                                    "Edit question",
+                                    key=f"{edit_q_key}_btn",
+                                    width='stretch',
+                                ):
+                                    st.session_state[edit_q_key] = not st.session_state.get(edit_q_key, False)
+                            with ec2:
+                                if st.button(
+                                    "Edit mark scheme",
+                                    key=f"{edit_ms_key}_btn",
+                                    width='stretch',
+                                ):
+                                    st.session_state[edit_ms_key] = not st.session_state.get(edit_ms_key, False)
+
+                            if st.session_state.get(edit_q_key):
+                                st.text_area(
+                                    "Question text",
+                                    value=st.session_state.get(q_key, ""),
+                                    height=200,
+                                    key=q_key,
+                                )
+                            if st.session_state.get(edit_ms_key):
+                                st.text_area(
+                                    "Mark scheme",
+                                    value=st.session_state.get(ms_key, ""),
+                                    height=240,
+                                    key=ms_key,
+                                )
 
                             if save_clicked:
                                 if not assignment_name.strip() or not question_label.strip():
@@ -966,12 +1000,56 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 with st.expander(f"Step {i+1}: {stp.get('objective','')[:80]}", expanded=(i == 0)):
                                     obj = st.text_input("Objective", value=str(stp.get("objective", "") or ""), key=f"jour_step_obj_{i}")
                                     mm = st.number_input("Max marks", min_value=1, max_value=12, value=int(stp.get("max_marks", 1) or 1), step=1, key=f"jour_step_mm_{i}")
-                                    qtxt = st.text_area("Question text (Markdown + LaTeX)", value=str(stp.get("question_text", "") or ""), height=160, key=f"jour_step_q_{i}")
-                                    mstxt = st.text_area("Mark scheme (ends with TOTAL = <max_marks>)", value=str(stp.get("markscheme_text", "") or ""), height=200, key=f"jour_step_ms_{i}")
+                                    q_key = f"jour_step_q_{i}"
+                                    ms_key = f"jour_step_ms_{i}"
+                                    if q_key not in st.session_state:
+                                        st.session_state[q_key] = str(stp.get("question_text", "") or "")
+                                    if ms_key not in st.session_state:
+                                        st.session_state[ms_key] = str(stp.get("markscheme_text", "") or "")
+                                    qtxt = st.session_state.get(q_key, "")
+                                    mstxt = st.session_state.get(ms_key, "")
                                     miscon = st.text_area("Common misconceptions (one per line)", value="\n".join([str(x) for x in (stp.get("misconceptions", []) or [])]), height=90, key=f"jour_step_mis_{i}")
 
                                     render_md_box("Preview: Question", qtxt, empty_text="No question text.")
                                     render_md_box("Preview: Mark scheme", mstxt, empty_text="No mark scheme.")
+
+                                    edit_q_key = f"jour_step_edit_q_{i}"
+                                    edit_ms_key = f"jour_step_edit_ms_{i}"
+                                    if edit_q_key not in st.session_state:
+                                        st.session_state[edit_q_key] = False
+                                    if edit_ms_key not in st.session_state:
+                                        st.session_state[edit_ms_key] = False
+
+                                    ec1, ec2 = st.columns(2)
+                                    with ec1:
+                                        if st.button(
+                                            "Edit question",
+                                            key=f"{edit_q_key}_btn",
+                                            width='stretch',
+                                        ):
+                                            st.session_state[edit_q_key] = not st.session_state.get(edit_q_key, False)
+                                    with ec2:
+                                        if st.button(
+                                            "Edit mark scheme",
+                                            key=f"{edit_ms_key}_btn",
+                                            width='stretch',
+                                        ):
+                                            st.session_state[edit_ms_key] = not st.session_state.get(edit_ms_key, False)
+
+                                    if st.session_state.get(edit_q_key):
+                                        st.text_area(
+                                            "Question text (Markdown + LaTeX)",
+                                            value=st.session_state.get(q_key, ""),
+                                            height=160,
+                                            key=q_key,
+                                        )
+                                    if st.session_state.get(edit_ms_key):
+                                        st.text_area(
+                                            "Mark scheme (ends with TOTAL = <max_marks>)",
+                                            value=st.session_state.get(ms_key, ""),
+                                            height=200,
+                                            key=ms_key,
+                                        )
 
                                     total_marks += int(mm)
                                     edited_steps.append({
