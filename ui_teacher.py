@@ -12,6 +12,7 @@ from config import (
     QUESTION_TYPES,
     SKILLS,
     SUBJECT_SITE,
+    _safe_secret,
     get_topic_group_for_name,
     get_topic_group_names_for_track,
     get_sub_topic_names_for_group,
@@ -97,7 +98,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
         st.divider()
         st.subheader("🔒 Teacher Dashboard")
 
-        if not (st.secrets.get("DATABASE_URL", "") or "").strip():
+        if not (_safe_secret("DATABASE_URL", "") or "").strip():
             st.info("Database not configured in secrets.")
         elif not db_ready():
             st.error("Database Connection Failed. Check drivers and URL.")
@@ -107,7 +108,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                 st.caption(st.session_state["db_last_error"])
         else:
             teacher_pw = st.text_input("Teacher password", type="password", key="pw_teacher_dash")
-            if teacher_pw and teacher_pw == st.secrets.get("TEACHER_PASSWORD", ""):
+            if teacher_pw and teacher_pw == (_safe_secret("TEACHER_PASSWORD", "") or ""):
                 st.session_state["is_teacher"] = True
                 ensure_attempts_table()
 
@@ -250,7 +251,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
         st.caption("Also ensure the Python package 'supabase' is installed.")
     else:
         teacher_pw2 = st.text_input("Teacher password (to manage question bank)", type="password", key="pw_bank")
-        if not (teacher_pw2 and teacher_pw2 == st.secrets.get("TEACHER_PASSWORD", "")):
+        if not (teacher_pw2 and teacher_pw2 == (_safe_secret("TEACHER_PASSWORD", "") or "")):
             st.caption("Enter the teacher password to generate/upload/manage questions.")
         else:
             st.session_state["is_teacher"] = True
@@ -428,7 +429,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 st.markdown("**Question**")
                                 with st.container(border=True):
                                     if q_img is not None:
-                                        st.image(q_img, width='stretch')
+                                        st.image(q_img, use_container_width=True)
                                     if q_text:
                                         st.markdown(normalize_markdown_math(q_text))
                                     if (q_img is None) and (not q_text):
@@ -438,7 +439,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 st.markdown("**Mark scheme (teacher only)**")
                                 with st.container(border=True):
                                     if ms_img is not None:
-                                        st.image(ms_img, width='stretch')
+                                        st.image(ms_img, use_container_width=True)
                                     if ms_text:
                                         st.markdown(normalize_markdown_math(ms_text))
                                     if (ms_img is None) and (not ms_text):
@@ -466,7 +467,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             if st.button(
                                 "Delete selected entries",
                                 type="primary",
-                                width='stretch',
+                                use_container_width=True,
                                 disabled=not (confirm_delete_q and delete_picks),
                                 key="delete_bank_btn",
                             ):
@@ -544,9 +545,15 @@ def render_teacher_page(nav_label: str, helpers: dict):
 
                     col_gen1, col_gen2 = st.columns([1, 1])
                     with col_gen1:
-                        gen_clicked = st.button("Generate draft", type="primary", width='stretch', disabled=not AI_READY, key="gen_btn")
+                        gen_clicked = st.button(
+                            "Generate draft",
+                            type="primary",
+                            use_container_width=True,
+                            disabled=not AI_READY,
+                            key="gen_btn",
+                        )
                     with col_gen2:
-                        if st.button("Clear draft", width='stretch', key="gen_clear_btn"):
+                        if st.button("Clear draft", use_container_width=True, key="gen_clear_btn"):
                             st.session_state["draft_questions"] = []
                             st.session_state["draft_warning"] = None
                             st.rerun()
@@ -636,7 +643,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 save_clicked = st.button(
                                     "Save to Question Bank",
                                     type="primary",
-                                    width='stretch',
+                                    use_container_width=True,
                                     key=f"draft_save_btn_{draft_id}",
                                 )
 
@@ -727,14 +734,14 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 if st.button(
                                     "Edit question",
                                     key=f"{edit_q_key}_btn",
-                                    width='stretch',
+                                    use_container_width=True,
                                 ):
                                     st.session_state[edit_q_key] = not st.session_state.get(edit_q_key, False)
                             with ec2:
                                 if st.button(
                                     "Edit mark scheme",
                                     key=f"{edit_ms_key}_btn",
-                                    width='stretch',
+                                    use_container_width=True,
                                 ):
                                     st.session_state[edit_ms_key] = not st.session_state.get(edit_ms_key, False)
 
@@ -840,12 +847,12 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         gen_j = st.button(
                             "Generate journey draft",
                             type="primary",
-                            width='stretch',
+                            use_container_width=True,
                             disabled=not AI_READY,
                             key="jour_gen_btn",
                         )
 
-                        if st.button("Clear journey draft", width='stretch', key="jour_clear_btn"):
+                        if st.button("Clear journey draft", use_container_width=True, key="jour_clear_btn"):
                             st.session_state["journey_draft"] = None
                             st.session_state["journey_gen_error_details"] = None
                             st.session_state["journey_show_error"] = False
@@ -914,7 +921,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
 
                         # Optional: reveal raw error details if the user wants them
                         if st.session_state.get("journey_gen_error_details"):
-                            if st.button("Explain error", key="jour_explain_error", width='stretch'):
+                            if st.button("Explain error", key="jour_explain_error", use_container_width=True):
                                 st.session_state["journey_show_error"] = True
 
                         if st.session_state.get("journey_show_error") and st.session_state.get("journey_gen_error_details"):
@@ -936,7 +943,12 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             d_tags_str = st.text_input("Tags (comma separated)", value=", ".join(d.get("tags", [])), key="jour_draft_tags")
 
                         with hd2:
-                            save_j = st.button("Save Topic Journey to bank", type="primary", width='stretch', key="jour_save_btn")
+                            save_j = st.button(
+                                "Save Topic Journey to bank",
+                                type="primary",
+                                use_container_width=True,
+                                key="jour_save_btn",
+                            )
                             st.caption("Saved as a single Question Bank entry (type=journey).")
 
                         topic_options = get_topic_group_names_for_track(track)
@@ -1025,14 +1037,14 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                         if st.button(
                                             "Edit question",
                                             key=f"{edit_q_key}_btn",
-                                            width='stretch',
+                                            use_container_width=True,
                                         ):
                                             st.session_state[edit_q_key] = not st.session_state.get(edit_q_key, False)
                                     with ec2:
                                         if st.button(
                                             "Edit mark scheme",
                                             key=f"{edit_ms_key}_btn",
-                                            width='stretch',
+                                            use_container_width=True,
                                         ):
                                             st.session_state[edit_ms_key] = not st.session_state.get(edit_ms_key, False)
 

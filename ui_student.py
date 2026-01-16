@@ -13,6 +13,7 @@ from config import (
     get_topic_group_names_for_track,
     get_topic_names_for_track,
     SUBJECT_SITE,
+    _safe_secret,
 )
 from db import load_question_bank_df, load_question_by_id
 
@@ -217,7 +218,7 @@ def render_student_page(helpers: dict):
 
                                 q_path = (st.session_state.get("cached_q_path") or "").strip()
                                 if q_path:
-                                    fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
+                                    fp = (_safe_secret("SUPABASE_URL", "") or "")[:40]
                                     q_bytes = cached_download_from_storage(q_path, fp)
                                     st.session_state["cached_question_img"] = safe_bytes_to_pil(q_bytes)
                                 else:
@@ -300,7 +301,7 @@ def render_student_page(helpers: dict):
 
             with st.container(border=True):
                 if question_img is not None:
-                    st.image(question_img, caption="Question image", width='stretch')
+                    st.image(question_img, caption="Question image", use_container_width=True)
                 if q_text:
                     st.markdown(normalize_markdown_math(q_text))
                 if (question_img is None) and (not q_text):
@@ -373,7 +374,7 @@ def render_student_page(helpers: dict):
                                 ms_path = (st.session_state.get("cached_ms_path") or q_row.get("markscheme_image_path") or "").strip()
                                 ms_img = None
                                 if ms_path:
-                                    fp = (st.secrets.get("SUPABASE_URL", "") or "")[:40]
+                                    fp = (_safe_secret("SUPABASE_URL", "") or "")[:40]
                                     ms_bytes = cached_download_from_storage(ms_path, fp)
                                     ms_img = bytes_to_pil(ms_bytes) if ms_bytes else None
                                 return get_gpt_feedback_from_bank(
@@ -1003,6 +1004,6 @@ def render_student_page(helpers: dict):
                         st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
                         st.session_state["student_answer_text_single"] = ""
 
-                    st.button("Start New Attempt", width='stretch', key="new_attempt", on_click=_new_attempt_cb)
+                    st.button("Start New Attempt", use_container_width=True, key="new_attempt", on_click=_new_attempt_cb)
             else:
                 st.info("Submit an answer to receive feedback.")

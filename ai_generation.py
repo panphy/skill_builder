@@ -19,6 +19,7 @@ from config import (
     DIFFICULTIES,
     SKILLS,
     SUBJECT_EQUATIONS,
+    _safe_secret,
     get_topic_group_for_name,
     get_topic_group_names_for_track,
     get_sub_topic_names_for_group,
@@ -49,7 +50,10 @@ def _append_instruction(extra_instructions: str, instruction: str) -> str:
 
 @st.cache_resource
 def get_client():
-    return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    api_key = _safe_secret("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY missing")
+    return OpenAI(api_key=api_key)
 
 
 client: Optional[OpenAI] = None
