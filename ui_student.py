@@ -300,7 +300,7 @@ def render_student_page(helpers: dict):
 
             with st.container(border=True):
                 if question_img is not None:
-                    st.image(question_img, caption="Question image", width='stretch')
+                    st.image(question_img, caption="Question image", use_container_width=True)
                 if q_text:
                     st.markdown(normalize_markdown_math(q_text))
                 if (question_img is None) and (not q_text):
@@ -1003,6 +1003,6 @@ def render_student_page(helpers: dict):
                         st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
                         st.session_state["student_answer_text_single"] = ""
 
-                    st.button("Start New Attempt", width='stretch', key="new_attempt", on_click=_new_attempt_cb)
+                    st.button("Start New Attempt", use_container_width=True, key="new_attempt", on_click=_new_attempt_cb)
             else:
                 st.info("Submit an answer to receive feedback.")
