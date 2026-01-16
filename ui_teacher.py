@@ -503,8 +503,8 @@ def render_teacher_page(nav_label: str, helpers: dict):
                 st.write("## 🤖 AI generation")
                 st.caption("Generate and review before saving to the bank.")
 
-                with st.expander("Generate Single Question", expanded=False):
-                    c1, c2, c3, c4, c5 = st.columns([3, 3, 2, 2, 1])
+                with st.expander("Generate Questions", expanded=False):
+                    c1, c2, c3, c4, c5, c6 = st.columns([3, 3, 2, 2, 1, 1])
 
                     with c1:
                         topic = st.selectbox(
@@ -527,6 +527,15 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         difficulty = st.selectbox("Difficulty", DIFFICULTIES, key="gen_difficulty")
                     with c5:
                         marks = st.number_input("Marks", min_value=1, max_value=12, value=3, step=1, key="gen_marks")
+                    with c6:
+                        question_count = st.number_input(
+                            "Questions",
+                            min_value=1,
+                            max_value=5,
+                            value=1,
+                            step=1,
+                            key="gen_question_count",
+                        )
 
                     extra = st.text_area(
                         "Optional extra instructions (for the AI)",
@@ -540,7 +549,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         gen_clicked = st.button("Generate draft", type="primary", width='stretch', disabled=not AI_READY, key="gen_btn")
                     with col_gen2:
                         if st.button("Clear draft", width='stretch', key="gen_clear_btn"):
-                            st.session_state["draft_question"] = None
+                            st.session_state["draft_questions"] = []
                             st.session_state["draft_warning"] = None
                             st.rerun()
 
@@ -555,158 +564,201 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 extra_instructions=extra,
                             )
 
-                        try:
-                            data = _run_ai_with_progress(
-                                task_fn=task_generate,
-                                ctx={"teacher": True, "mode": "ai_generator"},
-                                typical_range="15-35 seconds",
-                                est_seconds=25.0,
-                            )
+                        drafts = []
+                        draft_error = None
+                        for idx in range(int(question_count)):
+                            try:
+                                data = _run_ai_with_progress(
+                                    task_fn=task_generate,
+                                    ctx={"teacher": True, "mode": "ai_generator"},
+                                    typical_range="15-35 seconds",
+                                    est_seconds=25.0,
+                                )
 
-                            if data is None:
-                                raise ValueError("AI returned no usable question payload.")
+                                if data is None:
+                                    raise ValueError("AI returned no usable question payload.")
 
-                            draft = {
-                                "topic": data.get("topic", topic),
-                                "sub_topic": data.get("sub_topic") or sub_topic,
-                                "skill": data.get("skill"),
-                                "difficulty": data.get("difficulty", difficulty),
-                                "question_type": "single",
-                                "question_text": data.get("question_text", ""),
-                                "markscheme_text": data.get("markscheme_text", ""),
-                                "max_marks": data.get("max_marks", int(marks)),
-                                "tags": data.get("tags", []),
-                                "warnings": data.get("warnings", []),
-                            }
+                                draft = {
+                                    "id": pysecrets.token_hex(3),
+                                    "topic": data.get("topic", topic),
+                                    "sub_topic": data.get("sub_topic") or sub_topic,
+                                    "skill": data.get("skill"),
+                                    "difficulty": data.get("difficulty", difficulty),
+                                    "question_type": "single",
+                                    "question_text": data.get("question_text", ""),
+                                    "markscheme_text": data.get("markscheme_text", ""),
+                                    "max_marks": data.get("max_marks", int(marks)),
+                                    "tags": data.get("tags", []),
+                                    "warnings": data.get("warnings", []),
+                                }
 
-                            st.session_state["draft_question"] = draft
-                            st.session_state["draft_warning"] = None
-                        except Exception as e:
-                            st.session_state["draft_question"] = None
-                            st.session_state["draft_warning"] = str(e)
+                                drafts.append(draft)
+                            except Exception as e:
+                                draft_error = f"Question {idx + 1}: {e}"
+                                break
 
-                    draft = st.session_state.get("draft_question")
+                        st.session_state["draft_questions"] = drafts
+                        st.session_state["draft_warning"] = draft_error
+
+                    drafts = st.session_state.get("draft_questions", [])
                     if st.session_state.get("draft_warning"):
                         st.error(f"AI generation failed: {st.session_state['draft_warning']}")
 
-                    if draft:
-                        if draft.get("warnings"):
-                            st.warning("Draft warnings:\n\n" + "\n".join([f"- {w}" for w in draft.get("warnings", [])]))
-
-                        st.write("### ✅ Vet and edit")
-                        c1, c2 = st.columns([3, 1])
-                        with c1:
-                            assignment_name = st.text_input("Assignment name", value="AI Practice", key="draft_assignment")
-                            question_label = st.text_input("Question label", value=f"{slugify(topic)[:24]}-{pysecrets.token_hex(3)}", key="draft_label")
-                            tags_str = st.text_input("Tags (comma separated)", value=", ".join(draft.get("tags", [])), key="draft_tags")
-                        with c2:
-                            save_clicked = st.button("Save to Question Bank", type="primary", width='stretch', key="draft_save_btn")
-
-                        topic_options = get_topic_group_names_for_track(track)
-                        skill_options = list(SKILLS)
-                        difficulty_options = list(DIFFICULTIES)
-
-                        tc1, tc2 = st.columns(2)
-                        with tc1:
-                            topic_val = st.selectbox(
-                                "Topic group",
-                                topic_options,
-                                index=_index_for(topic_options, draft.get("topic")),
-                                key="draft_topic",
-                            )
-                            skill_val = st.selectbox(
-                                "Skill",
-                                skill_options,
-                                index=_index_for(skill_options, draft.get("skill")),
-                                key="draft_skill",
-                            )
-                        with tc2:
-                            sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_val))
-                            sub_topic_seed = draft.get("sub_topic")
-                            if sub_topic_seed not in sub_topic_options and sub_topic_options:
-                                matching = next(
-                                    (
-                                        option
-                                        for option in sub_topic_options
-                                        if _clean_sub_topic_label(option).lower() == str(sub_topic_seed or "").strip().lower()
-                                    ),
-                                    None,
+                    if drafts:
+                        total_drafts = len(drafts)
+                        for idx, draft in enumerate(drafts, start=1):
+                            draft_id = draft.get("id", str(idx))
+                            if draft.get("warnings"):
+                                st.warning(
+                                    "Draft warnings:\n\n" + "\n".join([f"- {w}" for w in draft.get("warnings", [])])
                                 )
-                                if matching:
-                                    sub_topic_seed = matching
-                                else:
-                                    sub_topic_seed = sub_topic_options[0]
+
+                            st.write(f"### ✅ Vet and edit (Draft {idx} of {total_drafts})")
+                            c1, c2 = st.columns([3, 1])
+                            with c1:
+                                assignment_name = st.text_input(
+                                    "Assignment name",
+                                    value="AI Practice",
+                                    key=f"draft_assignment_{draft_id}",
+                                )
+                                question_label = st.text_input(
+                                    "Question label",
+                                    value=f"{slugify(topic)[:24]}-{draft_id}",
+                                    key=f"draft_label_{draft_id}",
+                                )
+                                tags_str = st.text_input(
+                                    "Tags (comma separated)",
+                                    value=", ".join(draft.get("tags", [])),
+                                    key=f"draft_tags_{draft_id}",
+                                )
+                            with c2:
+                                save_clicked = st.button(
+                                    "Save to Question Bank",
+                                    type="primary",
+                                    width='stretch',
+                                    key=f"draft_save_btn_{draft_id}",
+                                )
+
+                            topic_options = get_topic_group_names_for_track(track)
+                            skill_options = list(SKILLS)
+                            difficulty_options = list(DIFFICULTIES)
+
+                            tc1, tc2 = st.columns(2)
+                            with tc1:
+                                topic_val = st.selectbox(
+                                    "Topic group",
+                                    topic_options,
+                                    index=_index_for(topic_options, draft.get("topic")),
+                                    key=f"draft_topic_{draft_id}",
+                                )
+                                skill_val = st.selectbox(
+                                    "Skill",
+                                    skill_options,
+                                    index=_index_for(skill_options, draft.get("skill")),
+                                    key=f"draft_skill_{draft_id}",
+                                )
+                            with tc2:
+                                sub_topic_options = _sorted_sub_topic_options(
+                                    get_sub_topic_names_for_group(track, topic_val)
+                                )
+                                sub_topic_seed = draft.get("sub_topic")
+                                if sub_topic_seed not in sub_topic_options and sub_topic_options:
+                                    matching = next(
+                                        (
+                                            option
+                                            for option in sub_topic_options
+                                            if _clean_sub_topic_label(option).lower()
+                                            == str(sub_topic_seed or "").strip().lower()
+                                        ),
+                                        None,
+                                    )
+                                    if matching:
+                                        sub_topic_seed = matching
+                                    else:
+                                        sub_topic_seed = sub_topic_options[0]
+                                        draft["sub_topic"] = sub_topic_seed
+                                elif sub_topic_seed not in sub_topic_options and not sub_topic_options:
+                                    sub_topic_seed = ""
                                     draft["sub_topic"] = sub_topic_seed
-                            elif sub_topic_seed not in sub_topic_options and not sub_topic_options:
-                                sub_topic_seed = ""
-                                draft["sub_topic"] = sub_topic_seed
-                            sub_topic_val = st.selectbox(
-                                "Topic",
-                                sub_topic_options,
-                                index=_index_for(sub_topic_options, sub_topic_seed),
-                                key="draft_sub_topic",
-                                format_func=_clean_sub_topic_label,
-                            )
-                            difficulty_val = st.selectbox(
-                                "Difficulty",
-                                difficulty_options,
-                                index=_index_for(difficulty_options, draft.get("difficulty")),
-                                key="draft_difficulty",
-                            )
-
-                        q_text = st.text_area("Question text", value=draft.get("question_text", ""), height=200, key="draft_q")
-                        ms_text = st.text_area("Mark scheme", value=draft.get("markscheme_text", ""), height=240, key="draft_ms")
-                        max_marks = st.number_input(
-                            "Max marks",
-                            min_value=1,
-                            max_value=12,
-                            value=int(draft.get("max_marks", 4) or 4),
-                            step=1,
-                            key="draft_mm",
-                        )
-
-                        render_md_box("Preview: Question", q_text, empty_text="No question text.")
-                        render_md_box("Preview: Mark scheme", ms_text, empty_text="No mark scheme.")
-
-                        if save_clicked:
-                            if not assignment_name.strip() or not question_label.strip():
-                                st.error("Assignment name and question label are required.")
-                            elif not _validate_classification_inputs(
-                                topic_val,
-                                sub_topic_val,
-                                skill_val,
-                                difficulty_val,
-                                topic_options,
-                                sub_topic_options,
-                                skill_options,
-                                difficulty_options,
-                            ):
-                                pass
-                            else:
-                                tags = [t.strip() for t in (tags_str or "").split(",") if t.strip()]
-                                ok = insert_question_bank_row(
-                                    source="ai_generated",
-                                    created_by="teacher",
-                                    subject_site=SUBJECT_SITE,
-                                    track_ok=st.session_state.get("teacher_track_ok", "both"),
-                                    assignment_name=assignment_name.strip(),
-                                    question_label=question_label.strip(),
-                                    max_marks=int(max_marks),
-                                    tags=tags,
-                                    topic=topic_val,
-                                    sub_topic=_clean_sub_topic_label(sub_topic_val),
-                                    sub_topic_raw=sub_topic_val,
-                                    skill=skill_val,
-                                    difficulty=difficulty_val,
-                                    question_text=(q_text or "").strip(),
-                                    markscheme_text=(ms_text or "").strip(),
-                                    question_image_path=None,
-                                    markscheme_image_path=None,
+                                sub_topic_val = st.selectbox(
+                                    "Topic",
+                                    sub_topic_options,
+                                    index=_index_for(sub_topic_options, sub_topic_seed),
+                                    key=f"draft_sub_topic_{draft_id}",
+                                    format_func=_clean_sub_topic_label,
                                 )
-                                if ok:
-                                    st.success("Approved and saved. Students can now access this under AI Practice.")
+                                difficulty_val = st.selectbox(
+                                    "Difficulty",
+                                    difficulty_options,
+                                    index=_index_for(difficulty_options, draft.get("difficulty")),
+                                    key=f"draft_difficulty_{draft_id}",
+                                )
+
+                            q_text = st.text_area(
+                                "Question text",
+                                value=draft.get("question_text", ""),
+                                height=200,
+                                key=f"draft_q_{draft_id}",
+                            )
+                            ms_text = st.text_area(
+                                "Mark scheme",
+                                value=draft.get("markscheme_text", ""),
+                                height=240,
+                                key=f"draft_ms_{draft_id}",
+                            )
+                            max_marks = st.number_input(
+                                "Max marks",
+                                min_value=1,
+                                max_value=12,
+                                value=int(draft.get("max_marks", 3) or 3),
+                                step=1,
+                                key=f"draft_mm_{draft_id}",
+                            )
+
+                            render_md_box("Preview: Question", q_text, empty_text="No question text.")
+                            render_md_box("Preview: Mark scheme", ms_text, empty_text="No mark scheme.")
+
+                            if save_clicked:
+                                if not assignment_name.strip() or not question_label.strip():
+                                    st.error("Assignment name and question label are required.")
+                                elif not _validate_classification_inputs(
+                                    topic_val,
+                                    sub_topic_val,
+                                    skill_val,
+                                    difficulty_val,
+                                    topic_options,
+                                    sub_topic_options,
+                                    skill_options,
+                                    difficulty_options,
+                                ):
+                                    pass
                                 else:
-                                    st.error("Save failed. Check database errors below.")
+                                    tags = [t.strip() for t in (tags_str or "").split(",") if t.strip()]
+                                    ok = insert_question_bank_row(
+                                        source="ai_generated",
+                                        created_by="teacher",
+                                        subject_site=SUBJECT_SITE,
+                                        track_ok=st.session_state.get("teacher_track_ok", "both"),
+                                        assignment_name=assignment_name.strip(),
+                                        question_label=question_label.strip(),
+                                        max_marks=int(max_marks),
+                                        tags=tags,
+                                        topic=topic_val,
+                                        sub_topic=_clean_sub_topic_label(sub_topic_val),
+                                        sub_topic_raw=sub_topic_val,
+                                        skill=skill_val,
+                                        difficulty=difficulty_val,
+                                        question_text=(q_text or "").strip(),
+                                        markscheme_text=(ms_text or "").strip(),
+                                        question_image_path=None,
+                                        markscheme_image_path=None,
+                                    )
+                                    if ok:
+                                        st.success(
+                                            "Approved and saved. Students can now access this under AI Practice."
+                                        )
+                                    else:
+                                        st.error("Save failed. Check database errors below.")
 
                 with st.expander("Generate Topic Journey", expanded=False):
                     st.caption("Create a multi-step journey (fixed at 10 minutes / 5 steps).")
