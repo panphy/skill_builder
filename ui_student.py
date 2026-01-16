@@ -76,6 +76,25 @@ def render_student_page(helpers: dict):
             out.append(value)
         return out
 
+    def _advance_question(
+        choice_key: str | None,
+        question_sequence: list[int],
+        label_by_id: dict[int, str],
+        current_qid: int | None,
+    ) -> None:
+        if not choice_key or not question_sequence or current_qid is None:
+            return
+        try:
+            current_index = question_sequence.index(current_qid)
+        except ValueError:
+            return
+        next_index = (current_index + 1) % len(question_sequence)
+        next_id = question_sequence[next_index]
+        next_label = label_by_id.get(next_id)
+        if next_label:
+            st.session_state[choice_key] = next_label
+            st.session_state["selected_qid"] = None
+
     with st.expander("Question selection", expanded=expand_by_default):
         sel1, sel2 = st.columns([2, 2])
         with sel1:
@@ -320,19 +339,14 @@ def render_student_page(helpers: dict):
                 except ValueError:
                     current_index = -1
                 next_disabled = current_index == -1
-                if st.button(
+                st.button(
                     "Next Question",
                     disabled=next_disabled,
                     use_container_width=True,
                     key="student_next_question_btn",
-                ):
-                    next_index = (current_index + 1) % len(question_sequence)
-                    next_id = question_sequence[next_index]
-                    next_label = label_by_id.get(next_id)
-                    if next_label:
-                        st.session_state[choice_key] = next_label
-                        st.session_state["selected_qid"] = None
-                        st.rerun()
+                    on_click=_advance_question,
+                    args=(choice_key, question_sequence, label_by_id, qid),
+                )
             st.caption(f"Max Marks: {max_marks}")
 
             st.write("")
