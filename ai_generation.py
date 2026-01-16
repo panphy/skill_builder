@@ -529,6 +529,8 @@ def generate_practice_question_with_ai(
                 "MARKS": int(marks),
             })
             user = (user or "").strip() + "\n\n" + base_user
+        if extra_hint:
+            user = user + "\n\nExtra constraints:\n" + extra_hint.strip()
 
 
         response = client.chat.completions.create(
@@ -561,8 +563,32 @@ def generate_practice_question_with_ai(
         if ok2:
             data = data2
         else:
-            data = data2 if isinstance(data2, dict) and data2 else data
-            data["warnings"] = reasons2[:10]
+            needs_retry = any(
+                msg in {
+                    "Missing question_text.",
+                    "Missing markscheme_text.",
+                    "Missing or invalid topic group.",
+                    "Missing or invalid sub_topic.",
+                    "Missing or invalid skill.",
+                    "Missing or invalid difficulty.",
+                }
+                for msg in reasons2
+            )
+            if needs_retry:
+                retry_hint = (
+                    "Return a complete JSON object with non-empty question_text and markscheme_text. "
+                    "Include topic, sub_topic, skill, difficulty, and max_marks fields exactly as requested."
+                )
+                data3 = _call_model(repair=True, reasons=reasons2, extra_hint=retry_hint)
+                ok3, reasons3 = _validate(data3)
+                if ok3:
+                    data = data3
+                else:
+                    data = data3 if isinstance(data3, dict) and data3 else data2
+                    data["warnings"] = reasons3[:10]
+            else:
+                data = data2 if isinstance(data2, dict) and data2 else data
+                data["warnings"] = reasons2[:10]
 
     topic_val = _coerce_vocab(data.get("topic"), topic_options) or (topic_text or "").strip()
     sub_topic_options = get_sub_topic_names_for_group(track, topic_val)

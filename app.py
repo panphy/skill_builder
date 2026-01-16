@@ -949,7 +949,15 @@ def render_md_box(title: str, md_text: str, caption: str = "", empty_text: str =
 # ============================================================
 # PROGRESS INDICATORS
 # ============================================================
-def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: float) -> dict:
+def _run_ai_with_progress(
+    task_fn,
+    ctx: dict,
+    typical_range: str,
+    est_seconds: float,
+    subtitle: str | None = None,
+    step_index: int | None = None,
+    total_steps: int | None = None,
+) -> dict:
     """Run a blocking task while showing a full-page overlay to prevent mid-run interaction.
 
     IMPORTANT: Keep the progress display simple and avoid presenting a precise ETA.
@@ -958,6 +966,11 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
     start_t = time.monotonic()
 
     def _render_overlay(subtitle: str, percent: int):
+        step_label = ""
+        step_percent = 0
+        if total_steps and total_steps > 0 and step_index:
+            step_label = f"Question {step_index} of {total_steps}"
+            step_percent = min(100, max(0, int((step_index / total_steps) * 100)))
         # Render a full-page blocker with a simple percent progress bar.
         overlay.markdown(
             f"""
@@ -1035,6 +1048,27 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
   border-radius: 999px;
   transition: width 0.35s ease;
 }}
+.pp-step {{
+  margin-top: 12px;
+}}
+.pp-step-label {{
+  font-size: 12px;
+  color: rgba(0,0,0,0.72);
+  margin-bottom: 6px;
+}}
+.pp-step-bar {{
+  width: 100%;
+  height: 6px;
+  background: rgba(47,109,246,0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}}
+.pp-step-fill {{
+  height: 100%;
+  background: #6c8df7;
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}}
 .pp-note {{
   font-size: 12px;
   color: rgba(0,0,0,0.52);
@@ -1056,6 +1090,14 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
     <div class="pp-progress">
       <div class="pp-progress-fill" style="width: {percent}%;"></div>
     </div>
+    {f'''
+    <div class="pp-step">
+      <div class="pp-step-label">{step_label}</div>
+      <div class="pp-step-bar">
+        <div class="pp-step-fill" style="width: {step_percent}%;"></div>
+      </div>
+    </div>
+    ''' if step_label else ''}
   </div>
 </div>
 """,
@@ -1069,7 +1111,7 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
             return 0
         return min(95, max(0, int((elapsed_s / est_seconds) * 100)))
 
-    _render_overlay("", 0)
+    _render_overlay(subtitle or "", 0)
 
     try:
         with ThreadPoolExecutor(max_workers=1) as ex:
@@ -1077,12 +1119,13 @@ def _run_ai_with_progress(task_fn, ctx: dict, typical_range: str, est_seconds: f
             # Update the elapsed timer a few times per second.
             while not fut.done():
                 elapsed = time.monotonic() - start_t
-                _render_overlay("", _calc_percent(elapsed))
+                _render_overlay(subtitle or "", _calc_percent(elapsed))
                 time.sleep(0.35)
 
             report = fut.result()
 
-        _render_overlay("Done. Updating the page…", _calc_percent(time.monotonic() - start_t, done=True))
+        done_subtitle = "Done. Updating the page…"
+        _render_overlay(done_subtitle, _calc_percent(time.monotonic() - start_t, done=True))
         time.sleep(0.08)
         return report
     finally:
