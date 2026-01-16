@@ -19,6 +19,7 @@ from sqlalchemy import text
 from logging.handlers import RotatingFileHandler
 import os
 import time
+import textwrap
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
@@ -971,9 +972,19 @@ def _run_ai_with_progress(
         if total_steps and total_steps > 0 and step_index:
             step_label = f"Question {step_index} of {total_steps}"
             step_percent = min(100, max(0, int((step_index / total_steps) * 100)))
+        step_html = ""
+        if step_label:
+            step_html = f"""
+<div class="pp-step">
+  <div class="pp-step-label">{step_label}</div>
+  <div class="pp-step-bar">
+    <div class="pp-step-fill" style="width: {step_percent}%;"></div>
+  </div>
+</div>
+"""
         # Render a full-page blocker with a simple percent progress bar.
         overlay.markdown(
-            f"""
+            textwrap.dedent(f"""
 <style>
 /* PanPhy full-page UI blocker */
 .pp-overlay {{
@@ -1090,17 +1101,10 @@ def _run_ai_with_progress(
     <div class="pp-progress">
       <div class="pp-progress-fill" style="width: {percent}%;"></div>
     </div>
-    {f'''
-    <div class="pp-step">
-      <div class="pp-step-label">{step_label}</div>
-      <div class="pp-step-bar">
-        <div class="pp-step-fill" style="width: {step_percent}%;"></div>
-      </div>
-    </div>
-    ''' if step_label else ''}
+    {step_html}
   </div>
 </div>
-""",
+"""),
             unsafe_allow_html=True,
         )
 
