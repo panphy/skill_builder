@@ -1,5 +1,6 @@
 import io
 import json
+import math
 from typing import Any, Dict
 
 import pandas as pd
@@ -9,13 +10,17 @@ from PIL import Image
 from ai_generation import AI_READY, JOURNEY_CHECKPOINT_EVERY
 from config import (
     clean_sub_topic_label,
-    get_sub_topic_names_for_group,
-    get_topic_group_names_for_track,
-    get_topic_names_for_track,
     SUBJECT_SITE,
     _safe_secret,
 )
-from db import load_question_bank_df, load_question_by_id
+from db import (
+    load_question_bank_distinct_difficulties,
+    load_question_bank_distinct_skills,
+    load_question_bank_distinct_sub_topics,
+    load_question_bank_distinct_topics,
+    load_question_bank_page,
+    load_question_by_id,
+)
 
 
 def render_student_page(helpers: dict):
@@ -66,16 +71,6 @@ def render_student_page(helpers: dict):
         secondary = _display_classification(raw_value, fallback)
         return clean_sub_topic_label(secondary, track)
 
-    def _unique_ordered(values: list[str]) -> list[str]:
-        seen: set[str] = set()
-        out: list[str] = []
-        for value in values:
-            if value in seen:
-                continue
-            seen.add(value)
-            out.append(value)
-        return out
-
     def _advance_question(
         choice_key: str | None,
         question_sequence: list[int],
@@ -110,161 +105,224 @@ def render_student_page(helpers: dict):
         if not db_ready():
             st.error("Database not ready. Configure DATABASE_URL first.")
         else:
-            dfb = load_question_bank_df(limit=5000)
-            if dfb.empty:
+            source_map = {
+                "AI Practice": "ai_generated",
+                "Teacher Uploads": "teacher",
+                "All": None,
+            }
+            source_filter = source_map.get(source, None)
+            topic_options = load_question_bank_distinct_topics(source=source_filter)
+            if not topic_options:
                 st.info("No questions in the database yet. Ask your teacher to generate or upload questions in the Question Bank page.")
             else:
-                if source == "AI Practice":
-                    df_src = dfb[dfb["source"] == "ai_generated"].copy()
-                elif source == "Teacher Uploads":
-                    df_src = dfb[dfb["source"] == "teacher"].copy()
-                else:
-                    df_src = dfb.copy()
+                topics = ["All"] + sorted(topic_options, key=lambda value: _display_classification(value).lower())
+                if st.session_state.get("student_topic_filter") not in topics:
+                    st.session_state["student_topic_filter"] = "All"
+                topic_cols = st.columns(2)
+                with topic_cols[0]:
+                    topic_filter = st.selectbox(
+                        "Step 1: Topic group",
+                        topics,
+                        key="student_topic_filter",
+                        format_func=lambda value: "All" if value == "All" else _display_classification(value),
+                    )
 
-                if df_src.empty:
-                    st.info("No questions available for this source yet.")
+                sub_topic_options = load_question_bank_distinct_sub_topics(
+                    source=source_filter,
+                    topic=None if topic_filter == "All" else topic_filter,
+                )
+                sub_topics = ["All"] + sorted(
+                    sub_topic_options,
+                    key=lambda value: clean_sub_topic_label(value, track).lower(),
+                )
+                if st.session_state.get("student_sub_topic_filter") not in sub_topics:
+                    st.session_state["student_sub_topic_filter"] = "All"
+                with topic_cols[1]:
+                    sub_topic_filter = st.selectbox(
+                        "Step 2: Topic",
+                        sub_topics,
+                        key="student_sub_topic_filter",
+                        format_func=lambda value: "All" if value == "All" else _display_sub_topic(value, value),
+                    )
+
+                skill_cols = st.columns(2)
+                skill_options = load_question_bank_distinct_skills(
+                    source=source_filter,
+                    topic=None if topic_filter == "All" else topic_filter,
+                    sub_topic=None if sub_topic_filter == "All" else sub_topic_filter,
+                )
+                skills = ["All"] + sorted(skill_options, key=lambda value: _display_classification(value).lower())
+                if st.session_state.get("student_skill_filter") not in skills:
+                    st.session_state["student_skill_filter"] = "All"
+                with skill_cols[0]:
+                    skill_filter = st.selectbox(
+                        "Step 3: Skill",
+                        skills,
+                        key="student_skill_filter",
+                        format_func=lambda value: "All" if value == "All" else _display_classification(value),
+                    )
+
+                difficulty_options = load_question_bank_distinct_difficulties(
+                    source=source_filter,
+                    topic=None if topic_filter == "All" else topic_filter,
+                    sub_topic=None if sub_topic_filter == "All" else sub_topic_filter,
+                    skill=None if skill_filter == "All" else skill_filter,
+                )
+                difficulties = ["All"] + sorted(
+                    difficulty_options,
+                    key=lambda value: _display_classification(value).lower(),
+                )
+                if st.session_state.get("student_difficulty_filter") not in difficulties:
+                    st.session_state["student_difficulty_filter"] = "All"
+                with skill_cols[1]:
+                    difficulty_filter = st.selectbox(
+                        "Step 4: Difficulty",
+                        difficulties,
+                        key="student_difficulty_filter",
+                        format_func=lambda value: "All" if value == "All" else _display_classification(value),
+                    )
+
+                filter_state = (
+                    source_filter,
+                    topic_filter,
+                    sub_topic_filter,
+                    skill_filter,
+                    difficulty_filter,
+                )
+                if st.session_state.get("student_filter_state") != filter_state:
+                    st.session_state["student_filter_state"] = filter_state
+                    st.session_state["student_page_index"] = 0
+                    st.session_state["student_page_number"] = 1
+
+                page_cols = st.columns([1, 1, 2])
+                with page_cols[0]:
+                    page_size = st.selectbox(
+                        "Page size",
+                        [10, 25, 50, 100],
+                        key="student_page_size",
+                    )
+                page_index = int(st.session_state.get("student_page_index", 0) or 0)
+                page_data = load_question_bank_page(
+                    source=source_filter,
+                    topic=None if topic_filter == "All" else topic_filter,
+                    sub_topic=None if sub_topic_filter == "All" else sub_topic_filter,
+                    skill=None if skill_filter == "All" else skill_filter,
+                    difficulty=None if difficulty_filter == "All" else difficulty_filter,
+                    page_size=page_size,
+                    page_index=page_index,
+                )
+                total_questions = int(page_data.get("total", 0) or 0)
+                max_page_index = max(0, math.ceil(total_questions / page_size) - 1)
+                if page_index > max_page_index:
+                    page_index = max_page_index
+                    st.session_state["student_page_index"] = page_index
+                    st.session_state["student_page_number"] = page_index + 1
+                    page_data = load_question_bank_page(
+                        source=source_filter,
+                        topic=None if topic_filter == "All" else topic_filter,
+                        sub_topic=None if sub_topic_filter == "All" else sub_topic_filter,
+                        skill=None if skill_filter == "All" else skill_filter,
+                        difficulty=None if difficulty_filter == "All" else difficulty_filter,
+                        page_size=page_size,
+                        page_index=page_index,
+                    )
+                with page_cols[1]:
+                    max_page_number = max_page_index + 1 if total_questions else 1
+                    page_number = st.number_input(
+                        "Page",
+                        min_value=1,
+                        max_value=max_page_number,
+                        value=page_index + 1,
+                        step=1,
+                        key="student_page_number",
+                    )
+                    st.session_state["student_page_index"] = int(page_number) - 1
+                with page_cols[2]:
+                    if total_questions:
+                        start_index = page_index * page_size + 1
+                        end_index = min(total_questions, (page_index + 1) * page_size)
+                        st.caption(f"Showing {start_index}-{end_index} of {total_questions} questions")
+                    else:
+                        st.caption("No questions match this filter set yet.")
+
+                df_filtered = page_data.get("df", pd.DataFrame()).copy()
+                if df_filtered.empty:
+                    empty_choice = "No questions yet for this selection."
+                    st.selectbox(
+                        "Question",
+                        [empty_choice],
+                        key=f"student_question_choice::empty::{source_filter}::{topic_filter}::{sub_topic_filter}::{skill_filter}::{difficulty_filter}",
+                        disabled=True,
+                    )
+                    st.info("No questions yet for this selection. Try a different topic or check back later.")
                 else:
-                    df_src["topic_display"] = df_src["topic"].apply(_display_classification)
-                    df_src["sub_topic_display"] = df_src.apply(
+                    df_filtered["topic_display"] = df_filtered["topic"].apply(_display_classification)
+                    df_filtered["sub_topic_display"] = df_filtered.apply(
                         lambda row: _display_sub_topic(row.get("sub_topic"), row.get("sub_topic_raw")),
                         axis=1,
                     )
-                    df_src["skill_display"] = df_src["skill"].apply(_display_classification)
-                    df_src["difficulty_display"] = df_src["difficulty"].apply(_display_classification)
-
-                    topic_group_catalog = get_topic_group_names_for_track(track)
-                    topics = ["All"] + topic_group_catalog
-                    topic_extras = sorted(
-                        {topic for topic in df_src["topic_display"].unique().tolist() if topic not in topics}
+                    df_filtered["skill_display"] = df_filtered["skill"].apply(_display_classification)
+                    df_filtered["difficulty_display"] = df_filtered["difficulty"].apply(_display_classification)
+                    df_filtered["label"] = df_filtered.apply(
+                        lambda r: (
+                            f"{r['topic_display']} / {r['sub_topic_display']} / {r['skill_display']} / {r['difficulty_display']}"
+                            f" | {r['question_label']} ({int(r['max_marks'])} marks) [{r.get('question_type','single')}] [id {int(r['id'])}]"
+                        ),
+                        axis=1,
                     )
-                    topics.extend(topic_extras)
-                    if st.session_state.get("student_topic_filter") not in topics:
-                        st.session_state["student_topic_filter"] = "All"
-                    topic_cols = st.columns(2)
-                    with topic_cols[0]:
-                        topic_filter = st.selectbox("Step 1: Topic group", topics, key="student_topic_filter")
+                    choices = df_filtered["label"].tolist()
+                    labels_map = dict(zip(df_filtered["label"], df_filtered["id"]))
+                    id_sequence = [int(x) for x in df_filtered["id"].tolist()]
+                    label_by_id = {int(row_id): label for row_id, label in zip(df_filtered["id"], df_filtered["label"])}
 
-                    if topic_filter != "All":
-                        df2 = df_src[df_src["topic_display"] == topic_filter].copy()
-                    else:
-                        df2 = df_src.copy()
-
-                    if topic_filter != "All":
-                        base_sub_topics = get_sub_topic_names_for_group(track, topic_filter)
-                    else:
-                        base_sub_topics = get_topic_names_for_track(track)
-                    base_sub_topics = [
-                        clean_sub_topic_label(name, track) for name in base_sub_topics if name
-                    ]
-                    sub_topics = ["All"] + _unique_ordered(base_sub_topics)
-                    sub_topic_extras = sorted(
-                        {topic for topic in df2["sub_topic_display"].unique().tolist() if topic not in sub_topics}
+                    choice_key = (
+                        f"student_question_choice::{source_filter}::{topic_filter}::{sub_topic_filter}"
+                        f"::{skill_filter}::{difficulty_filter}::page_{page_index}"
                     )
-                    sub_topics.extend(sub_topic_extras)
-                    if st.session_state.get("student_sub_topic_filter") not in sub_topics:
-                        st.session_state["student_sub_topic_filter"] = "All"
-                    with topic_cols[1]:
-                        sub_topic_filter = st.selectbox("Step 2: Topic", sub_topics, key="student_sub_topic_filter")
+                    if st.session_state.get(choice_key) not in choices:
+                        st.session_state[choice_key] = choices[0]
 
-                    if sub_topic_filter != "All":
-                        df3 = df2[df2["sub_topic_display"] == sub_topic_filter].copy()
-                    else:
-                        df3 = df2.copy()
+                    choice = st.selectbox("Question", choices, key=choice_key)
+                    chosen_id = int(labels_map.get(choice, 0)) if choice else 0
+                    st.session_state["student_question_sequence"] = id_sequence
+                    st.session_state["student_question_label_by_id"] = label_by_id
+                    st.session_state["student_question_choice_key"] = choice_key
 
-                    skills = ["All"] + sorted(df3["skill_display"].unique().tolist())
-                    if st.session_state.get("student_skill_filter") not in skills:
-                        st.session_state["student_skill_filter"] = "All"
-                    skill_cols = st.columns(2)
-                    with skill_cols[0]:
-                        skill_filter = st.selectbox("Step 3: Skill", skills, key="student_skill_filter")
+                    if chosen_id:
+                        if st.session_state.get("selected_qid") != chosen_id:
+                            st.session_state["selected_qid"] = chosen_id
 
-                    if skill_filter != "All":
-                        df4 = df3[df3["skill_display"] == skill_filter].copy()
-                    else:
-                        df4 = df3.copy()
+                            q_row = load_question_by_id(chosen_id)
+                            st.session_state["cached_q_row"] = q_row
 
-                    difficulties = ["All"] + sorted(df4["difficulty_display"].unique().tolist())
-                    if st.session_state.get("student_difficulty_filter") not in difficulties:
-                        st.session_state["student_difficulty_filter"] = "All"
-                    with skill_cols[1]:
-                        difficulty_filter = st.selectbox("Step 4: Difficulty", difficulties, key="student_difficulty_filter")
+                            st.session_state["cached_q_path"] = (q_row.get("question_image_path") or "").strip()
+                            st.session_state["cached_ms_path"] = (q_row.get("markscheme_image_path") or "").strip()
 
-                    if difficulty_filter != "All":
-                        df_filtered = df4[df4["difficulty_display"] == difficulty_filter].copy()
-                    else:
-                        df_filtered = df4.copy()
+                            q_path = (st.session_state.get("cached_q_path") or "").strip()
+                            if q_path:
+                                fp = (_safe_secret("SUPABASE_URL", "") or "")[:40]
+                                q_bytes = cached_download_from_storage(q_path, fp)
+                                st.session_state["cached_question_img"] = safe_bytes_to_pil(q_bytes)
+                            else:
+                                st.session_state["cached_question_img"] = None
 
-                    if df_filtered.empty:
-                        empty_choice = "No questions yet for this selection."
-                        st.selectbox(
-                            "Question",
-                            [empty_choice],
-                            key=f"student_question_choice::empty::{source}::{topic_filter}::{sub_topic_filter}::{skill_filter}::{difficulty_filter}",
-                            disabled=True,
-                        )
-                        st.info("No questions yet for this selection. Try a different topic or check back later.")
-                    else:
-                        df_filtered = df_filtered.sort_values(
-                            ["topic_display", "sub_topic_display", "skill_display", "difficulty_display", "question_label", "id"],
-                            kind="mergesort",
-                        )
-                        df_filtered["label"] = df_filtered.apply(
-                            lambda r: (
-                                f"{r['topic_display']} / {r['sub_topic_display']} / {r['skill_display']} / {r['difficulty_display']}"
-                                f" | {r['question_label']} ({int(r['max_marks'])} marks) [{r.get('question_type','single')}] [id {int(r['id'])}]"
-                            ),
-                            axis=1,
-                        )
-                        choices = df_filtered["label"].tolist()
-                        labels_map = dict(zip(df_filtered["label"], df_filtered["id"]))
-                        id_sequence = [int(x) for x in df_filtered["id"].tolist()]
-                        label_by_id = {int(row_id): label for row_id, label in zip(df_filtered["id"], df_filtered["label"])}
+                            # Reset attempt state
+                            st.session_state["feedback"] = None
+                            st.session_state["canvas_key"] += 1
+                            st.session_state["last_canvas_image_data"] = None  # legacy
+                            st.session_state["last_canvas_image_data_single"] = None
+                            st.session_state["last_canvas_data_url_single"] = None
+                            st.session_state["last_canvas_image_data_journey"] = None
+                            st.session_state["last_canvas_data_url_journey"] = None
 
-                        choice_key = f"student_question_choice::{source}::{topic_filter}::{sub_topic_filter}::{skill_filter}::{difficulty_filter}"
-                        if st.session_state.get(choice_key) not in choices:
-                            st.session_state[choice_key] = choices[0]
-
-                        choice = st.selectbox("Question", choices, key=choice_key)
-                        chosen_id = int(labels_map.get(choice, 0)) if choice else 0
-                        st.session_state["student_question_sequence"] = id_sequence
-                        st.session_state["student_question_label_by_id"] = label_by_id
-                        st.session_state["student_question_choice_key"] = choice_key
-
-                        if chosen_id:
-                            if st.session_state.get("selected_qid") != chosen_id:
-                                st.session_state["selected_qid"] = chosen_id
-
-                                q_row = load_question_by_id(chosen_id)
-                                st.session_state["cached_q_row"] = q_row
-
-                                st.session_state["cached_q_path"] = (q_row.get("question_image_path") or "").strip()
-                                st.session_state["cached_ms_path"] = (q_row.get("markscheme_image_path") or "").strip()
-
-                                q_path = (st.session_state.get("cached_q_path") or "").strip()
-                                if q_path:
-                                    fp = (_safe_secret("SUPABASE_URL", "") or "")[:40]
-                                    q_bytes = cached_download_from_storage(q_path, fp)
-                                    st.session_state["cached_question_img"] = safe_bytes_to_pil(q_bytes)
-                                else:
-                                    st.session_state["cached_question_img"] = None
-
-                                # Reset attempt state
-                                st.session_state["feedback"] = None
-                                st.session_state["canvas_key"] += 1
-                                st.session_state["last_canvas_image_data"] = None  # legacy
-                                st.session_state["last_canvas_image_data_single"] = None
-                                st.session_state["last_canvas_data_url_single"] = None
-                                st.session_state["last_canvas_image_data_journey"] = None
-                                st.session_state["last_canvas_data_url_journey"] = None
-
-                                # Reset Topic Journey state (if applicable)
-                                st.session_state["journey_step_index"] = 0
-                                st.session_state["journey_step_reports"] = []
-                                st.session_state["journey_checkpoint_notes"] = {}
-                                st.session_state["journey_active_id"] = int(chosen_id)
-                                st.session_state["journey_json_cache"] = None
-                                st.session_state["student_answer_text_single"] = ""
-                                st.session_state["student_answer_text_journey"] = ""
+                            # Reset Topic Journey state (if applicable)
+                            st.session_state["journey_step_index"] = 0
+                            st.session_state["journey_step_reports"] = []
+                            st.session_state["journey_checkpoint_notes"] = {}
+                            st.session_state["journey_active_id"] = int(chosen_id)
+                            st.session_state["journey_json_cache"] = None
+                            st.session_state["student_answer_text_single"] = ""
+                            st.session_state["student_answer_text_journey"] = ""
 
     if st.session_state.get("cached_q_row"):
         _qr = st.session_state["cached_q_row"]
