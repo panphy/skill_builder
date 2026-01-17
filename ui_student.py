@@ -228,11 +228,11 @@ def render_student_page(helpers: dict):
                     )
                 with page_cols[1]:
                     max_page_number = max_page_index + 1 if total_questions else 1
+                    st.session_state.setdefault("student_page_number", page_index + 1)
                     page_number = st.number_input(
                         "Page",
                         min_value=1,
                         max_value=max_page_number,
-                        value=page_index + 1,
                         step=1,
                         key="student_page_number",
                     )
