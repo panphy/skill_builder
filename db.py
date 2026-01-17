@@ -68,6 +68,52 @@ def db_ready() -> bool:
     return get_db_engine() is not None
 
 
+def _normalize_filter_value(value: str | None) -> str | None:
+    cleaned = (value or "").strip()
+    if not cleaned or cleaned.lower() == "all":
+        return None
+    return cleaned
+
+
+def _build_question_bank_filters(
+    track: str,
+    subject_site: str,
+    include_inactive: bool = False,
+    source: Optional[str] = None,
+    topic: Optional[str] = None,
+    sub_topic: Optional[str] = None,
+    skill: Optional[str] = None,
+    difficulty: Optional[str] = None,
+) -> tuple[str, Dict[str, Any]]:
+    track = (track or "").strip().lower()
+    subject_site = (subject_site or "").strip().lower() or SUBJECT_SITE
+    clauses: list[str] = []
+    params: Dict[str, Any] = {"subject_site": subject_site}
+
+    if not include_inactive:
+        clauses.append("is_active = true")
+    clauses.append("subject_site = :subject_site")
+    if track == "combined":
+        clauses.append("track_ok = 'both'")
+    if source:
+        clauses.append("source = :source")
+        params["source"] = source
+    if topic:
+        clauses.append("topic = :topic")
+        params["topic"] = topic
+    if sub_topic:
+        clauses.append("coalesce(sub_topic, sub_topic_raw) = :sub_topic")
+        params["sub_topic"] = sub_topic
+    if skill:
+        clauses.append("skill = :skill")
+        params["skill"] = skill
+    if difficulty:
+        clauses.append("difficulty = :difficulty")
+        params["difficulty"] = difficulty
+
+    where = ("where " + " and ".join(clauses)) if clauses else ""
+    return where, params
+
 
 def _split_sql_statements(sql_blob: str) -> List[str]:
     """
@@ -264,6 +310,300 @@ def load_question_bank_df(limit: int = 5000, include_inactive: bool = False) -> 
         return pd.DataFrame()
 
 
+def _load_distinct_values(
+    conn,
+    column_sql: str,
+    where: str,
+    params: Dict[str, Any],
+) -> List[str]:
+    rows = conn.execute(
+        text(f"""
+            select distinct {column_sql} as value
+            from public.question_bank_v2
+            {where}
+            order by value
+        """),
+        params,
+    ).fetchall()
+    values = []
+    for row in rows:
+        value = row[0]
+        if value is None:
+            continue
+        text_value = str(value).strip()
+        if not text_value:
+            continue
+        values.append(text_value)
+    return values
+
+
+@st.cache_data(ttl=60)
+def load_question_bank_distinct_topics_cached(
+    _fp: str,
+    track: str,
+    subject_site: str,
+    source: Optional[str] = None,
+    include_inactive: bool = False,
+) -> List[str]:
+    eng = get_db_engine()
+    if eng is None:
+        return []
+    ensure_question_bank_table()
+    where, params = _build_question_bank_filters(
+        track=track,
+        subject_site=subject_site,
+        include_inactive=include_inactive,
+        source=_normalize_filter_value(source),
+    )
+    with eng.connect() as conn:
+        return _load_distinct_values(conn, "topic", where, params)
+
+
+@st.cache_data(ttl=60)
+def load_question_bank_distinct_sub_topics_cached(
+    _fp: str,
+    track: str,
+    subject_site: str,
+    source: Optional[str] = None,
+    topic: Optional[str] = None,
+    include_inactive: bool = False,
+) -> List[str]:
+    eng = get_db_engine()
+    if eng is None:
+        return []
+    ensure_question_bank_table()
+    where, params = _build_question_bank_filters(
+        track=track,
+        subject_site=subject_site,
+        include_inactive=include_inactive,
+        source=_normalize_filter_value(source),
+        topic=_normalize_filter_value(topic),
+    )
+    with eng.connect() as conn:
+        return _load_distinct_values(conn, "coalesce(sub_topic, sub_topic_raw)", where, params)
+
+
+@st.cache_data(ttl=60)
+def load_question_bank_distinct_skills_cached(
+    _fp: str,
+    track: str,
+    subject_site: str,
+    source: Optional[str] = None,
+    topic: Optional[str] = None,
+    sub_topic: Optional[str] = None,
+    include_inactive: bool = False,
+) -> List[str]:
+    eng = get_db_engine()
+    if eng is None:
+        return []
+    ensure_question_bank_table()
+    where, params = _build_question_bank_filters(
+        track=track,
+        subject_site=subject_site,
+        include_inactive=include_inactive,
+        source=_normalize_filter_value(source),
+        topic=_normalize_filter_value(topic),
+        sub_topic=_normalize_filter_value(sub_topic),
+    )
+    with eng.connect() as conn:
+        return _load_distinct_values(conn, "skill", where, params)
+
+
+@st.cache_data(ttl=60)
+def load_question_bank_distinct_difficulties_cached(
+    _fp: str,
+    track: str,
+    subject_site: str,
+    source: Optional[str] = None,
+    topic: Optional[str] = None,
+    sub_topic: Optional[str] = None,
+    skill: Optional[str] = None,
+    include_inactive: bool = False,
+) -> List[str]:
+    eng = get_db_engine()
+    if eng is None:
+        return []
+    ensure_question_bank_table()
+    where, params = _build_question_bank_filters(
+        track=track,
+        subject_site=subject_site,
+        include_inactive=include_inactive,
+        source=_normalize_filter_value(source),
+        topic=_normalize_filter_value(topic),
+        sub_topic=_normalize_filter_value(sub_topic),
+        skill=_normalize_filter_value(skill),
+    )
+    with eng.connect() as conn:
+        return _load_distinct_values(conn, "difficulty", where, params)
+
+
+def load_question_bank_distinct_topics(source: Optional[str] = None, include_inactive: bool = False) -> List[str]:
+    fp = (_safe_secret("DATABASE_URL", "") or "")[:40]
+    try:
+        return load_question_bank_distinct_topics_cached(
+            fp,
+            track=st.session_state.get("track", "combined"),
+            subject_site=SUBJECT_SITE,
+            source=source,
+            include_inactive=include_inactive,
+        )
+    except Exception as e:
+        st.session_state["db_last_error"] = f"Load Topics Error: {type(e).__name__}: {e}"
+        return []
+
+
+def load_question_bank_distinct_sub_topics(
+    source: Optional[str] = None,
+    topic: Optional[str] = None,
+    include_inactive: bool = False,
+) -> List[str]:
+    fp = (_safe_secret("DATABASE_URL", "") or "")[:40]
+    try:
+        return load_question_bank_distinct_sub_topics_cached(
+            fp,
+            track=st.session_state.get("track", "combined"),
+            subject_site=SUBJECT_SITE,
+            source=source,
+            topic=topic,
+            include_inactive=include_inactive,
+        )
+    except Exception as e:
+        st.session_state["db_last_error"] = f"Load Sub Topics Error: {type(e).__name__}: {e}"
+        return []
+
+
+def load_question_bank_distinct_skills(
+    source: Optional[str] = None,
+    topic: Optional[str] = None,
+    sub_topic: Optional[str] = None,
+    include_inactive: bool = False,
+) -> List[str]:
+    fp = (_safe_secret("DATABASE_URL", "") or "")[:40]
+    try:
+        return load_question_bank_distinct_skills_cached(
+            fp,
+            track=st.session_state.get("track", "combined"),
+            subject_site=SUBJECT_SITE,
+            source=source,
+            topic=topic,
+            sub_topic=sub_topic,
+            include_inactive=include_inactive,
+        )
+    except Exception as e:
+        st.session_state["db_last_error"] = f"Load Skills Error: {type(e).__name__}: {e}"
+        return []
+
+
+def load_question_bank_distinct_difficulties(
+    source: Optional[str] = None,
+    topic: Optional[str] = None,
+    sub_topic: Optional[str] = None,
+    skill: Optional[str] = None,
+    include_inactive: bool = False,
+) -> List[str]:
+    fp = (_safe_secret("DATABASE_URL", "") or "")[:40]
+    try:
+        return load_question_bank_distinct_difficulties_cached(
+            fp,
+            track=st.session_state.get("track", "combined"),
+            subject_site=SUBJECT_SITE,
+            source=source,
+            topic=topic,
+            sub_topic=sub_topic,
+            skill=skill,
+            include_inactive=include_inactive,
+        )
+    except Exception as e:
+        st.session_state["db_last_error"] = f"Load Difficulties Error: {type(e).__name__}: {e}"
+        return []
+
+
+@st.cache_data(ttl=30)
+def load_question_bank_page_cached(
+    _fp: str,
+    track: str,
+    subject_site: str,
+    source: Optional[str] = None,
+    topic: Optional[str] = None,
+    sub_topic: Optional[str] = None,
+    skill: Optional[str] = None,
+    difficulty: Optional[str] = None,
+    page_size: int = 25,
+    page_index: int = 0,
+    include_inactive: bool = False,
+) -> Dict[str, Any]:
+    eng = get_db_engine()
+    if eng is None:
+        return {"df": pd.DataFrame(), "total": 0}
+    ensure_question_bank_table()
+    where, params = _build_question_bank_filters(
+        track=track,
+        subject_site=subject_site,
+        include_inactive=include_inactive,
+        source=_normalize_filter_value(source),
+        topic=_normalize_filter_value(topic),
+        sub_topic=_normalize_filter_value(sub_topic),
+        skill=_normalize_filter_value(skill),
+        difficulty=_normalize_filter_value(difficulty),
+    )
+    page_size = max(1, int(page_size))
+    page_index = max(0, int(page_index))
+    params = {**params, "limit": page_size, "offset": page_size * page_index}
+    with eng.connect() as conn:
+        total = conn.execute(
+            text(f"select count(*) from public.question_bank_v2 {where}"),
+            params,
+        ).scalar_one()
+        df = pd.read_sql(
+            text(f"""
+                select
+                  id, created_at, updated_at,
+                  source, assignment_name, question_label,
+                  max_marks, question_type,
+                  topic, sub_topic, sub_topic_raw, skill, difficulty,
+                  tags, question_text,
+                  subject_site, track_ok, is_active
+                from public.question_bank_v2
+                {where}
+                order by topic, sub_topic, skill, difficulty, question_label, id
+                limit :limit
+                offset :offset
+            """),
+            conn,
+            params=params,
+        )
+    return {"df": df, "total": int(total or 0)}
+
+
+def load_question_bank_page(
+    source: Optional[str] = None,
+    topic: Optional[str] = None,
+    sub_topic: Optional[str] = None,
+    skill: Optional[str] = None,
+    difficulty: Optional[str] = None,
+    page_size: int = 25,
+    page_index: int = 0,
+    include_inactive: bool = False,
+) -> Dict[str, Any]:
+    fp = (_safe_secret("DATABASE_URL", "") or "")[:40]
+    try:
+        return load_question_bank_page_cached(
+            fp,
+            track=st.session_state.get("track", "combined"),
+            subject_site=SUBJECT_SITE,
+            source=source,
+            topic=topic,
+            sub_topic=sub_topic,
+            skill=skill,
+            difficulty=difficulty,
+            page_size=page_size,
+            page_index=page_index,
+            include_inactive=include_inactive,
+        )
+    except Exception as e:
+        st.session_state["db_last_error"] = f"Load Question Bank Page Error: {type(e).__name__}: {e}"
+        return {"df": pd.DataFrame(), "total": 0}
+
 @st.cache_data(ttl=60)
 
 def load_question_by_id_cached(_fp: str, qid: int) -> Dict[str, Any]:
@@ -390,6 +730,11 @@ def insert_question_bank_row(
         try:
             load_question_bank_df_cached.clear()
             load_question_by_id_cached.clear()
+            load_question_bank_distinct_topics_cached.clear()
+            load_question_bank_distinct_sub_topics_cached.clear()
+            load_question_bank_distinct_skills_cached.clear()
+            load_question_bank_distinct_difficulties_cached.clear()
+            load_question_bank_page_cached.clear()
         except Exception:
             pass
         return True
@@ -414,6 +759,11 @@ def delete_question_bank_by_id(qid: int) -> bool:
         try:
             load_question_bank_df_cached.clear()
             load_question_by_id_cached.clear()
+            load_question_bank_distinct_topics_cached.clear()
+            load_question_bank_distinct_sub_topics_cached.clear()
+            load_question_bank_distinct_skills_cached.clear()
+            load_question_bank_distinct_difficulties_cached.clear()
+            load_question_bank_page_cached.clear()
         except Exception:
             pass
         return res.rowcount > 0

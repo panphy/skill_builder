@@ -20,6 +20,7 @@ Students can:
 - Select questions from either:
   - **AI Practice** (AI-generated questions saved to the database)
   - **Teacher Upload** (scanned images stored in Supabase Storage)
+- Filter question bank results with server-side topic/skill/difficulty filters and paginated pages
 - Answer using:
   - **Typed response**
   - **Handwritten response** via a drawing canvas
