@@ -54,7 +54,7 @@ Teachers can:
 - **Database**: Supabase Postgres
 - **File storage**: Supabase Storage (for scanned images)
 - **Python libraries**: SQLAlchemy, psycopg, Pillow, pandas, streamlit-drawable-canvas
-- **Logging**: Stream + rotating log file (`panphy_app.log`)
+- **Logging**: Stream + rotating log file (`panphy_app.log`, created at runtime in the working directory; override with `PANPHY_LOG_FILE`)
 
 ---
 
