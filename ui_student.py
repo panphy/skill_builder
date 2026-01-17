@@ -90,6 +90,25 @@ def render_student_page(helpers: dict):
             st.session_state[choice_key] = next_label
             st.session_state["selected_qid"] = None
 
+    def _retreat_question(
+        choice_key: str | None,
+        question_sequence: list[int],
+        label_by_id: dict[int, str],
+        current_qid: int | None,
+    ) -> None:
+        if not choice_key or not question_sequence or current_qid is None:
+            return
+        try:
+            current_index = question_sequence.index(current_qid)
+        except ValueError:
+            return
+        prev_index = (current_index - 1) % len(question_sequence)
+        prev_id = question_sequence[prev_index]
+        prev_label = label_by_id.get(prev_id)
+        if prev_label:
+            st.session_state[choice_key] = prev_label
+            st.session_state["selected_qid"] = None
+
     with st.expander("Question selection", expanded=expand_by_default):
         sel1, sel2 = st.columns([2, 2])
         with sel1:
@@ -194,12 +213,13 @@ def render_student_page(helpers: dict):
                     st.session_state["student_page_index"] = 0
                     st.session_state["student_page_number"] = 1
 
-                page_cols = st.columns([1, 1, 2])
+                page_cols = st.columns([1.2, 1.4, 2])
                 with page_cols[0]:
                     page_size = st.selectbox(
-                        "Page size",
+                        "Questions per page",
                         [10, 25, 50, 100],
                         key="student_page_size",
+                        help="Adjust how many questions show up at once.",
                     )
                 page_index = int(st.session_state.get("student_page_index", 0) or 0)
                 page_data = load_question_bank_page(
@@ -230,18 +250,23 @@ def render_student_page(helpers: dict):
                     max_page_number = max_page_index + 1 if total_questions else 1
                     st.session_state.setdefault("student_page_number", page_index + 1)
                     page_number = st.number_input(
-                        "Page",
+                        "Page number",
                         min_value=1,
                         max_value=max_page_number,
                         step=1,
                         key="student_page_number",
+                        help="Jump to a specific page of results.",
+                        disabled=max_page_number <= 1,
                     )
                     st.session_state["student_page_index"] = int(page_number) - 1
                 with page_cols[2]:
                     if total_questions:
                         start_index = page_index * page_size + 1
                         end_index = min(total_questions, (page_index + 1) * page_size)
-                        st.caption(f"Showing {start_index}-{end_index} of {total_questions} questions")
+                        st.caption(
+                            f"Showing {start_index}-{end_index} of {total_questions} questions "
+                            f"(page {page_index + 1} of {max_page_number})"
+                        )
                     else:
                         st.caption("No questions match this filter set yet.")
 
@@ -396,15 +421,26 @@ def render_student_page(helpers: dict):
                     current_index = question_sequence.index(qid)
                 except ValueError:
                     current_index = -1
-                next_disabled = current_index == -1
-                st.button(
-                    "Next Question",
-                    disabled=next_disabled,
-                    use_container_width=True,
-                    key="student_next_question_btn",
-                    on_click=_advance_question,
-                    args=(choice_key, question_sequence, label_by_id, qid),
-                )
+                nav_disabled = current_index == -1
+                nav_cols = st.columns([1, 1])
+                with nav_cols[0]:
+                    st.button(
+                        "Previous Question",
+                        disabled=nav_disabled,
+                        use_container_width=True,
+                        key="student_prev_question_btn",
+                        on_click=_retreat_question,
+                        args=(choice_key, question_sequence, label_by_id, qid),
+                    )
+                with nav_cols[1]:
+                    st.button(
+                        "Next Question",
+                        disabled=nav_disabled,
+                        use_container_width=True,
+                        key="student_next_question_btn",
+                        on_click=_advance_question,
+                        args=(choice_key, question_sequence, label_by_id, qid),
+                    )
             st.caption(f"Max Marks: {max_marks}")
 
             st.write("")
@@ -723,6 +759,35 @@ def render_student_page(helpers: dict):
                 with st.container(border=True):
                     st.markdown(normalize_markdown_math(step_qtext or ""))
                 st.caption(f"Max Marks: {step_marks}")
+
+                question_sequence = st.session_state.get("student_question_sequence") or []
+                label_by_id = st.session_state.get("student_question_label_by_id") or {}
+                choice_key = st.session_state.get("student_question_choice_key")
+                if qid and choice_key and len(question_sequence) > 1:
+                    try:
+                        current_index = question_sequence.index(qid)
+                    except ValueError:
+                        current_index = -1
+                    nav_disabled = current_index == -1
+                    nav_cols = st.columns([1, 1])
+                    with nav_cols[0]:
+                        st.button(
+                            "Previous Question",
+                            disabled=nav_disabled,
+                            use_container_width=True,
+                            key="student_prev_question_btn_journey",
+                            on_click=_retreat_question,
+                            args=(choice_key, question_sequence, label_by_id, qid),
+                        )
+                    with nav_cols[1]:
+                        st.button(
+                            "Next Question",
+                            disabled=nav_disabled,
+                            use_container_width=True,
+                            key="student_next_question_btn_journey",
+                            on_click=_advance_question,
+                            args=(choice_key, question_sequence, label_by_id, qid),
+                        )
 
                 # Answer mode for journey steps
                 mode_row = st.columns([0.88, 0.12])
