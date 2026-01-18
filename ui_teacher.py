@@ -120,31 +120,43 @@ def render_teacher_page(nav_label: str, helpers: dict):
                 if df.empty:
                     st.info("No attempts logged yet.")
                 else:
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("Total attempts", int(len(df)))
-                    c2.metric("Unique students", int(df["student_id"].nunique()))
-                    c3.metric("Topics attempted", int(df["question_key"].nunique()))
-
-                    st.write("### By student (overall %)")
                     by_student = (
                         df.groupby("student_id")[["marks_awarded", "max_marks"]]
                         .sum()
                         .assign(percent=lambda x: (100 * x["marks_awarded"] / x["max_marks"].replace(0, np.nan)).round(1))
                         .sort_values("percent", ascending=False)
                     )
-                    st.dataframe(by_student, use_container_width=True)
-
-                    st.write("### By topic (overall %)")
                     by_topic = (
                         df.groupby("question_key")[["marks_awarded", "max_marks"]]
                         .sum()
                         .assign(percent=lambda x: (100 * x["marks_awarded"] / x["max_marks"].replace(0, np.nan)).round(1))
                         .sort_values("percent", ascending=False)
                     )
-                    st.dataframe(by_topic, use_container_width=True)
 
-                    st.write("### Recent attempts")
-                    st.dataframe(df.head(50), use_container_width=True)
+                    tab_overview, tab_students, tab_topics, tab_recent = st.tabs(
+                        ["Overview", "By student", "By topic", "Recent"]
+                    )
+                    with tab_overview:
+                        c1, c2, c3 = st.columns(3)
+                        c1.metric("Total attempts", int(len(df)))
+                        c2.metric("Unique students", int(df["student_id"].nunique()))
+                        c3.metric("Topics attempted", int(df["question_key"].nunique()))
+                        total_marks = float(df["max_marks"].sum() or 0)
+                        awarded_marks = float(df["marks_awarded"].sum() or 0)
+                        overall_pct = round(100 * awarded_marks / total_marks, 1) if total_marks else 0.0
+                        st.caption(f"Overall score rate: {overall_pct}% across all attempts.")
+                    with tab_students:
+                        st.markdown("### By student (overall %)")
+                        st.dataframe(by_student, use_container_width=True)
+                    with tab_topics:
+                        st.markdown("### By topic (overall %)")
+                        st.dataframe(by_topic, use_container_width=True)
+                    with tab_recent:
+                        st.markdown("### Recent attempts")
+                        st.dataframe(df.head(50), use_container_width=True)
+
+                    with st.expander("Detailed attempts table", expanded=False):
+                        st.dataframe(df, use_container_width=True)
 
                     attempt_delete_open = bool(st.session_state.get("attempt_delete_picks")) or bool(
                         st.session_state.get("confirm_delete_attempt")
@@ -505,6 +517,10 @@ def render_teacher_page(nav_label: str, helpers: dict):
                 st.caption("Generate and review before saving to the bank.")
 
                 with st.expander("Generate Questions", expanded=False):
+                    st.caption(
+                        "Required inputs: topic group, topic, question type, difficulty, and marks. "
+                        "When saving, assignment name + question label are mandatory."
+                    )
                     c1, c2, c3, c4, c5, c6 = st.columns([3, 3, 2, 2, 1, 1])
 
                     with c1:
@@ -628,16 +644,19 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                     "Assignment name",
                                     value="AI Practice",
                                     key=f"draft_assignment_{draft_id}",
+                                    help="Required. Use a short, descriptive name (e.g. 'AI Practice' or 'Paper 1 Electricity').",
                                 )
                                 question_label = st.text_input(
                                     "Question label",
                                     value=f"{slugify(topic)[:24]}-{draft_id}",
                                     key=f"draft_label_{draft_id}",
+                                    help="Required. Use a simple label like Q3b or a short slug.",
                                 )
                                 tags_str = st.text_input(
                                     "Tags (comma separated)",
                                     value=", ".join(draft.get("tags", [])),
                                     key=f"draft_tags_{draft_id}",
+                                    help="Optional. Comma-separated keywords for search (e.g. circuits, energy).",
                                 )
                             with c2:
                                 save_clicked = st.button(
@@ -833,8 +852,18 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         j_duration = 10
                         st.caption("Journey length is fixed: 10 minutes, 5 steps.")
 
-                        j_assignment = st.text_input("Assignment name for saving", value="Topic Journey", key="jour_assignment")
-                        j_tags = st.text_input("Tags (comma separated)", value="", key="jour_tags")
+                        j_assignment = st.text_input(
+                            "Assignment name for saving",
+                            value="Topic Journey",
+                            key="jour_assignment",
+                            help="Required when saving. Use a short, descriptive name for the journey.",
+                        )
+                        j_tags = st.text_input(
+                            "Tags (comma separated)",
+                            value="",
+                            key="jour_tags",
+                            help="Optional. Comma-separated keywords for search and filtering.",
+                        )
                         j_extra_instr = st.text_area(
                             "Optional constraints for the AI",
                             height=80,
@@ -937,10 +966,25 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             st.warning("Journey draft warnings:\n\n" + "\n".join([f"- {w}" for w in journey.get("warnings", [])]))
                         st.write("### ✅ Vet and edit the journey")
                         hd1, hd2 = st.columns([2, 1])
-                        with hd1:
-                            d_assignment = st.text_input("Assignment name", value=d.get("assignment_name", "Topic Journey"), key="jour_draft_assignment")
-                            d_label = st.text_input("Journey label", value=d.get("question_label", ""), key="jour_draft_label")
-                            d_tags_str = st.text_input("Tags (comma separated)", value=", ".join(d.get("tags", [])), key="jour_draft_tags")
+                    with hd1:
+                        d_assignment = st.text_input(
+                            "Assignment name",
+                            value=d.get("assignment_name", "Topic Journey"),
+                            key="jour_draft_assignment",
+                            help="Required. Use a short, descriptive name for the journey assignment.",
+                        )
+                        d_label = st.text_input(
+                            "Journey label",
+                            value=d.get("question_label", ""),
+                            key="jour_draft_label",
+                            help="Required. Keep labels concise (e.g. JOURNEY-ENERGY-ABC123).",
+                        )
+                        d_tags_str = st.text_input(
+                            "Tags (comma separated)",
+                            value=", ".join(d.get("tags", [])),
+                            key="jour_draft_tags",
+                            help="Optional. Comma-separated keywords for search and filtering.",
+                        )
 
                         with hd2:
                             save_j = st.button(
@@ -1184,14 +1228,38 @@ def render_teacher_page(nav_label: str, helpers: dict):
                 with st.form("upload_q_form", clear_on_submit=True):
                     c1, c2 = st.columns([2, 1])
                     with c1:
-                        assignment_name = st.text_input("Assignment name", placeholder="e.g. AQA Paper 1 (Electricity)", key="up_assignment")
-                        question_label = st.text_input("Question label", placeholder="e.g. Q3b", key="up_label")
+                        assignment_name = st.text_input(
+                            "Assignment name",
+                            placeholder="e.g. AQA Paper 1 (Electricity)",
+                            key="up_assignment",
+                            help="Required. Use the paper or assignment name students will recognize.",
+                        )
+                        question_label = st.text_input(
+                            "Question label",
+                            placeholder="e.g. Q3b",
+                            key="up_label",
+                            help="Required. Use the exact label students see on the paper (e.g. Q3b).",
+                        )
                     with c2:
                         max_marks_in = st.number_input("Max marks", min_value=1, max_value=50, value=3, step=1, key="up_marks")
 
-                    tags_str = st.text_input("Tags (comma separated)", placeholder="forces, resultant, newton", key="up_tags")
-                    q_text_opt = st.text_area("Optional: question text (Markdown + LaTeX supported)", height=100, key="up_qtext")
+                    tags_str = st.text_input(
+                        "Tags (comma separated)",
+                        placeholder="forces, resultant, newton",
+                        key="up_tags",
+                        help="Optional. Comma-separated keywords for search and filtering.",
+                    )
+                    q_text_opt = st.text_area(
+                        "Optional: question text (Markdown + LaTeX supported)",
+                        height=100,
+                        key="up_qtext",
+                        help="Optional. Use this if you want text searchable in the question bank.",
+                    )
 
+                    st.caption(
+                        f"Upload PNG/JPG files up to {QUESTION_MAX_MB:.1f} MB each. "
+                        "Use clear scans with consistent naming (e.g. Q3b question/markscheme)."
+                    )
                     q_file = st.file_uploader("Upload question screenshot (PNG/JPG)", type=["png", "jpg", "jpeg"], key="up_qfile")
                     ms_file = st.file_uploader("Upload mark scheme screenshot (PNG/JPG)", type=["png", "jpg", "jpeg"], key="up_msfile")
 

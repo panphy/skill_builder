@@ -52,6 +52,8 @@ def render_student_page(helpers: dict):
     bytes_to_pil = helpers["bytes_to_pil"]
 
     st.divider()
+    st.subheader("🧑‍🎓 Student Workspace")
+    st.caption("Choose a question set, confirm the filters, then answer and submit for feedback.")
 
     source_options = ["AI Practice", "Teacher Uploads", "All"]
     expand_by_default = False
@@ -70,6 +72,24 @@ def render_student_page(helpers: dict):
             return clean_sub_topic_label(primary, track)
         secondary = _display_classification(raw_value, fallback)
         return clean_sub_topic_label(secondary, track)
+
+    def _reset_student_filters() -> None:
+        st.session_state["student_source"] = "AI Practice"
+        st.session_state["student_topic_filter"] = "All"
+        st.session_state["student_sub_topic_filter"] = "All"
+        st.session_state["student_skill_filter"] = "All"
+        st.session_state["student_difficulty_filter"] = "All"
+        st.session_state["student_page_index"] = 0
+        st.session_state["student_page_number"] = 1
+        st.session_state["selected_qid"] = None
+        st.session_state["cached_q_row"] = None
+
+    def _render_filter_chips(chips: list[str]) -> None:
+        if not chips:
+            st.caption("No active filters. Showing everything for this source.")
+            return
+        chips_html = " ".join([f"<span class='pp-chip'>{chip}</span>" for chip in chips])
+        st.markdown(f"<div class='pp-chip-row'>{chips_html}</div>", unsafe_allow_html=True)
 
     def _advance_question(
         choice_key: str | None,
@@ -123,6 +143,9 @@ def render_student_page(helpers: dict):
 
         if not db_ready():
             st.error("Database not ready. Configure DATABASE_URL first.")
+            st.info(
+                "Teachers: add DATABASE_URL in secrets, then upload questions in 📚 Question Bank → Upload scans."
+            )
         else:
             source_map = {
                 "AI Practice": "ai_generated",
@@ -132,74 +155,105 @@ def render_student_page(helpers: dict):
             source_filter = source_map.get(source, None)
             topic_options = load_question_bank_distinct_topics(source=source_filter)
             if not topic_options:
-                st.info("No questions in the database yet. Ask your teacher to generate or upload questions in the Question Bank page.")
+                st.info(
+                    "No questions in the database yet. Teachers can generate AI practice questions or upload scans in "
+                    "📚 Question Bank → Upload scans."
+                )
             else:
-                topics = ["All"] + sorted(topic_options, key=lambda value: _display_classification(value).lower())
-                if st.session_state.get("student_topic_filter") not in topics:
-                    st.session_state["student_topic_filter"] = "All"
-                topic_cols = st.columns(2)
-                with topic_cols[0]:
-                    topic_filter = st.selectbox(
-                        "Step 1: Topic group",
-                        topics,
-                        key="student_topic_filter",
-                        format_func=lambda value: "All" if value == "All" else _display_classification(value),
-                    )
+                with st.container(border=True):
+                    header_cols = st.columns([3, 1])
+                    with header_cols[0]:
+                        st.markdown("### Filters")
+                        st.caption("Refine the question list, then confirm the active filters below.")
+                    with header_cols[1]:
+                        st.button(
+                            "Reset filters",
+                            use_container_width=True,
+                            on_click=_reset_student_filters,
+                            key="student_filters_reset",
+                        )
 
-                sub_topic_options = load_question_bank_distinct_sub_topics(
-                    source=source_filter,
-                    topic=None if topic_filter == "All" else topic_filter,
-                )
-                sub_topics = ["All"] + sorted(
-                    sub_topic_options,
-                    key=lambda value: clean_sub_topic_label(value, track).lower(),
-                )
-                if st.session_state.get("student_sub_topic_filter") not in sub_topics:
-                    st.session_state["student_sub_topic_filter"] = "All"
-                with topic_cols[1]:
-                    sub_topic_filter = st.selectbox(
-                        "Step 2: Topic",
-                        sub_topics,
-                        key="student_sub_topic_filter",
-                        format_func=lambda value: "All" if value == "All" else _display_sub_topic(value, value),
-                    )
+                    topics = ["All"] + sorted(topic_options, key=lambda value: _display_classification(value).lower())
+                    if st.session_state.get("student_topic_filter") not in topics:
+                        st.session_state["student_topic_filter"] = "All"
+                    topic_cols = st.columns(2)
+                    with topic_cols[0]:
+                        topic_filter = st.selectbox(
+                            "Step 1: Topic group",
+                            topics,
+                            key="student_topic_filter",
+                            format_func=lambda value: "All" if value == "All" else _display_classification(value),
+                        )
 
-                skill_cols = st.columns(2)
-                skill_options = load_question_bank_distinct_skills(
-                    source=source_filter,
-                    topic=None if topic_filter == "All" else topic_filter,
-                    sub_topic=None if sub_topic_filter == "All" else sub_topic_filter,
-                )
-                skills = ["All"] + sorted(skill_options, key=lambda value: _display_classification(value).lower())
-                if st.session_state.get("student_skill_filter") not in skills:
-                    st.session_state["student_skill_filter"] = "All"
-                with skill_cols[0]:
-                    skill_filter = st.selectbox(
-                        "Step 3: Skill",
-                        skills,
-                        key="student_skill_filter",
-                        format_func=lambda value: "All" if value == "All" else _display_classification(value),
+                    sub_topic_options = load_question_bank_distinct_sub_topics(
+                        source=source_filter,
+                        topic=None if topic_filter == "All" else topic_filter,
                     )
+                    sub_topics = ["All"] + sorted(
+                        sub_topic_options,
+                        key=lambda value: clean_sub_topic_label(value, track).lower(),
+                    )
+                    if st.session_state.get("student_sub_topic_filter") not in sub_topics:
+                        st.session_state["student_sub_topic_filter"] = "All"
+                    with topic_cols[1]:
+                        sub_topic_filter = st.selectbox(
+                            "Step 2: Topic",
+                            sub_topics,
+                            key="student_sub_topic_filter",
+                            format_func=lambda value: "All" if value == "All" else _display_sub_topic(value, value),
+                        )
 
-                difficulty_options = load_question_bank_distinct_difficulties(
-                    source=source_filter,
-                    topic=None if topic_filter == "All" else topic_filter,
-                    sub_topic=None if sub_topic_filter == "All" else sub_topic_filter,
-                    skill=None if skill_filter == "All" else skill_filter,
-                )
-                difficulties = ["All"] + sorted(
-                    difficulty_options,
-                    key=lambda value: _display_classification(value).lower(),
-                )
-                if st.session_state.get("student_difficulty_filter") not in difficulties:
-                    st.session_state["student_difficulty_filter"] = "All"
-                with skill_cols[1]:
-                    difficulty_filter = st.selectbox(
-                        "Step 4: Difficulty",
-                        difficulties,
-                        key="student_difficulty_filter",
-                        format_func=lambda value: "All" if value == "All" else _display_classification(value),
+                    skill_cols = st.columns(2)
+                    skill_options = load_question_bank_distinct_skills(
+                        source=source_filter,
+                        topic=None if topic_filter == "All" else topic_filter,
+                        sub_topic=None if sub_topic_filter == "All" else sub_topic_filter,
                     )
+                    skills = ["All"] + sorted(skill_options, key=lambda value: _display_classification(value).lower())
+                    if st.session_state.get("student_skill_filter") not in skills:
+                        st.session_state["student_skill_filter"] = "All"
+                    with skill_cols[0]:
+                        skill_filter = st.selectbox(
+                            "Step 3: Skill",
+                            skills,
+                            key="student_skill_filter",
+                            format_func=lambda value: "All" if value == "All" else _display_classification(value),
+                        )
+
+                    difficulty_options = load_question_bank_distinct_difficulties(
+                        source=source_filter,
+                        topic=None if topic_filter == "All" else topic_filter,
+                        sub_topic=None if sub_topic_filter == "All" else sub_topic_filter,
+                        skill=None if skill_filter == "All" else skill_filter,
+                    )
+                    difficulties = ["All"] + sorted(
+                        difficulty_options,
+                        key=lambda value: _display_classification(value).lower(),
+                    )
+                    if st.session_state.get("student_difficulty_filter") not in difficulties:
+                        st.session_state["student_difficulty_filter"] = "All"
+                    with skill_cols[1]:
+                        difficulty_filter = st.selectbox(
+                            "Step 4: Difficulty",
+                            difficulties,
+                            key="student_difficulty_filter",
+                            format_func=lambda value: "All" if value == "All" else _display_classification(value),
+                        )
+
+                    active_filters = []
+                    if source != "All":
+                        active_filters.append(f"Source: {source}")
+                    if topic_filter != "All":
+                        active_filters.append(f"Topic group: {_display_classification(topic_filter)}")
+                    if sub_topic_filter != "All":
+                        active_filters.append(f"Topic: {_display_sub_topic(sub_topic_filter, sub_topic_filter)}")
+                    if skill_filter != "All":
+                        active_filters.append(f"Skill: {_display_classification(skill_filter)}")
+                    if difficulty_filter != "All":
+                        active_filters.append(f"Difficulty: {_display_classification(difficulty_filter)}")
+
+                    st.markdown("**Active filters**")
+                    _render_filter_chips(active_filters)
 
                 filter_state = (
                     source_filter,
@@ -232,6 +286,14 @@ def render_student_page(helpers: dict):
                     page_index=page_index,
                 )
                 total_questions = int(page_data.get("total", 0) or 0)
+                with st.container(border=True):
+                    st.markdown("### Question status")
+                    st.caption(
+                        f"Source: {source} • Topic group: "
+                        f"{_display_classification(topic_filter) if topic_filter != 'All' else 'All topics'} • "
+                        f"Difficulty: {_display_classification(difficulty_filter) if difficulty_filter != 'All' else 'All levels'}"
+                    )
+                    st.caption(f"Questions available for this selection: {total_questions}")
                 max_page_index = max(0, math.ceil(total_questions / page_size) - 1)
                 if page_index > max_page_index:
                     page_index = max_page_index

@@ -156,6 +156,31 @@ div[data-testid="stButton"] button[aria-label="⤡"] span {
   font-weight: 700;
   margin-bottom: 0.5rem;
 }
+.pp-hero-callout {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  color: #1e3a8a;
+  font-size: 0.98rem;
+}
+.pp-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0.25rem 0;
+}
+.pp-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
 footer {
   position: static;
   font-size: 15px;
@@ -1608,6 +1633,10 @@ if nav == "🧑‍🎓 Student":
     <div class="pp-hero-subtitle">
       Generate spec-aligned questions, capture handwritten working, and give instant feedback—
       all in one place.
+    </div>
+    <div class="pp-hero-callout">
+      <strong>Start here:</strong> Students choose 🧑‍🎓 Student to practice. Teachers upload or generate
+      questions in 📚 Question Bank and review progress in 🔒 Teacher Dashboard.
     </div>
     <ul class="pp-hero-list">
       <li>AI practice questions tailored to topic and difficulty.</li>
