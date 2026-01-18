@@ -966,208 +966,208 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             st.warning("Journey draft warnings:\n\n" + "\n".join([f"- {w}" for w in journey.get("warnings", [])]))
                         st.write("### ✅ Vet and edit the journey")
                         hd1, hd2 = st.columns([2, 1])
-                    with hd1:
-                        d_assignment = st.text_input(
-                            "Assignment name",
-                            value=d.get("assignment_name", "Topic Journey"),
-                            key="jour_draft_assignment",
-                            help="Required. Use a short, descriptive name for the journey assignment.",
-                        )
-                        d_label = st.text_input(
-                            "Journey label",
-                            value=d.get("question_label", ""),
-                            key="jour_draft_label",
-                            help="Required. Keep labels concise (e.g. JOURNEY-ENERGY-ABC123).",
-                        )
-                        d_tags_str = st.text_input(
-                            "Tags (comma separated)",
-                            value=", ".join(d.get("tags", [])),
-                            key="jour_draft_tags",
-                            help="Optional. Comma-separated keywords for search and filtering.",
-                        )
-
-                        with hd2:
-                            save_j = st.button(
-                                "Save Topic Journey to bank",
-                                type="primary",
-                                use_container_width=True,
-                                key="jour_save_btn",
+                        with hd1:
+                            d_assignment = st.text_input(
+                                "Assignment name",
+                                value=d.get("assignment_name", "Topic Journey"),
+                                key="jour_draft_assignment",
+                                help="Required. Use a short, descriptive name for the journey assignment.",
                             )
-                            st.caption("Saved as a single Question Bank entry (type=journey).")
-
-                        topic_options = get_topic_group_names_for_track(track)
-                        skill_options = list(SKILLS)
-                        difficulty_options = list(DIFFICULTIES)
-                        topic_val = str(d.get("topic") or "").strip()
-                        sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_val))
-                        sub_topic_val = str(d.get("sub_topic") or "").strip()
-
-                        hc1, hc2 = st.columns(2)
-                        with hc1:
-                            st.selectbox(
-                                "Topic group",
-                                topic_options,
-                                index=_index_for(topic_options, topic_val),
-                                key="jour_topic_display",
-                                disabled=True,
+                            d_label = st.text_input(
+                                "Journey label",
+                                value=d.get("question_label", ""),
+                                key="jour_draft_label",
+                                help="Required. Keep labels concise (e.g. JOURNEY-ENERGY-ABC123).",
                             )
-                            st.selectbox(
-                                "Topic",
-                                sub_topic_options,
-                                index=_index_for(sub_topic_options, sub_topic_val),
-                                key="jour_sub_topic_display",
-                                disabled=True,
-                                format_func=_clean_sub_topic_label,
-                            )
-                        with hc2:
-                            skill_val = st.selectbox(
-                                "Skill",
-                                skill_options,
-                                index=_index_for(skill_options, d.get("skill")),
-                                key="jour_skill",
-                            )
-                            difficulty_val = st.selectbox(
-                                "Difficulty",
-                                difficulty_options,
-                                index=_index_for(difficulty_options, d.get("difficulty")),
-                                key="jour_difficulty",
+                            d_tags_str = st.text_input(
+                                "Tags (comma separated)",
+                                value=", ".join(d.get("tags", [])),
+                                key="jour_draft_tags",
+                                help="Optional. Comma-separated keywords for search and filtering.",
                             )
 
-                        plan_md = st.text_area("Journey plan (Markdown)", value=journey.get("plan_markdown", ""), height=140, key="jour_plan_md")
-                        render_md_box("Preview: Journey plan", plan_md, empty_text="No plan.")
+                            with hd2:
+                                save_j = st.button(
+                                    "Save Topic Journey to bank",
+                                    type="primary",
+                                    use_container_width=True,
+                                    key="jour_save_btn",
+                                )
+                                st.caption("Saved as a single Question Bank entry (type=journey).")
 
-                        # Optional teacher-only spec alignment preview
-                        with st.expander("Show spec alignment (teacher only)", expanded=False):
-                            spec_align = journey.get("spec_alignment", [])
-                            if isinstance(spec_align, list) and spec_align:
-                                for sref in spec_align[:20]:
-                                    st.markdown(normalize_markdown_math(f"- {sref}"))
-                            else:
-                                st.caption("No spec alignment provided.")
+                            topic_options = get_topic_group_names_for_track(track)
+                            skill_options = list(SKILLS)
+                            difficulty_options = list(DIFFICULTIES)
+                            topic_val = str(d.get("topic") or "").strip()
+                            sub_topic_options = _sorted_sub_topic_options(get_sub_topic_names_for_group(track, topic_val))
+                            sub_topic_val = str(d.get("sub_topic") or "").strip()
 
-                        st.write("### Steps")
-                        if not isinstance(steps, list) or not steps:
-                            st.error("No steps found in journey JSON.")
-                        else:
-                            total_marks = 0
-                            edited_steps = []
-                            for i, stp in enumerate(steps):
-                                stp = stp if isinstance(stp, dict) else {}
-                                with st.expander(f"Step {i+1}: {stp.get('objective','')[:80]}", expanded=(i == 0)):
-                                    obj = st.text_input("Objective", value=str(stp.get("objective", "") or ""), key=f"jour_step_obj_{i}")
-                                    mm = st.number_input("Max marks", min_value=1, max_value=12, value=int(stp.get("max_marks", 1) or 1), step=1, key=f"jour_step_mm_{i}")
-                                    q_key = f"jour_step_q_{i}"
-                                    ms_key = f"jour_step_ms_{i}"
-                                    if q_key not in st.session_state:
-                                        st.session_state[q_key] = str(stp.get("question_text", "") or "")
-                                    if ms_key not in st.session_state:
-                                        st.session_state[ms_key] = str(stp.get("markscheme_text", "") or "")
-                                    qtxt = st.session_state.get(q_key, "")
-                                    mstxt = st.session_state.get(ms_key, "")
-                                    miscon = st.text_area("Common misconceptions (one per line)", value="\n".join([str(x) for x in (stp.get("misconceptions", []) or [])]), height=90, key=f"jour_step_mis_{i}")
+                            hc1, hc2 = st.columns(2)
+                            with hc1:
+                                st.selectbox(
+                                    "Topic group",
+                                    topic_options,
+                                    index=_index_for(topic_options, topic_val),
+                                    key="jour_topic_display",
+                                    disabled=True,
+                                )
+                                st.selectbox(
+                                    "Topic",
+                                    sub_topic_options,
+                                    index=_index_for(sub_topic_options, sub_topic_val),
+                                    key="jour_sub_topic_display",
+                                    disabled=True,
+                                    format_func=_clean_sub_topic_label,
+                                )
+                            with hc2:
+                                skill_val = st.selectbox(
+                                    "Skill",
+                                    skill_options,
+                                    index=_index_for(skill_options, d.get("skill")),
+                                    key="jour_skill",
+                                )
+                                difficulty_val = st.selectbox(
+                                    "Difficulty",
+                                    difficulty_options,
+                                    index=_index_for(difficulty_options, d.get("difficulty")),
+                                    key="jour_difficulty",
+                                )
 
-                                    render_md_box("Preview: Question", qtxt, empty_text="No question text.")
-                                    render_md_box("Preview: Mark scheme", mstxt, empty_text="No mark scheme.")
+                            plan_md = st.text_area("Journey plan (Markdown)", value=journey.get("plan_markdown", ""), height=140, key="jour_plan_md")
+                            render_md_box("Preview: Journey plan", plan_md, empty_text="No plan.")
 
-                                    edit_q_key = f"jour_step_edit_q_{i}"
-                                    edit_ms_key = f"jour_step_edit_ms_{i}"
-                                    if edit_q_key not in st.session_state:
-                                        st.session_state[edit_q_key] = False
-                                    if edit_ms_key not in st.session_state:
-                                        st.session_state[edit_ms_key] = False
-
-                                    ec1, ec2 = st.columns(2)
-                                    with ec1:
-                                        if st.button(
-                                            "Edit question",
-                                            key=f"{edit_q_key}_btn",
-                                            use_container_width=True,
-                                        ):
-                                            st.session_state[edit_q_key] = not st.session_state.get(edit_q_key, False)
-                                    with ec2:
-                                        if st.button(
-                                            "Edit mark scheme",
-                                            key=f"{edit_ms_key}_btn",
-                                            use_container_width=True,
-                                        ):
-                                            st.session_state[edit_ms_key] = not st.session_state.get(edit_ms_key, False)
-
-                                    if st.session_state.get(edit_q_key):
-                                        st.text_area(
-                                            "Question text (Markdown + LaTeX)",
-                                            value=st.session_state.get(q_key, ""),
-                                            height=160,
-                                            key=q_key,
-                                        )
-                                    if st.session_state.get(edit_ms_key):
-                                        st.text_area(
-                                            "Mark scheme (ends with TOTAL = <max_marks>)",
-                                            value=st.session_state.get(ms_key, ""),
-                                            height=200,
-                                            key=ms_key,
-                                        )
-
-                                    total_marks += int(mm)
-                                    edited_steps.append({
-                                        "objective": str(obj or "").strip(),
-                                        "question_text": str(qtxt or "").strip(),
-                                        "markscheme_text": str(mstxt or "").strip(),
-                                        "max_marks": int(mm),
-                                        "misconceptions": [x.strip() for x in (miscon or "").split("\n") if x.strip()][:6],
-                                        "spec_refs": [str(x).strip() for x in (stp.get("spec_refs", []) or []) if str(x).strip()][:6],
-                                    })
-
-                            if save_j:
-                                if not d_assignment.strip() or not d_label.strip():
-                                    st.error("Assignment name and Journey label cannot be blank.")
+                            # Optional teacher-only spec alignment preview
+                            with st.expander("Show spec alignment (teacher only)", expanded=False):
+                                spec_align = journey.get("spec_alignment", [])
+                                if isinstance(spec_align, list) and spec_align:
+                                    for sref in spec_align[:20]:
+                                        st.markdown(normalize_markdown_math(f"- {sref}"))
                                 else:
-                                    # Validate TOTAL lines
-                                    bad_total = []
-                                    for i, stp in enumerate(edited_steps):
-                                        if f"TOTAL = {int(stp['max_marks'])}" not in (stp.get("markscheme_text") or ""):
-                                            bad_total.append(i + 1)
-                                    if bad_total:
-                                        st.error("These steps are missing the required TOTAL line: " + ", ".join([str(x) for x in bad_total]))
-                                        st.stop()
+                                    st.caption("No spec alignment provided.")
 
-                                    tags = [t.strip() for t in (d_tags_str or "").split(",") if t.strip()]
-                                    tags = tags[:20]
+                            st.write("### Steps")
+                            if not isinstance(steps, list) or not steps:
+                                st.error("No steps found in journey JSON.")
+                            else:
+                                total_marks = 0
+                                edited_steps = []
+                                for i, stp in enumerate(steps):
+                                    stp = stp if isinstance(stp, dict) else {}
+                                    with st.expander(f"Step {i+1}: {stp.get('objective','')[:80]}", expanded=(i == 0)):
+                                        obj = st.text_input("Objective", value=str(stp.get("objective", "") or ""), key=f"jour_step_obj_{i}")
+                                        mm = st.number_input("Max marks", min_value=1, max_value=12, value=int(stp.get("max_marks", 1) or 1), step=1, key=f"jour_step_mm_{i}")
+                                        q_key = f"jour_step_q_{i}"
+                                        ms_key = f"jour_step_ms_{i}"
+                                        if q_key not in st.session_state:
+                                            st.session_state[q_key] = str(stp.get("question_text", "") or "")
+                                        if ms_key not in st.session_state:
+                                            st.session_state[ms_key] = str(stp.get("markscheme_text", "") or "")
+                                        qtxt = st.session_state.get(q_key, "")
+                                        mstxt = st.session_state.get(ms_key, "")
+                                        miscon = st.text_area("Common misconceptions (one per line)", value="\n".join([str(x) for x in (stp.get("misconceptions", []) or [])]), height=90, key=f"jour_step_mis_{i}")
 
-                                    journey_json = {
-                                        "topic": str(topic_val or journey.get("topic", "")).strip(),
-                                        "duration_minutes": 10,
-                                        "checkpoint_every": int(journey.get("checkpoint_every", JOURNEY_CHECKPOINT_EVERY) or JOURNEY_CHECKPOINT_EVERY),
-                                        "plan_markdown": str(plan_md or "").strip(),
-                                        "spec_alignment": [str(x).strip() for x in (journey.get("spec_alignment", []) or []) if str(x).strip()][:20],
-                                        "steps": edited_steps,
-                                    }
+                                        render_md_box("Preview: Question", qtxt, empty_text="No question text.")
+                                        render_md_box("Preview: Mark scheme", mstxt, empty_text="No mark scheme.")
 
-                                    ok = insert_question_bank_row(
-                                        source="ai_generated",
-                                        created_by="teacher",
-                                        subject_site=SUBJECT_SITE,
-                                        track_ok=d.get("track_ok", st.session_state.get("teacher_track_ok", "both")),
-                                        assignment_name=d_assignment.strip(),
-                                        question_label=d_label.strip(),
-                                        max_marks=int(total_marks) if total_marks > 0 else 1,
-                                        tags=tags,
-                                        topic=topic_val,
-                                        sub_topic=_clean_sub_topic_label(sub_topic_val),
-                                        sub_topic_raw=sub_topic_val,
-                                        skill=skill_val,
-                                        difficulty=difficulty_val,
-                                        question_text=str(plan_md or "").strip(),
-                                        markscheme_text="",
-                                        question_image_path=None,
-                                        markscheme_image_path=None,
-                                        question_type="journey",
-                                        journey_json=journey_json,
-                                    )
-                                    if ok:
-                                        st.session_state["journey_draft"] = None
-                                        st.success("Topic Journey saved. Students will see it as a single assignment and progress step-by-step.")
+                                        edit_q_key = f"jour_step_edit_q_{i}"
+                                        edit_ms_key = f"jour_step_edit_ms_{i}"
+                                        if edit_q_key not in st.session_state:
+                                            st.session_state[edit_q_key] = False
+                                        if edit_ms_key not in st.session_state:
+                                            st.session_state[edit_ms_key] = False
+
+                                        ec1, ec2 = st.columns(2)
+                                        with ec1:
+                                            if st.button(
+                                                "Edit question",
+                                                key=f"{edit_q_key}_btn",
+                                                use_container_width=True,
+                                            ):
+                                                st.session_state[edit_q_key] = not st.session_state.get(edit_q_key, False)
+                                        with ec2:
+                                            if st.button(
+                                                "Edit mark scheme",
+                                                key=f"{edit_ms_key}_btn",
+                                                use_container_width=True,
+                                            ):
+                                                st.session_state[edit_ms_key] = not st.session_state.get(edit_ms_key, False)
+
+                                        if st.session_state.get(edit_q_key):
+                                            st.text_area(
+                                                "Question text (Markdown + LaTeX)",
+                                                value=st.session_state.get(q_key, ""),
+                                                height=160,
+                                                key=q_key,
+                                            )
+                                        if st.session_state.get(edit_ms_key):
+                                            st.text_area(
+                                                "Mark scheme (ends with TOTAL = <max_marks>)",
+                                                value=st.session_state.get(ms_key, ""),
+                                                height=200,
+                                                key=ms_key,
+                                            )
+
+                                        total_marks += int(mm)
+                                        edited_steps.append({
+                                            "objective": str(obj or "").strip(),
+                                            "question_text": str(qtxt or "").strip(),
+                                            "markscheme_text": str(mstxt or "").strip(),
+                                            "max_marks": int(mm),
+                                            "misconceptions": [x.strip() for x in (miscon or "").split("\n") if x.strip()][:6],
+                                            "spec_refs": [str(x).strip() for x in (stp.get("spec_refs", []) or []) if str(x).strip()][:6],
+                                        })
+
+                                if save_j:
+                                    if not d_assignment.strip() or not d_label.strip():
+                                        st.error("Assignment name and Journey label cannot be blank.")
                                     else:
-                                        st.error("Failed to save journey to database. Check errors below.")
+                                        # Validate TOTAL lines
+                                        bad_total = []
+                                        for i, stp in enumerate(edited_steps):
+                                            if f"TOTAL = {int(stp['max_marks'])}" not in (stp.get("markscheme_text") or ""):
+                                                bad_total.append(i + 1)
+                                        if bad_total:
+                                            st.error("These steps are missing the required TOTAL line: " + ", ".join([str(x) for x in bad_total]))
+                                            st.stop()
+
+                                        tags = [t.strip() for t in (d_tags_str or "").split(",") if t.strip()]
+                                        tags = tags[:20]
+
+                                        journey_json = {
+                                            "topic": str(topic_val or journey.get("topic", "")).strip(),
+                                            "duration_minutes": 10,
+                                            "checkpoint_every": int(journey.get("checkpoint_every", JOURNEY_CHECKPOINT_EVERY) or JOURNEY_CHECKPOINT_EVERY),
+                                            "plan_markdown": str(plan_md or "").strip(),
+                                            "spec_alignment": [str(x).strip() for x in (journey.get("spec_alignment", []) or []) if str(x).strip()][:20],
+                                            "steps": edited_steps,
+                                        }
+
+                                        ok = insert_question_bank_row(
+                                            source="ai_generated",
+                                            created_by="teacher",
+                                            subject_site=SUBJECT_SITE,
+                                            track_ok=d.get("track_ok", st.session_state.get("teacher_track_ok", "both")),
+                                            assignment_name=d_assignment.strip(),
+                                            question_label=d_label.strip(),
+                                            max_marks=int(total_marks) if total_marks > 0 else 1,
+                                            tags=tags,
+                                            topic=topic_val,
+                                            sub_topic=_clean_sub_topic_label(sub_topic_val),
+                                            sub_topic_raw=sub_topic_val,
+                                            skill=skill_val,
+                                            difficulty=difficulty_val,
+                                            question_text=str(plan_md or "").strip(),
+                                            markscheme_text="",
+                                            question_image_path=None,
+                                            markscheme_image_path=None,
+                                            question_type="journey",
+                                            journey_json=journey_json,
+                                        )
+                                        if ok:
+                                            st.session_state["journey_draft"] = None
+                                            st.success("Topic Journey saved. Students will see it as a single assignment and progress step-by-step.")
+                                        else:
+                                            st.error("Failed to save journey to database. Check errors below.")
 
                 st.divider()
 
