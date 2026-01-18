@@ -100,6 +100,50 @@ div[data-testid="stButton"] button[aria-label="⤡"] span {
   line-height: 1;
   font-weight: 700;
 }
+div[data-testid="stButton"] > button {
+  background: #2563eb;
+  color: #ffffff;
+  border: 1px solid #1d4ed8;
+  border-radius: 10px;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.18);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+div[data-testid="stButton"] > button:hover {
+  background: #1d4ed8;
+  box-shadow: 0 8px 18px rgba(29, 78, 216, 0.22);
+  transform: translateY(-1px);
+}
+div[data-testid="stButton"] > button:active {
+  background: #1e40af;
+  transform: translateY(0);
+}
+div[data-testid="stButton"] > button:disabled {
+  background: #cbd5f5;
+  color: #f8fafc;
+  border-color: #cbd5f5;
+  box-shadow: none;
+}
+div[data-testid="stButton"] > button[kind="secondary"] {
+  background: #f8fafc;
+  color: #1e293b;
+  border: 1px solid #94a3b8;
+  box-shadow: none;
+}
+div[data-testid="stButton"] > button[kind="secondary"]:hover {
+  background: #e2e8f0;
+  border-color: #64748b;
+}
+div[data-testid="stButton"] > button[kind="secondary"]:active {
+  background: #cbd5f5;
+}
+div[data-testid="stButton"] > button[kind="primary"] {
+  background: #1d4ed8;
+  border-color: #1e40af;
+}
+div[data-testid="stButton"] > button[kind="primary"]:hover {
+  background: #1e40af;
+}
 .pp-hero {
   display: flex;
   flex-wrap: wrap;
