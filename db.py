@@ -229,6 +229,8 @@ QUESTION_BANK_ALTER_DDL = """
 alter table public.question_bank_v2
   add column if not exists sub_topic_raw text;
 
+drop index if exists public.uq_question_bank_v2_subject_source_assignment_label;
+
 create unique index if not exists uq_question_bank_subject_source_assignment_label
   on public.question_bank_v2 (subject_site, source, assignment_name, question_label);
 """.strip()

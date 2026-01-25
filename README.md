@@ -86,3 +86,43 @@ Teachers can:
   This file.
 
 ---
+
+## Supabase linter fixes
+
+Supabase may flag two common issues in this project:
+
+### 1) Auth RLS Initialization Plan warnings (attempts_v1 policies)
+
+The linter warning indicates that calls like `auth.uid()` or `current_setting()` are being evaluated per-row inside RLS policies. To fix it, wrap those calls in a `select` subquery so Postgres evaluates them once per statement.
+
+1. Inspect the existing policy definitions:
+   ```sql
+   select polname, pg_get_policydef(oid) as policy_def
+   from pg_policy
+   where polrelid = 'public.attempts_v1'::regclass;
+   ```
+2. Update each policy that references `auth.<function>()` by wrapping it:
+   ```sql
+   alter policy attempts_select_own on public.attempts_v1
+     using (<same expression as before, but replace auth.uid() with (select auth.uid())>);
+
+   alter policy attempts_insert_own on public.attempts_v1
+     with check (<same expression as before, but replace auth.uid() with (select auth.uid())>);
+
+   alter policy attempts_update_own on public.attempts_v1
+     using (<same expression as before, but replace auth.uid() with (select auth.uid())>)
+     with check (<same expression as before, but replace auth.uid() with (select auth.uid())>);
+
+   alter policy attempts_delete_own on public.attempts_v1
+     using (<same expression as before, but replace auth.uid() with (select auth.uid())>);
+   ```
+
+### 2) Duplicate index warning (question_bank_v2)
+
+If Supabase reports both `uq_question_bank_subject_source_assignment_label` and `uq_question_bank_v2_subject_source_assignment_label`, keep one and drop the other:
+
+```sql
+drop index if exists public.uq_question_bank_v2_subject_source_assignment_label;
+```
+
+The app now drops the duplicate index during table maintenance to keep the schema clean.
