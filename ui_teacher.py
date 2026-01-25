@@ -360,9 +360,43 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         if "bank_preview_pick" in st.session_state and st.session_state["bank_preview_pick"] not in options:
                             st.session_state["bank_preview_pick"] = options[0]
 
+                        def _shift_bank_preview(step, option_list):
+                            if not option_list:
+                                st.session_state["bank_preview_pick"] = None
+                                return
+                            current = st.session_state.get("bank_preview_pick")
+                            if current not in option_list:
+                                st.session_state["bank_preview_pick"] = option_list[0]
+                                return
+                            current_index = option_list.index(current)
+                            new_index = max(0, min(current_index + step, len(option_list) - 1))
+                            st.session_state["bank_preview_pick"] = option_list[new_index]
+
                         with st.expander("Select an entry to preview", expanded=False):
                             pick = st.selectbox("Question entry", options, key="bank_preview_pick")
                             pick_id = int(df_f.loc[df_f["label"] == pick, "id"].iloc[0])
+                            if len(options) > 1:
+                                current_index = options.index(pick)
+                                nav_disabled = current_index < 0
+                                nav_cols = st.columns([1, 1])
+                                with nav_cols[0]:
+                                    st.button(
+                                        "Previous Question",
+                                        disabled=nav_disabled or current_index == 0,
+                                        use_container_width=True,
+                                        key="bank_prev_question_btn",
+                                        on_click=_shift_bank_preview,
+                                        args=(-1, options),
+                                    )
+                                with nav_cols[1]:
+                                    st.button(
+                                        "Next Question",
+                                        disabled=nav_disabled or current_index == len(options) - 1,
+                                        use_container_width=True,
+                                        key="bank_next_question_btn",
+                                        on_click=_shift_bank_preview,
+                                        args=(1, options),
+                                    )
 
                         row = load_question_by_id(pick_id) or {}
                         q_text = (row.get("question_text") or "").strip()
