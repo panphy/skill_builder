@@ -375,28 +375,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                         with st.expander("Select an entry to preview", expanded=False):
                             pick = st.selectbox("Question entry", options, key="bank_preview_pick")
                             pick_id = int(df_f.loc[df_f["label"] == pick, "id"].iloc[0])
-                            if len(options) > 1:
-                                current_index = options.index(pick)
-                                nav_disabled = current_index < 0
-                                nav_cols = st.columns([1, 1])
-                                with nav_cols[0]:
-                                    st.button(
-                                        "Previous Question",
-                                        disabled=nav_disabled or current_index == 0,
-                                        use_container_width=True,
-                                        key="bank_prev_question_btn",
-                                        on_click=_shift_bank_preview,
-                                        args=(-1, options),
-                                    )
-                                with nav_cols[1]:
-                                    st.button(
-                                        "Next Question",
-                                        disabled=nav_disabled or current_index == len(options) - 1,
-                                        use_container_width=True,
-                                        key="bank_next_question_btn",
-                                        on_click=_shift_bank_preview,
-                                        args=(1, options),
-                                    )
+                            current_index = options.index(pick) if pick in options else -1
 
                         row = load_question_by_id(pick_id) or {}
                         q_text = (row.get("question_text") or "").strip()
@@ -490,6 +469,28 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                         st.markdown(normalize_markdown_math(ms_text))
                                     if (ms_img is None) and (not ms_text):
                                         st.caption("No mark scheme text/image (image-only teacher uploads are supported).")
+
+                        if len(options) > 1:
+                            nav_disabled = current_index < 0
+                            nav_cols = st.columns([1, 1])
+                            with nav_cols[0]:
+                                st.button(
+                                    "Previous Question",
+                                    disabled=nav_disabled or current_index == 0,
+                                    use_container_width=True,
+                                    key="bank_prev_question_btn",
+                                    on_click=_shift_bank_preview,
+                                    args=(-1, options),
+                                )
+                            with nav_cols[1]:
+                                st.button(
+                                    "Next Question",
+                                    disabled=nav_disabled or current_index == len(options) - 1,
+                                    use_container_width=True,
+                                    key="bank_next_question_btn",
+                                    on_click=_shift_bank_preview,
+                                    args=(1, options),
+                                )
 
                         if st.session_state.get("bank_delete_reset"):
                             st.session_state["bank_delete_picks"] = []
