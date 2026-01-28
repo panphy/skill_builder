@@ -82,9 +82,12 @@ LOGGER = setup_logging()
 # =========================
 # --- PAGE CONFIG ---
 # =========================
+PANPHY_LOGO_URL = "https://panphy.github.io/panphy.png"
+PANPHY_FAVICON_URL = "https://panphy.github.io/favicon.png"
+
 st.set_page_config(
     page_title="PanPhy Skill Builder",
-    page_icon="⚛️",
+    page_icon=PANPHY_FAVICON_URL,
     layout="wide"
 )
 
@@ -227,20 +230,38 @@ div[data-testid="stButton"] > button[kind="primary"]:hover {
 }
 footer {
   position: static;
-  font-size: 15px;
+  font-size: 0.85rem;
   text-align: center;
-  padding: 7px;
+  padding: 16px 8px;
   background: transparent;
-  color: #555;
-  margin: 4px 0;
+  color: rgba(11, 26, 51, 0.62);
+  margin-top: 24px;
   width: 100%;
+  border-top: 1px solid rgba(23, 37, 84, 0.12);
 }
 footer a {
-  color: #ff5f1f;
+  color: #2f6bff;
   text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease;
 }
 footer a:hover {
+  color: #1d4ed8;
   text-decoration: underline;
+}
+.app-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+.app-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 </style>
 """,
@@ -1653,8 +1674,17 @@ with header_right:
         _render_badge("SEPARATE", color="primary", icon=":material/call_split:")
 
 with header_left:
-
-    st.title("⚛️ PanPhy Skill Builder")
+    st.markdown(
+        f"""
+        <div class="app-title-row">
+          <a href="https://panphy.github.io/?" target="_blank" rel="noopener noreferrer">
+            <img src="{PANPHY_LOGO_URL}" alt="PanPhy logo" class="app-logo" />
+          </a>
+          <h1 style="margin: 0; font-size: 2rem; font-weight: 700;">PanPhy Skill Builder</h1>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.caption(f"Powered by OpenAI {MODEL_NAME}")
 with header_right:
     issues = []
@@ -1749,8 +1779,11 @@ elif nav in ("🔒 Teacher Dashboard", "📚 Question Bank"):
 st.markdown(
     """
 <footer>
-  &copy; <a href="https://panphy.github.io/" target="_blank" rel="noopener noreferrer">PanPhy</a> |
-  <a href="https://buymeacoffee.com/panphy" target="_blank" rel="noopener noreferrer">Support My Projects</a>
+    <p>&copy; 2026 PanPhy Projects</p>
+    <p>
+      <a href="mailto:panphyprojects@icloud.com">Contact Me</a> •
+      <a href="https://buymeacoffee.com/panphy" target="_blank" rel="noopener noreferrer">Support My Projects</a>
+    </p>
 </footer>
 """,
     unsafe_allow_html=True,
