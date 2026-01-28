@@ -673,33 +673,24 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 )
 
                             st.write(f"### ✅ Vet and edit (Draft {idx} of {total_drafts})")
-                            c1, c2 = st.columns([3, 1])
-                            with c1:
-                                assignment_name = st.text_input(
-                                    "Assignment name",
-                                    value="AI Practice",
-                                    key=f"draft_assignment_{draft_id}",
-                                    help="Required. Use a short, descriptive name (e.g. 'AI Practice' or 'Paper 1 Electricity').",
-                                )
-                                question_label = st.text_input(
-                                    "Question label",
-                                    value=f"{slugify(topic)[:24]}-{draft_id}",
-                                    key=f"draft_label_{draft_id}",
-                                    help="Required. Use a simple label like Q3b or a short slug.",
-                                )
-                                tags_str = st.text_input(
-                                    "Tags (comma separated)",
-                                    value=", ".join(draft.get("tags", [])),
-                                    key=f"draft_tags_{draft_id}",
-                                    help="Optional. Comma-separated keywords for search (e.g. circuits, energy).",
-                                )
-                            with c2:
-                                save_clicked = st.button(
-                                    "Save to Question Bank",
-                                    type="primary",
-                                    use_container_width=True,
-                                    key=f"draft_save_btn_{draft_id}",
-                                )
+                            assignment_name = st.text_input(
+                                "Assignment name",
+                                value="AI Practice",
+                                key=f"draft_assignment_{draft_id}",
+                                help="Required. Use a short, descriptive name (e.g. 'AI Practice' or 'Paper 1 Electricity').",
+                            )
+                            question_label = st.text_input(
+                                "Question label",
+                                value=f"{slugify(topic)[:24]}-{draft_id}",
+                                key=f"draft_label_{draft_id}",
+                                help="Required. Use a simple label like Q3b or a short slug.",
+                            )
+                            tags_str = st.text_input(
+                                "Tags (comma separated)",
+                                value=", ".join(draft.get("tags", [])),
+                                key=f"draft_tags_{draft_id}",
+                                help="Optional. Comma-separated keywords for search (e.g. circuits, energy).",
+                            )
 
                             topic_options = get_topic_group_names_for_track(track)
                             skill_options = list(SKILLS)
@@ -783,7 +774,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                             if edit_ms_key not in st.session_state:
                                 st.session_state[edit_ms_key] = False
 
-                            ec1, ec2 = st.columns(2)
+                            ec1, ec2, ec3 = st.columns(3)
                             with ec1:
                                 if st.button(
                                     "Edit question",
@@ -798,6 +789,13 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                     use_container_width=True,
                                 ):
                                     st.session_state[edit_ms_key] = not st.session_state.get(edit_ms_key, False)
+                            with ec3:
+                                save_clicked = st.button(
+                                    "Save to Question Bank",
+                                    type="primary",
+                                    use_container_width=True,
+                                    key=f"draft_save_btn_{draft_id}",
+                                )
 
                             if st.session_state.get(edit_q_key):
                                 st.text_area(
