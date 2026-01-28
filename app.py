@@ -1618,7 +1618,17 @@ def render_report(report: dict):
 # ============================================================
 # NAVIGATION
 # ============================================================
-st.sidebar.title("⚛️ PanPhy")
+st.sidebar.markdown(
+    f"""
+    <div class="app-title-row">
+      <a href="https://panphy.github.io/?" target="_blank" rel="noopener noreferrer">
+        <img src="{PANPHY_LOGO_URL}" alt="PanPhy logo" class="app-logo" style="width: 36px; height: 36px;" />
+      </a>
+      <span style="font-size: 1.5rem; font-weight: 700;">PanPhy</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 nav = st.sidebar.radio(
     "Navigate",
     ["🧑‍🎓 Student", "🔒 Teacher Dashboard", "📚 Question Bank"],
