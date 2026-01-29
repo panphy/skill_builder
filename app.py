@@ -796,13 +796,34 @@ html[data-pp-theme="light"] [data-testid="stTextArea"] textarea:hover,
 }
 
 /* Dark theme text area - use light background for readability */
+/* Force light grey background with dark text in ALL dark mode scenarios */
 html[data-pp-theme="dark"] [data-testid="stTextArea"] textarea,
+html[data-pp-theme="dark"] .stTextArea textarea,
+[data-theme="dark"] [data-testid="stTextArea"] textarea,
+[data-theme="dark"] .stTextArea textarea {
+  border: 1px solid #cbd5e1 !important;
+  background-color: #f8fafc !important;
+  background: #f8fafc !important;
+  color: #1e293b !important;
+  -webkit-text-fill-color: #1e293b !important;
+}
+
 @media (prefers-color-scheme: dark) {
-  [data-testid="stTextArea"] textarea {
+  [data-testid="stTextArea"] textarea,
+  .stTextArea textarea {
     border: 1px solid #cbd5e1 !important;
-    background: #ffffff !important;
+    background-color: #f8fafc !important;
+    background: #f8fafc !important;
     color: #1e293b !important;
+    -webkit-text-fill-color: #1e293b !important;
   }
+}
+
+/* Also fix placeholder text color in dark mode */
+html[data-pp-theme="dark"] [data-testid="stTextArea"] textarea::placeholder,
+[data-theme="dark"] [data-testid="stTextArea"] textarea::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
 }
 
 /* ============================================================
