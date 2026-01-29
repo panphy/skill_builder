@@ -88,8 +88,7 @@ def render_student_page(helpers: dict):
         if not chips:
             st.caption("No active filters. Showing everything for this source.")
             return
-        chips_html = " ".join([f"<span class='pp-chip'>{chip}</span>" for chip in chips])
-        st.markdown(f"<div class='pp-chip-row'>{chips_html}</div>", unsafe_allow_html=True)
+        st.markdown("**Active filters:** " + ", ".join(chips))
 
     def _advance_question(
         choice_key: str | None,

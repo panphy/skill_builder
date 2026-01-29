@@ -20,7 +20,6 @@ from sqlalchemy import text
 from logging.handlers import RotatingFileHandler
 import os
 import time
-import textwrap
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
@@ -92,340 +91,6 @@ st.set_page_config(
     layout="wide"
 )
 
-st.markdown(
-    """
-<style>
-/* ============================================================
-   PanPhy Skill Builder - Modern Theme System
-   Supports both light and dark modes via CSS variables
-   ============================================================ */
-
-/* CSS Variables for Light Mode (default) - applied with high specificity */
-:root,
-html,
-body,
-[data-testid="stAppViewContainer"],
-.stApp {
-  /* Primary colors */
-  --pp-primary: #3b82f6;
-  --pp-primary-hover: #2563eb;
-  --pp-primary-active: #1d4ed8;
-  --pp-primary-light: rgba(59, 130, 246, 0.12);
-  --pp-primary-border: rgba(59, 130, 246, 0.3);
-
-  /* Background colors */
-  --pp-bg-primary: #ffffff;
-  --pp-bg-secondary: #f8fafc;
-  --pp-bg-tertiary: #f1f5f9;
-  --pp-bg-elevated: #ffffff;
-
-  /* Text colors */
-  --pp-text-primary: #1e293b;
-  --pp-text-secondary: #475569;
-  --pp-text-tertiary: #64748b;
-  --pp-text-muted: #94a3b8;
-  --pp-text-on-primary: #ffffff;
-
-  /* Border colors */
-  --pp-border: #e2e8f0;
-  --pp-border-light: rgba(0, 0, 0, 0.06);
-  --pp-border-focus: var(--pp-primary);
-
-  /* Shadows */
-  --pp-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --pp-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --pp-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
-  --pp-shadow-primary: 0 4px 14px rgba(59, 130, 246, 0.25);
-
-  /* Card colors */
-  --pp-card-bg: rgba(255, 255, 255, 0.8);
-  --pp-card-border: rgba(148, 163, 184, 0.2);
-
-  /* Callout colors */
-  --pp-callout-bg: rgba(59, 130, 246, 0.06);
-  --pp-callout-border: rgba(59, 130, 246, 0.2);
-  --pp-callout-text: #1e40af;
-
-  /* Chip colors */
-  --pp-chip-bg: rgba(59, 130, 246, 0.1);
-  --pp-chip-text: #1e40af;
-
-  /* Footer */
-  --pp-footer-text: rgba(30, 41, 59, 0.6);
-  --pp-footer-border: rgba(0, 0, 0, 0.08);
-
-  /* Secondary button */
-  --pp-btn-secondary-bg: #f8fafc;
-  --pp-btn-secondary-hover: #f1f5f9;
-  --pp-btn-secondary-text: #334155;
-  --pp-btn-secondary-border: #cbd5e1;
-
-  /* Disabled state */
-  --pp-disabled-bg: #e2e8f0;
-  --pp-disabled-text: #94a3b8;
-
-  /* Overlay */
-  --pp-overlay-bg: rgba(0, 0, 0, 0.3);
-  --pp-overlay-card: rgba(255, 255, 255, 0.98);
-
-  /* Progress */
-  --pp-progress-bg: rgba(59, 130, 246, 0.15);
-  --pp-progress-fill: #3b82f6;
-  --pp-progress-secondary: #93c5fd;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root,
-  html,
-  body,
-  [data-testid="stAppViewContainer"],
-  .stApp {
-    /* Primary colors */
-    --pp-primary: #60a5fa;
-    --pp-primary-hover: #3b82f6;
-    --pp-primary-active: #2563eb;
-    --pp-primary-light: rgba(59, 130, 246, 0.2);
-    --pp-primary-border: rgba(96, 165, 250, 0.35);
-
-    /* Background colors */
-    --pp-bg-primary: #0f172a;
-    --pp-bg-secondary: #111827;
-    --pp-bg-tertiary: #1f2937;
-    --pp-bg-elevated: #111827;
-
-    /* Text colors */
-    --pp-text-primary: #f8fafc;
-    --pp-text-secondary: #cbd5e1;
-    --pp-text-tertiary: #94a3b8;
-    --pp-text-muted: #64748b;
-    --pp-text-on-primary: #0f172a;
-
-    /* Border colors */
-    --pp-border: rgba(148, 163, 184, 0.3);
-    --pp-border-light: rgba(148, 163, 184, 0.2);
-    --pp-border-focus: var(--pp-primary);
-
-    /* Shadows */
-    --pp-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.4);
-    --pp-shadow-md: 0 6px 16px rgba(15, 23, 42, 0.5);
-    --pp-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.55);
-    --pp-shadow-primary: 0 6px 18px rgba(59, 130, 246, 0.35);
-
-    /* Card colors */
-    --pp-card-bg: rgba(15, 23, 42, 0.85);
-    --pp-card-border: rgba(148, 163, 184, 0.35);
-
-    /* Callout colors */
-    --pp-callout-bg: rgba(59, 130, 246, 0.18);
-    --pp-callout-border: rgba(99, 102, 241, 0.35);
-    --pp-callout-text: #e0e7ff;
-
-    /* Chip colors */
-    --pp-chip-bg: rgba(59, 130, 246, 0.2);
-    --pp-chip-text: #e0f2fe;
-
-    /* Footer */
-    --pp-footer-text: rgba(226, 232, 240, 0.7);
-    --pp-footer-border: rgba(148, 163, 184, 0.25);
-
-    /* Secondary button */
-    --pp-btn-secondary-bg: #1f2937;
-    --pp-btn-secondary-hover: #273449;
-    --pp-btn-secondary-text: #e2e8f0;
-    --pp-btn-secondary-border: rgba(148, 163, 184, 0.35);
-
-    /* Disabled state */
-    --pp-disabled-bg: rgba(148, 163, 184, 0.2);
-    --pp-disabled-text: #94a3b8;
-
-    /* Overlay */
-    --pp-overlay-bg: rgba(15, 23, 42, 0.6);
-    --pp-overlay-card: rgba(15, 23, 42, 0.95);
-
-    /* Progress */
-    --pp-progress-bg: rgba(59, 130, 246, 0.3);
-    --pp-progress-fill: #60a5fa;
-    --pp-progress-secondary: #93c5fd;
-  }
-}
-
-/* ============================================================
-   Base Layout
-   ============================================================ */
-div[data-testid="stAppViewContainer"] > .main .block-container {
-  padding-top: 1rem;
-}
-
-/* ============================================================
-   Button Styles
-   ============================================================ */
-/* Base button styling - applies to all buttons */
-div[data-testid="stButton"] > button {
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 0.2s ease;
-}
-
-div[data-testid="stButton"] > button:hover {
-  transform: translateY(-1px);
-}
-
-div[data-testid="stButton"] > button:active {
-  transform: translateY(0);
-}
-
-div[data-testid="stButton"] > button:disabled {
-  box-shadow: none;
-  transform: none;
-  cursor: not-allowed;
-}
-
-/* ============================================================
-   Chips
-   ============================================================ */
-.pp-chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0.5rem 0 0.25rem 0;
-}
-
-.pp-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  background: var(--pp-chip-bg);
-  color: var(--pp-chip-text);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-/* ============================================================
-   Footer
-   ============================================================ */
-footer {
-  position: static;
-  font-size: 0.85rem;
-  text-align: center;
-  padding: 16px 8px;
-  background: transparent;
-  color: var(--pp-footer-text);
-  margin-top: 24px;
-  width: 100%;
-  border-top: 1px solid var(--pp-footer-border);
-}
-
-footer a {
-  color: var(--pp-primary);
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.2s ease;
-}
-
-footer a:hover {
-  color: var(--pp-primary-hover);
-  text-decoration: underline;
-}
-
-/* ============================================================
-   App Header
-   ============================================================ */
-.app-logo {
-  width: 44px;
-  height: 44px;
-  object-fit: contain;
-  border-radius: 10px;
-  box-shadow: none;
-  background: transparent;
-  padding: 0;
-}
-
-.app-title-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.app-title-row h1 {
-  color: var(--text-color);
-}
-
-.app-title {
-  margin: 0;
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--text-color) !important;
-}
-
-.app-title {
-  margin: 0;
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--pp-text-primary) !important;
-}
-
-/* ============================================================
-   Section Headers
-   ============================================================ */
-.pp-section-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.pp-section-icon {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--pp-primary-light);
-  color: var(--pp-primary);
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-/* ============================================================
-   Text Area Styling - visible borders
-   ============================================================ */
-[data-testid="stTextArea"] textarea {
-  border: 1px solid var(--pp-border) !important;
-  border-radius: 10px !important;
-  background: var(--pp-bg-primary) !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
-}
-
-[data-testid="stTextInput"] input {
-  background-color: var(--secondary-background-color) !important;
-  color: var(--text-color) !important;
-}
-
-/* ============================================================
-   Expand Button Styling
-   ============================================================ */
-/* Target the expand/collapse buttons specifically */
-div[data-testid="stButton"] > button:has([data-testid="stMarkdownContainer"]),
-div[data-testid="column"]:last-child div[data-testid="stButton"] > button {
-  min-width: 44px !important;
-  padding: 0.35rem 0.5rem !important;
-}
-
-/* ============================================================
-   Bordered Container Styling
-   (Question box, AI Feedback box, etc.)
-   ============================================================ */
-/* Target Streamlit's bordered containers */
-[data-testid="stVerticalBlockBorderWrapper"] {
-  border: 2px solid rgba(59, 130, 246, 0.35) !important;
-  border-radius: 12px !important;
-  overflow: hidden;
-}
-</style>
-""",
-    unsafe_allow_html=True,
-)
 
 # =========================
 # --- CONSTANTS ---
@@ -1339,141 +1004,16 @@ def _run_ai_with_progress(
         if total_steps and total_steps > 0 and step_index:
             step_label = f"Question {step_index} of {total_steps}"
             step_percent = min(100, max(0, int((step_index / total_steps) * 100)))
-        step_html = ""
-        if step_label:
-            step_html = f"""
-<div class="pp-step">
-  <div class="pp-step-label">{step_label}</div>
-  <div class="pp-step-bar">
-    <div class="pp-step-fill" style="width: {step_percent}%;"></div>
-  </div>
-</div>
-"""
-        # Render a full-page blocker with a simple percent progress bar.
-        overlay.markdown(
-            textwrap.dedent(f"""
-<style>
-/* PanPhy full-page UI blocker - theme-aware */
-.pp-overlay {{
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  background: var(--pp-overlay-bg, rgba(0,0,0,0.3));
-  z-index: 999999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: all;
-}}
-.pp-overlay-card {{
-  width: min(560px, 92vw);
-  background: var(--pp-overlay-card, rgba(255,255,255,0.98));
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: var(--pp-shadow-lg, 0 10px 30px rgba(0,0,0,0.22));
-  border: 1px solid var(--pp-border, rgba(0,0,0,0.12));
-}}
-.pp-row {{
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}}
-.pp-spinner {{
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  border: 3px solid var(--pp-progress-bg, rgba(59,130,246,0.2));
-  border-top-color: var(--pp-progress-fill, #3b82f6);
-  animation: pp-spin 0.8s linear infinite;
-  flex: 0 0 auto;
-  margin-top: 2px;
-}}
-@keyframes pp-spin {{
-  from {{ transform: rotate(0deg); }}
-  to   {{ transform: rotate(360deg); }}
-}}
-.pp-title {{
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--pp-text-primary, #1e293b);
-  margin: 0;
-  line-height: 1.3;
-}}
-.pp-subtitle {{
-  font-size: 13px;
-  color: var(--pp-text-secondary, #475569);
-  margin-top: 4px;
-  line-height: 1.4;
-}}
-.pp-meta {{
-  font-size: 12px;
-  color: var(--pp-text-tertiary, #64748b);
-  margin-top: 6px;
-}}
-.pp-progress {{
-  margin-top: 14px;
-  width: 100%;
-  height: 8px;
-  background: var(--pp-progress-bg, rgba(59,130,246,0.15));
-  border-radius: 999px;
-  overflow: hidden;
-  position: relative;
-}}
-.pp-progress-fill {{
-  height: 100%;
-  background: var(--pp-progress-fill, #3b82f6);
-  border-radius: 999px;
-  transition: width 0.35s ease;
-}}
-.pp-step {{
-  margin-top: 12px;
-}}
-.pp-step-label {{
-  font-size: 12px;
-  color: var(--pp-text-secondary, #475569);
-  margin-bottom: 6px;
-}}
-.pp-step-bar {{
-  width: 100%;
-  height: 5px;
-  background: var(--pp-progress-bg, rgba(59,130,246,0.15));
-  border-radius: 999px;
-  overflow: hidden;
-}}
-.pp-step-fill {{
-  height: 100%;
-  background: var(--pp-progress-secondary, #93c5fd);
-  border-radius: 999px;
-  transition: width 0.35s ease;
-}}
-.pp-note {{
-  font-size: 11px;
-  color: var(--pp-text-muted, #94a3b8);
-  margin-top: 6px;
-}}
-</style>
-
-<div class="pp-overlay">
-  <div class="pp-overlay-card">
-    <div class="pp-row">
-      <div class="pp-spinner"></div>
-      <div>
-        <div class="pp-title">AI is working. Please wait...</div>
-        <div class="pp-subtitle">{subtitle}</div>
-        <div class="pp-meta">{percent}% • Estimate: {estimate_label}</div>
-        <div class="pp-note">May take longer for complex tasks.</div>
-      </div>
-    </div>
-    <div class="pp-progress">
-      <div class="pp-progress-fill" style="width: {percent}%;"></div>
-    </div>
-    {step_html}
-  </div>
-</div>
-"""),
-            unsafe_allow_html=True,
-        )
+        with overlay.container():
+            st.info("AI is working. Please wait...")
+            if subtitle:
+                st.caption(subtitle)
+            st.caption(f"{percent}% • Estimate: {estimate_label}")
+            st.caption("May take longer for complex tasks.")
+            st.progress(percent)
+            if step_label:
+                st.caption(step_label)
+                st.progress(step_percent)
 
     def _calc_percent(elapsed_s: float, done: bool = False) -> int:
         if done:
@@ -1832,18 +1372,13 @@ with header_right:
         _render_badge("SEPARATE", color="primary", icon=":material/call_split:")
 
 with header_left:
-    st.markdown(
-        f"""
-        <div class="app-title-row">
-          <a href="https://panphy.github.io/?" target="_blank" rel="noopener noreferrer">
-            <img src="{PANPHY_LOGO_URL}" alt="PanPhy logo" class="app-logo" />
-          </a>
-          <h1 class="app-title">PanPhy Skill Builder</h1>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.caption(f"Powered by OpenAI {MODEL_NAME}")
+    logo_col, title_col = st.columns([1, 5])
+    with logo_col:
+        st.image(PANPHY_LOGO_URL, width=64)
+    with title_col:
+        st.title("PanPhy Skill Builder")
+        st.caption(f"Powered by OpenAI {MODEL_NAME}")
+    st.markdown("[PanPhy Home](https://panphy.github.io/?)")
 with header_right:
     issues = []
     if not AI_READY:
@@ -1903,15 +1438,9 @@ if nav == "Student":
 elif nav in ("Teacher Dashboard", "Question Bank"):
     render_teacher_page(nav, _ui_helpers)
 
+st.divider()
+st.caption("© 2026 PanPhy Projects")
 st.markdown(
-    """
-<footer>
-    <p>&copy; 2026 PanPhy Projects</p>
-    <p>
-      <a href="mailto:panphyprojects@icloud.com">Contact Me</a> •
-      <a href="https://buymeacoffee.com/panphy" target="_blank" rel="noopener noreferrer">Support My Projects</a>
-    </p>
-</footer>
-""",
-    unsafe_allow_html=True,
+    "[Contact Me](mailto:panphyprojects@icloud.com) • "
+    "[Support My Projects](https://buymeacoffee.com/panphy)"
 )
