@@ -1,20 +1,3 @@
-# Streamlit configuration for PanPhy Skill Builder
-# Modern theme with clean, accessible colors for both light and dark modes
-
-[theme]
-# Primary accent color - used for interactive elements, links, and highlights
-primaryColor = "#3b82f6"
-
-# Background colors - Streamlit auto-switches between light/dark
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f8fafc"
-
-# Text color
-textColor = "#1e293b"
-
-# Font family
-font = "sans serif"
-
 [server]
 headless = true
 enableCORS = false
