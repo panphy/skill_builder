@@ -138,8 +138,8 @@ body,
   --pp-shadow-primary: 0 4px 14px rgba(59, 130, 246, 0.25);
 
   /* Hero section */
-  --pp-hero-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(139, 92, 246, 0.06) 100%);
-  --pp-hero-border: rgba(148, 163, 184, 0.25);
+  --pp-hero-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.14) 0%, rgba(139, 92, 246, 0.12) 100%);
+  --pp-hero-border: rgba(148, 163, 184, 0.4);
 
   /* Card colors */
   --pp-card-bg: rgba(255, 255, 255, 0.8);
@@ -301,6 +301,7 @@ div[data-testid="stButton"] > button:disabled {
   border-radius: 16px;
   background: var(--pp-hero-bg);
   border: 1px solid var(--pp-hero-border);
+  box-shadow: var(--pp-shadow-md);
   margin-bottom: 1.5rem;
 }
 
