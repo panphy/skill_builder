@@ -4,6 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
+    /* Theme-aware canvas component */
+    :root {
+      --canvas-bg: #ffffff;
+      --canvas-border: rgba(0, 0, 0, 0.1);
+      --canvas-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --canvas-bg: #1e293b;
+        --canvas-border: rgba(255, 255, 255, 0.12);
+        --canvas-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      }
+    }
+
     html, body {
       margin: 0;
       padding: 0;
@@ -30,13 +45,19 @@
       resize: vertical;
       overflow: hidden;
       box-sizing: border-box;
-      border-radius: 12px;
-      border: 1px solid rgba(0,0,0,0.08);
-      background: #ffffff;
+      border-radius: 10px;
+      border: 1px solid var(--canvas-border);
+      background: var(--canvas-bg);
+      box-shadow: var(--canvas-shadow);
       position: relative;
       -webkit-user-select: none;
       user-select: none;
       -webkit-touch-callout: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    #resizable:hover {
+      border-color: rgba(59, 130, 246, 0.4);
     }
 
     /* Disable resize handle when not allowed */
@@ -49,10 +70,11 @@
       width: 100%;
       height: 100%;
       touch-action: none; /* important for stylus/touch drawing */
-      background: #ffffff;
+      background: var(--canvas-bg);
       -webkit-user-select: none;
       user-select: none;
       -webkit-touch-callout: none;
+      border-radius: 9px;
     }
   </style>
 </head>
@@ -361,6 +383,12 @@
     // Apply resizable setting
     if (args.resizable) resizable.classList.remove("no-resize");
     else resizable.classList.add("no-resize");
+
+    // Update CSS custom properties for background color
+    const bgColor = args.background_color || "#ffffff";
+    document.documentElement.style.setProperty('--canvas-bg', bgColor);
+    resizable.style.background = bgColor;
+    canvas.style.background = bgColor;
 
     // Set initial height (prefer persisted user choice) or apply when args.height changes
     const persisted = tryLoadPersistedHeight();

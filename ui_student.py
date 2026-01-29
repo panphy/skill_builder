@@ -52,7 +52,7 @@ def render_student_page(helpers: dict):
     bytes_to_pil = helpers["bytes_to_pil"]
 
     st.divider()
-    st.subheader("🧑‍🎓 Student Workspace")
+    st.subheader("Student Workspace")
     st.caption("Choose a question set, confirm the filters, then answer and submit for feedback.")
 
     source_options = ["AI Practice", "Teacher Uploads", "All"]
@@ -461,10 +461,10 @@ def render_student_page(helpers: dict):
     # -------------------------
     with col1:
         if not q_row:
-            st.subheader("📝 Question")
+            st.subheader("Question")
             st.info("Select a question above to begin.")
         elif q_type != "journey":
-            st.subheader("📝 Question")
+            st.subheader("Question")
             max_marks = int(q_row.get("max_marks", 1))
             q_text = (q_row.get("question_text") or "").strip()
 
@@ -511,16 +511,16 @@ def render_student_page(helpers: dict):
             with mode_row[0]:
                 mode_single = st.radio(
                     "Answer mode",
-                    ["⌨️ Type answer", "✍️ Write answer"],
+                    ["Type answer", "Write answer"],
                     horizontal=True,
                     label_visibility="collapsed",
                     key="answer_mode_single",
                 )
             with mode_row[1]:
-                if str(mode_single).startswith("⌨️"):
+                if str(mode_single).startswith("Type"):
                     text_expanded = bool(st.session_state.get("text_expanded_single", False))
                     if st.button(
-                        "⤡" if text_expanded else "⤢",
+                        "Collapse" if text_expanded else "Expand",
                         help=("Collapse working area" if text_expanded else "Expand working area"),
                         key="text_expand_btn_single",
                     ):
@@ -529,14 +529,14 @@ def render_student_page(helpers: dict):
                 else:
                     canvas_expanded = bool(st.session_state.get("canvas_expanded_single", False))
                     if st.button(
-                        "⤡" if canvas_expanded else "⤢",
+                        "Collapse" if canvas_expanded else "Expand",
                         help=("Collapse working area" if canvas_expanded else "Expand working area"),
                         key="canvas_expand_btn_single",
                     ):
                         st.session_state["canvas_expanded_single"] = not canvas_expanded
                         canvas_expanded = not canvas_expanded
 
-            if str(mode_single).startswith("⌨️"):
+            if str(mode_single).startswith("Type"):
                 text_height = TEXTAREA_HEIGHT_EXPANDED if text_expanded else TEXTAREA_HEIGHT_DEFAULT
                 answer_single = st.text_area(
                     "Type your working:",
@@ -554,7 +554,7 @@ def render_student_page(helpers: dict):
                     sid = _effective_student_id(student_id)
 
                     if not str(answer_single).strip():
-                        st.toast("Please type an answer first.", icon="⚠️")
+                        st.toast("Please type an answer first.")
                     else:
                         try:
                             allowed_now, _, reset_str = _check_rate_limit_db(sid)
@@ -620,8 +620,8 @@ def render_student_page(helpers: dict):
                             help="Best on iPad. When enabled, finger/palm touches are ignored.",
                             key="stylus_only_enabled",
                         )
-                    undo_clicked = tool_row[2].button("↩️ Undo", use_container_width=True, key="canvas_undo_single")
-                    clear_clicked = tool_row[3].button("🗑️ Clear", use_container_width=True, key="canvas_clear_single")
+                    undo_clicked = tool_row[2].button("Undo", use_container_width=True, key="canvas_undo_single")
+                    clear_clicked = tool_row[3].button("Clear", use_container_width=True, key="canvas_clear_single")
                     cmd = None
                     if undo_clicked:
                         st.session_state["feedback"] = None
@@ -665,7 +665,7 @@ def render_student_page(helpers: dict):
                             label_visibility="collapsed",
                             key="canvas_tool_single",
                         )
-                    clear_clicked = tool_row[1].button("🗑️ Clear", use_container_width=True, key="canvas_clear_single")
+                    clear_clicked = tool_row[1].button("Clear", use_container_width=True, key="canvas_clear_single")
                     if clear_clicked:
                         st.session_state["feedback"] = None
                         st.session_state["last_canvas_image_data_single"] = None
@@ -731,7 +731,7 @@ def render_student_page(helpers: dict):
                         img_data = st.session_state.get("last_canvas_image_data_single")
 
                     if img_data is None or (not canvas_has_ink(img_data)):
-                        st.toast("Canvas is blank. Write your answer first, then press Submit.", icon="⚠️")
+                        st.toast("Canvas is blank. Write your answer first, then press Submit.")
                         st.stop()
 
                     try:
@@ -792,7 +792,7 @@ def render_student_page(helpers: dict):
             step_i = max(0, min(step_i, max(0, total_steps - 1)))
             st.session_state["journey_step_index"] = step_i
 
-            st.subheader("🧭 Topic Journey")
+            st.subheader("Topic Journey")
             if total_steps == 0:
                 st.warning("This journey has no steps.")
             else:
@@ -856,16 +856,16 @@ def render_student_page(helpers: dict):
                 with mode_row[0]:
                     mode_journey = st.radio(
                         "Answer mode",
-                        ["⌨️ Type answer", "✍️ Write answer"],
+                        ["Type answer", "Write answer"],
                         horizontal=True,
                         label_visibility="collapsed",
                         key="answer_mode_journey",
                     )
                 with mode_row[1]:
-                    if str(mode_journey).startswith("⌨️"):
+                    if str(mode_journey).startswith("Type"):
                         text_expanded = bool(st.session_state.get("text_expanded_journey", False))
                         if st.button(
-                            "⤡" if text_expanded else "⤢",
+                            "Collapse" if text_expanded else "Expand",
                             help=("Collapse working area" if text_expanded else "Expand working area"),
                             key="text_expand_btn_journey",
                         ):
@@ -874,7 +874,7 @@ def render_student_page(helpers: dict):
                     else:
                         canvas_expanded = bool(st.session_state.get("canvas_expanded_journey", False))
                         if st.button(
-                            "⤡" if canvas_expanded else "⤢",
+                            "Collapse" if canvas_expanded else "Expand",
                             help=("Collapse working area" if canvas_expanded else "Expand working area"),
                             key="canvas_expand_btn_journey",
                         ):
@@ -899,7 +899,7 @@ def render_student_page(helpers: dict):
                     notes[str(idx)] = note_md.strip()
                     st.session_state["journey_checkpoint_notes"] = notes
 
-                if str(mode_journey).startswith("⌨️"):
+                if str(mode_journey).startswith("Type"):
                     text_height = TEXTAREA_HEIGHT_EXPANDED if text_expanded else TEXTAREA_HEIGHT_DEFAULT
                     answer_journey = st.text_area(
                         "Type your working:",
@@ -917,7 +917,7 @@ def render_student_page(helpers: dict):
                         sid = _effective_student_id(student_id)
 
                         if not str(answer_journey).strip():
-                            st.toast("Please type an answer first.", icon="⚠️")
+                            st.toast("Please type an answer first.")
                         else:
                             try:
                                 allowed_now, _, reset_str = _check_rate_limit_db(sid)
@@ -989,8 +989,8 @@ def render_student_page(helpers: dict):
                                 help="Best on iPad. When enabled, finger/palm touches are ignored.",
                                 key="stylus_only_enabled",
                             )
-                        undo_clicked = tool_row[2].button("↩️ Undo", use_container_width=True, key="canvas_undo_journey")
-                        clear_clicked = tool_row[3].button("🗑️ Clear", use_container_width=True, key="canvas_clear_journey")
+                        undo_clicked = tool_row[2].button("Undo", use_container_width=True, key="canvas_undo_journey")
+                        clear_clicked = tool_row[3].button("Clear", use_container_width=True, key="canvas_clear_journey")
                         cmd = None
                         if undo_clicked:
                             st.session_state["feedback"] = None
@@ -1034,7 +1034,7 @@ def render_student_page(helpers: dict):
                                 label_visibility="collapsed",
                                 key="canvas_tool_journey",
                             )
-                        clear_clicked = tool_row[1].button("🗑️ Clear", use_container_width=True, key="canvas_clear_journey")
+                        clear_clicked = tool_row[1].button("Clear", use_container_width=True, key="canvas_clear_journey")
                         if clear_clicked:
                             st.session_state["feedback"] = None
                             st.session_state["last_canvas_image_data_journey"] = None
@@ -1100,7 +1100,7 @@ def render_student_page(helpers: dict):
                             img_data = st.session_state.get("last_canvas_image_data_journey")
 
                         if img_data is None or (not canvas_has_ink(img_data)):
-                            st.toast("Canvas is blank. Write your answer first, then press Submit.", icon="⚠️")
+                            st.toast("Canvas is blank. Write your answer first, then press Submit.")
                             st.stop()
 
                         try:
@@ -1169,7 +1169,7 @@ def render_student_page(helpers: dict):
     # RIGHT: Feedback
     # -------------------------
     with col2:
-        st.subheader("👨‍🏫 Feedback")
+        st.subheader("Feedback")
         with st.container(border=True):
             if st.session_state.get("feedback"):
                 render_report(st.session_state["feedback"])

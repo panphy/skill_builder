@@ -94,59 +94,282 @@ st.set_page_config(
 st.markdown(
     """
 <style>
+/* ============================================================
+   PanPhy Skill Builder - Modern Theme System
+   Supports both light and dark modes via CSS variables
+   ============================================================ */
+
+/* CSS Variables for Light Mode (default) */
+:root {
+  /* Primary colors */
+  --pp-primary: #3b82f6;
+  --pp-primary-hover: #2563eb;
+  --pp-primary-active: #1d4ed8;
+  --pp-primary-light: rgba(59, 130, 246, 0.12);
+  --pp-primary-border: rgba(59, 130, 246, 0.3);
+
+  /* Background colors */
+  --pp-bg-primary: #ffffff;
+  --pp-bg-secondary: #f8fafc;
+  --pp-bg-tertiary: #f1f5f9;
+  --pp-bg-elevated: #ffffff;
+
+  /* Text colors */
+  --pp-text-primary: #1e293b;
+  --pp-text-secondary: #475569;
+  --pp-text-tertiary: #64748b;
+  --pp-text-muted: #94a3b8;
+  --pp-text-on-primary: #ffffff;
+
+  /* Border colors */
+  --pp-border: #e2e8f0;
+  --pp-border-light: rgba(0, 0, 0, 0.06);
+  --pp-border-focus: var(--pp-primary);
+
+  /* Shadows */
+  --pp-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --pp-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --pp-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --pp-shadow-primary: 0 4px 14px rgba(59, 130, 246, 0.25);
+
+  /* Hero section */
+  --pp-hero-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(139, 92, 246, 0.06) 100%);
+  --pp-hero-border: rgba(148, 163, 184, 0.25);
+
+  /* Card colors */
+  --pp-card-bg: rgba(255, 255, 255, 0.8);
+  --pp-card-border: rgba(148, 163, 184, 0.2);
+
+  /* Callout colors */
+  --pp-callout-bg: rgba(59, 130, 246, 0.06);
+  --pp-callout-border: rgba(59, 130, 246, 0.2);
+  --pp-callout-text: #1e40af;
+
+  /* Chip colors */
+  --pp-chip-bg: rgba(59, 130, 246, 0.1);
+  --pp-chip-text: #1e40af;
+
+  /* Footer */
+  --pp-footer-text: rgba(30, 41, 59, 0.6);
+  --pp-footer-border: rgba(0, 0, 0, 0.08);
+
+  /* Secondary button */
+  --pp-btn-secondary-bg: #f8fafc;
+  --pp-btn-secondary-hover: #f1f5f9;
+  --pp-btn-secondary-text: #334155;
+  --pp-btn-secondary-border: #cbd5e1;
+
+  /* Disabled state */
+  --pp-disabled-bg: #e2e8f0;
+  --pp-disabled-text: #94a3b8;
+
+  /* Overlay */
+  --pp-overlay-bg: rgba(0, 0, 0, 0.3);
+  --pp-overlay-card: rgba(255, 255, 255, 0.98);
+
+  /* Progress */
+  --pp-progress-bg: rgba(59, 130, 246, 0.15);
+  --pp-progress-fill: #3b82f6;
+  --pp-progress-secondary: #93c5fd;
+}
+
+/* CSS Variables for Dark Mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Primary colors */
+    --pp-primary: #60a5fa;
+    --pp-primary-hover: #3b82f6;
+    --pp-primary-active: #2563eb;
+    --pp-primary-light: rgba(96, 165, 250, 0.15);
+    --pp-primary-border: rgba(96, 165, 250, 0.35);
+
+    /* Background colors */
+    --pp-bg-primary: #0f172a;
+    --pp-bg-secondary: #1e293b;
+    --pp-bg-tertiary: #334155;
+    --pp-bg-elevated: #1e293b;
+
+    /* Text colors */
+    --pp-text-primary: #f1f5f9;
+    --pp-text-secondary: #cbd5e1;
+    --pp-text-tertiary: #94a3b8;
+    --pp-text-muted: #64748b;
+    --pp-text-on-primary: #0f172a;
+
+    /* Border colors */
+    --pp-border: #334155;
+    --pp-border-light: rgba(255, 255, 255, 0.08);
+
+    /* Shadows */
+    --pp-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --pp-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --pp-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --pp-shadow-primary: 0 4px 14px rgba(96, 165, 250, 0.3);
+
+    /* Hero section */
+    --pp-hero-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%);
+    --pp-hero-border: rgba(71, 85, 105, 0.5);
+
+    /* Card colors */
+    --pp-card-bg: rgba(30, 41, 59, 0.9);
+    --pp-card-border: rgba(71, 85, 105, 0.4);
+
+    /* Callout colors */
+    --pp-callout-bg: rgba(96, 165, 250, 0.1);
+    --pp-callout-border: rgba(96, 165, 250, 0.25);
+    --pp-callout-text: #93c5fd;
+
+    /* Chip colors */
+    --pp-chip-bg: rgba(96, 165, 250, 0.15);
+    --pp-chip-text: #93c5fd;
+
+    /* Footer */
+    --pp-footer-text: rgba(203, 213, 225, 0.7);
+    --pp-footer-border: rgba(255, 255, 255, 0.1);
+
+    /* Secondary button */
+    --pp-btn-secondary-bg: #1e293b;
+    --pp-btn-secondary-hover: #334155;
+    --pp-btn-secondary-text: #e2e8f0;
+    --pp-btn-secondary-border: #475569;
+
+    /* Disabled state */
+    --pp-disabled-bg: #334155;
+    --pp-disabled-text: #64748b;
+
+    /* Overlay */
+    --pp-overlay-bg: rgba(0, 0, 0, 0.6);
+    --pp-overlay-card: rgba(30, 41, 59, 0.98);
+
+    /* Progress */
+    --pp-progress-bg: rgba(96, 165, 250, 0.2);
+    --pp-progress-fill: #60a5fa;
+    --pp-progress-secondary: #3b82f6;
+  }
+}
+
+/* Streamlit-specific dark mode detection */
+[data-testid="stAppViewContainer"][data-theme="dark"],
+.stApp[data-theme="dark"],
+html[data-theme="dark"] {
+  --pp-primary: #60a5fa;
+  --pp-primary-hover: #3b82f6;
+  --pp-primary-active: #2563eb;
+  --pp-primary-light: rgba(96, 165, 250, 0.15);
+  --pp-primary-border: rgba(96, 165, 250, 0.35);
+  --pp-bg-primary: #0f172a;
+  --pp-bg-secondary: #1e293b;
+  --pp-bg-tertiary: #334155;
+  --pp-bg-elevated: #1e293b;
+  --pp-text-primary: #f1f5f9;
+  --pp-text-secondary: #cbd5e1;
+  --pp-text-tertiary: #94a3b8;
+  --pp-text-muted: #64748b;
+  --pp-text-on-primary: #0f172a;
+  --pp-border: #334155;
+  --pp-border-light: rgba(255, 255, 255, 0.08);
+  --pp-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --pp-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --pp-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --pp-shadow-primary: 0 4px 14px rgba(96, 165, 250, 0.3);
+  --pp-hero-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%);
+  --pp-hero-border: rgba(71, 85, 105, 0.5);
+  --pp-card-bg: rgba(30, 41, 59, 0.9);
+  --pp-card-border: rgba(71, 85, 105, 0.4);
+  --pp-callout-bg: rgba(96, 165, 250, 0.1);
+  --pp-callout-border: rgba(96, 165, 250, 0.25);
+  --pp-callout-text: #93c5fd;
+  --pp-chip-bg: rgba(96, 165, 250, 0.15);
+  --pp-chip-text: #93c5fd;
+  --pp-footer-text: rgba(203, 213, 225, 0.7);
+  --pp-footer-border: rgba(255, 255, 255, 0.1);
+  --pp-btn-secondary-bg: #1e293b;
+  --pp-btn-secondary-hover: #334155;
+  --pp-btn-secondary-text: #e2e8f0;
+  --pp-btn-secondary-border: #475569;
+  --pp-disabled-bg: #334155;
+  --pp-disabled-text: #64748b;
+  --pp-overlay-bg: rgba(0, 0, 0, 0.6);
+  --pp-overlay-card: rgba(30, 41, 59, 0.98);
+  --pp-progress-bg: rgba(96, 165, 250, 0.2);
+  --pp-progress-fill: #60a5fa;
+  --pp-progress-secondary: #3b82f6;
+}
+
+/* ============================================================
+   Base Layout
+   ============================================================ */
 div[data-testid="stAppViewContainer"] > .main .block-container {
   padding-top: 1rem;
 }
-div[data-testid="stButton"] button[aria-label="⤢"] span,
-div[data-testid="stButton"] button[aria-label="⤡"] span {
-  font-size: 22px;
+
+/* ============================================================
+   Button Styles
+   ============================================================ */
+div[data-testid="stButton"] button[aria-label="Expand"] span,
+div[data-testid="stButton"] button[aria-label="Collapse"] span {
+  font-size: 20px;
   line-height: 1;
-  font-weight: 700;
-}
-div[data-testid="stButton"] > button {
-  background: #2563eb;
-  color: #ffffff;
-  border: 1px solid #1d4ed8;
-  border-radius: 10px;
   font-weight: 600;
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.18);
-  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
+
+div[data-testid="stButton"] > button {
+  background: var(--pp-primary);
+  color: var(--pp-text-on-primary);
+  border: 1px solid var(--pp-primary-hover);
+  border-radius: 8px;
+  font-weight: 600;
+  box-shadow: var(--pp-shadow-primary);
+  transition: all 0.2s ease;
+}
+
 div[data-testid="stButton"] > button:hover {
-  background: #1d4ed8;
-  box-shadow: 0 8px 18px rgba(29, 78, 216, 0.22);
+  background: var(--pp-primary-hover);
+  box-shadow: var(--pp-shadow-md);
   transform: translateY(-1px);
 }
+
 div[data-testid="stButton"] > button:active {
-  background: #1e40af;
+  background: var(--pp-primary-active);
   transform: translateY(0);
 }
+
 div[data-testid="stButton"] > button:disabled {
-  background: #cbd5f5;
-  color: #f8fafc;
-  border-color: #cbd5f5;
+  background: var(--pp-disabled-bg);
+  color: var(--pp-disabled-text);
+  border-color: var(--pp-disabled-bg);
   box-shadow: none;
+  transform: none;
 }
+
 div[data-testid="stButton"] > button[kind="secondary"] {
-  background: #f8fafc;
-  color: #1e293b;
-  border: 1px solid #94a3b8;
-  box-shadow: none;
+  background: var(--pp-btn-secondary-bg);
+  color: var(--pp-btn-secondary-text);
+  border: 1px solid var(--pp-btn-secondary-border);
+  box-shadow: var(--pp-shadow-sm);
 }
+
 div[data-testid="stButton"] > button[kind="secondary"]:hover {
-  background: #e2e8f0;
-  border-color: #64748b;
+  background: var(--pp-btn-secondary-hover);
+  border-color: var(--pp-border);
 }
+
 div[data-testid="stButton"] > button[kind="secondary"]:active {
-  background: #cbd5f5;
+  background: var(--pp-bg-tertiary);
 }
+
 div[data-testid="stButton"] > button[kind="primary"] {
-  background: #1d4ed8;
-  border-color: #1e40af;
+  background: var(--pp-primary-hover);
+  border-color: var(--pp-primary-active);
 }
+
 div[data-testid="stButton"] > button[kind="primary"]:hover {
-  background: #1e40af;
+  background: var(--pp-primary-active);
 }
+
+/* ============================================================
+   Hero Section
+   ============================================================ */
 .pp-hero {
   display: flex;
   flex-wrap: wrap;
@@ -154,114 +377,176 @@ div[data-testid="stButton"] > button[kind="primary"]:hover {
   align-items: center;
   justify-content: space-between;
   padding: 2rem 2.5rem;
-  border-radius: 24px;
-  background: linear-gradient(135deg, rgba(33, 99, 255, 0.08), rgba(138, 43, 226, 0.08));
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 16px;
+  background: var(--pp-hero-bg);
+  border: 1px solid var(--pp-hero-border);
   margin-bottom: 1.5rem;
 }
+
 .pp-hero-content {
   flex: 1 1 360px;
   min-width: 280px;
 }
+
 .pp-hero-kicker {
-  font-size: 0.9rem;
-  letter-spacing: 0.08em;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #2563eb;
+  color: var(--pp-primary);
   font-weight: 700;
   margin-bottom: 0.5rem;
 }
+
 .pp-hero-title {
-  font-size: 2.2rem;
-  font-weight: 800;
-  line-height: 1.1;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
   margin-bottom: 0.75rem;
+  color: var(--pp-text-primary);
 }
+
 .pp-hero-subtitle {
-  font-size: 1.05rem;
-  color: #475569;
+  font-size: 1rem;
+  color: var(--pp-text-secondary);
   margin-bottom: 1rem;
+  line-height: 1.5;
 }
+
 .pp-hero-list {
   margin: 0;
   padding-left: 1.25rem;
-  color: #334155;
+  color: var(--pp-text-secondary);
+  line-height: 1.7;
 }
+
+.pp-hero-list li {
+  margin-bottom: 0.25rem;
+}
+
 .pp-hero-card {
   flex: 0 1 260px;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 18px;
+  background: var(--pp-card-bg);
+  border-radius: 12px;
   padding: 1.25rem 1.5rem;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--pp-card-border);
+  box-shadow: var(--pp-shadow-md);
 }
+
 .pp-hero-card h4 {
   margin: 0 0 0.5rem 0;
+  color: var(--pp-text-primary);
+  font-weight: 600;
 }
+
 .pp-hero-metric {
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
+  color: var(--pp-primary);
 }
+
 .pp-hero-callout {
   margin-top: 1rem;
   padding: 0.85rem 1rem;
-  border-radius: 12px;
-  background: rgba(37, 99, 235, 0.08);
-  border: 1px solid rgba(37, 99, 235, 0.25);
-  color: #1e3a8a;
-  font-size: 0.98rem;
+  border-radius: 8px;
+  background: var(--pp-callout-bg);
+  border: 1px solid var(--pp-callout-border);
+  color: var(--pp-callout-text);
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
+
+/* ============================================================
+   Chips
+   ============================================================ */
 .pp-chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin: 0.5rem 0 0.25rem 0;
 }
+
 .pp-chip {
   display: inline-flex;
   align-items: center;
-  padding: 0.2rem 0.6rem;
+  padding: 0.25rem 0.75rem;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.08);
-  color: #0f172a;
+  background: var(--pp-chip-bg);
+  color: var(--pp-chip-text);
   font-size: 0.8rem;
   font-weight: 600;
 }
+
+/* ============================================================
+   Footer
+   ============================================================ */
 footer {
   position: static;
   font-size: 0.85rem;
   text-align: center;
   padding: 16px 8px;
   background: transparent;
-  color: rgba(11, 26, 51, 0.62);
+  color: var(--pp-footer-text);
   margin-top: 24px;
   width: 100%;
-  border-top: 1px solid rgba(23, 37, 84, 0.12);
+  border-top: 1px solid var(--pp-footer-border);
 }
+
 footer a {
-  color: #2f6bff;
+  color: var(--pp-primary);
   text-decoration: none;
   font-weight: 500;
   transition: color 0.2s ease;
 }
+
 footer a:hover {
-  color: #1d4ed8;
+  color: var(--pp-primary-hover);
   text-decoration: underline;
 }
+
+/* ============================================================
+   App Header
+   ============================================================ */
 .app-logo {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
-  border-radius: 12px;
+  border-radius: 10px;
   box-shadow: none;
   background: transparent;
   padding: 0;
 }
+
 .app-title-row {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.app-title-row h1 {
+  color: var(--pp-text-primary);
+}
+
+/* ============================================================
+   Section Headers
+   ============================================================ */
+.pp-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.pp-section-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pp-primary-light);
+  color: var(--pp-primary);
+  border-radius: 6px;
+  font-size: 14px;
 }
 </style>
 """,
@@ -1194,13 +1479,13 @@ def _run_ai_with_progress(
         overlay.markdown(
             textwrap.dedent(f"""
 <style>
-/* PanPhy full-page UI blocker */
+/* PanPhy full-page UI blocker - theme-aware */
 .pp-overlay {{
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0,0,0,0.25);
+  background: var(--pp-overlay-bg, rgba(0,0,0,0.3));
   z-index: 999999;
   display: flex;
   align-items: center;
@@ -1209,11 +1494,11 @@ def _run_ai_with_progress(
 }}
 .pp-overlay-card {{
   width: min(560px, 92vw);
-  background: rgba(255,255,255,0.96);
-  border-radius: 16px;
-  padding: 18px 18px 16px 18px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.22);
-  border: 1px solid rgba(0,0,0,0.12);
+  background: var(--pp-overlay-card, rgba(255,255,255,0.98));
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--pp-shadow-lg, 0 10px 30px rgba(0,0,0,0.22));
+  border: 1px solid var(--pp-border, rgba(0,0,0,0.12));
 }}
 .pp-row {{
   display: flex;
@@ -1221,12 +1506,12 @@ def _run_ai_with_progress(
   align-items: flex-start;
 }}
 .pp-spinner {{
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
-  border: 4px solid rgba(0,0,0,0.15);
-  border-top-color: rgba(0,0,0,0.55);
-  animation: pp-spin 0.9s linear infinite;
+  border: 3px solid var(--pp-progress-bg, rgba(59,130,246,0.2));
+  border-top-color: var(--pp-progress-fill, #3b82f6);
+  animation: pp-spin 0.8s linear infinite;
   flex: 0 0 auto;
   margin-top: 2px;
 }}
@@ -1235,35 +1520,35 @@ def _run_ai_with_progress(
   to   {{ transform: rotate(360deg); }}
 }}
 .pp-title {{
-  font-size: 16px;
-  font-weight: 700;
-  color: rgba(0,0,0,0.85);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--pp-text-primary, #1e293b);
   margin: 0;
-  line-height: 1.2;
+  line-height: 1.3;
 }}
 .pp-subtitle {{
   font-size: 13px;
-  color: rgba(0,0,0,0.72);
+  color: var(--pp-text-secondary, #475569);
   margin-top: 4px;
-  line-height: 1.35;
+  line-height: 1.4;
 }}
 .pp-meta {{
   font-size: 12px;
-  color: rgba(0,0,0,0.58);
+  color: var(--pp-text-tertiary, #64748b);
   margin-top: 6px;
 }}
 .pp-progress {{
   margin-top: 14px;
   width: 100%;
-  height: 10px;
-  background: rgba(0,0,0,0.10);
+  height: 8px;
+  background: var(--pp-progress-bg, rgba(59,130,246,0.15));
   border-radius: 999px;
   overflow: hidden;
   position: relative;
 }}
 .pp-progress-fill {{
   height: 100%;
-  background: #2f6df6;
+  background: var(--pp-progress-fill, #3b82f6);
   border-radius: 999px;
   transition: width 0.35s ease;
 }}
@@ -1272,25 +1557,25 @@ def _run_ai_with_progress(
 }}
 .pp-step-label {{
   font-size: 12px;
-  color: rgba(0,0,0,0.72);
+  color: var(--pp-text-secondary, #475569);
   margin-bottom: 6px;
 }}
 .pp-step-bar {{
   width: 100%;
-  height: 6px;
-  background: rgba(47,109,246,0.12);
+  height: 5px;
+  background: var(--pp-progress-bg, rgba(59,130,246,0.15));
   border-radius: 999px;
   overflow: hidden;
 }}
 .pp-step-fill {{
   height: 100%;
-  background: #6c8df7;
+  background: var(--pp-progress-secondary, #93c5fd);
   border-radius: 999px;
   transition: width 0.35s ease;
 }}
 .pp-note {{
-  font-size: 12px;
-  color: rgba(0,0,0,0.52);
+  font-size: 11px;
+  color: var(--pp-text-muted, #94a3b8);
   margin-top: 6px;
 }}
 </style>
@@ -1620,7 +1905,7 @@ def render_report(report: dict):
 # ============================================================
 nav = st.sidebar.radio(
     "Navigate",
-    ["🧑‍🎓 Student", "🔒 Teacher Dashboard", "📚 Question Bank"],
+    ["Student", "Teacher Dashboard", "Question Bank"],
     index=0,
     key="nav_page",
 )
@@ -1696,7 +1981,7 @@ with header_right:
         for msg in issues:
             st.caption(msg)
 
-if nav == "🧑‍🎓 Student":
+if nav == "Student":
     st.markdown(
         """
 <div class="pp-hero">
@@ -1704,12 +1989,12 @@ if nav == "🧑‍🎓 Student":
     <div class="pp-hero-kicker">Personalised practice</div>
     <div class="pp-hero-title">Build confident GCSE physicists in minutes.</div>
     <div class="pp-hero-subtitle">
-      Generate spec-aligned questions, capture handwritten working, and give instant feedback—
-      all in one place.
+      Generate spec-aligned questions, capture handwritten working, and give instant feedback
+      - all in one place.
     </div>
     <div class="pp-hero-callout">
-      <strong>Start here:</strong> Students choose 🧑‍🎓 Student to practice. Teachers upload or generate
-      questions in 📚 Question Bank and review progress in 🔒 Teacher Dashboard.
+      <strong>Start here:</strong> Students select Student to practice. Teachers upload or generate
+      questions in Question Bank and review progress in Teacher Dashboard.
     </div>
     <ul class="pp-hero-list">
       <li>AI practice questions tailored to topic and difficulty.</li>
@@ -1770,9 +2055,9 @@ _ui_helpers = {
     "insert_question_bank_row": insert_question_bank_row,
 }
 
-if nav == "🧑‍🎓 Student":
+if nav == "Student":
     render_student_page(_ui_helpers)
-elif nav in ("🔒 Teacher Dashboard", "📚 Question Bank"):
+elif nav in ("Teacher Dashboard", "Question Bank"):
     render_teacher_page(nav, _ui_helpers)
 
 st.markdown(

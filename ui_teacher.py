@@ -94,9 +94,9 @@ def render_teacher_page(nav_label: str, helpers: dict):
             return False
         return True
 
-    if nav_label == "🔒 Teacher Dashboard":
+    if nav_label == "Teacher Dashboard":
         st.divider()
-        st.subheader("🔒 Teacher Dashboard")
+        st.subheader("Teacher Dashboard")
 
         if not (_safe_secret("DATABASE_URL", "") or "").strip():
             st.info("Database not configured in secrets.")
@@ -243,7 +243,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
         return
 
     st.divider()
-    st.subheader("📚 Question Bank")
+    st.subheader("Question Bank")
 
     # Default track eligibility tag for any question you SAVE (AI drafts, edited, uploads).
     _tt_label = st.selectbox(
@@ -271,13 +271,13 @@ def render_teacher_page(nav_label: str, helpers: dict):
 
             st.write("### Question Bank manager")
 
-            tab_browse, tab_ai, tab_upload = st.tabs(["🔎 Browse & preview", "🤖 AI generation", "🖼️ Upload scans"])
+            tab_browse, tab_ai, tab_upload = st.tabs(["Browse & Preview", "AI Generation", "Upload Scans"])
 
             # -------------------------
             # Browse & preview
             # -------------------------
             with tab_browse:
-                st.write("## 🔎 Browse & preview")
+                st.write("## Browse & Preview")
                 df_all = load_question_bank_df(limit=5000, include_inactive=False)
 
                 if df_all.empty:
@@ -548,7 +548,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
             # AI generation
             # -------------------------
             with tab_ai:
-                st.write("## 🤖 AI generation")
+                st.write("## AI Generation")
                 st.caption("Generate and review before saving to the bank.")
 
                 with st.expander("Generate Questions", expanded=False):
@@ -672,7 +672,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                     "Draft warnings:\n\n" + "\n".join([f"- {w}" for w in draft.get("warnings", [])])
                                 )
 
-                            st.write(f"### ✅ Vet and edit (Draft {idx} of {total_drafts})")
+                            st.write(f"### Vet and Edit (Draft {idx} of {total_drafts})")
                             assignment_name = st.text_input(
                                 "Assignment name",
                                 value="AI Practice",
@@ -997,7 +997,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
 
                         if journey.get("warnings"):
                             st.warning("Journey draft warnings:\n\n" + "\n".join([f"- {w}" for w in journey.get("warnings", [])]))
-                        st.write("### ✅ Vet and edit the journey")
+                        st.write("### Vet and Edit the Journey")
                         hd1, hd2 = st.columns([2, 1])
                         with hd1:
                             d_assignment = st.text_input(
@@ -1208,7 +1208,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
             # Upload scans
             # -------------------------
             with tab_upload:
-                st.write("## 🖼️ Upload a teacher question (images)")
+                st.write("## Upload a Teacher Question")
                 st.caption("Optional question text supports Markdown and LaTeX.")
 
                 topic_options = get_topic_group_names_for_track(track)
