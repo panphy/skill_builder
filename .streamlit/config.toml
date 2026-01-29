@@ -1,4 +1,24 @@
-# The "Separate" badge uses the app primary color. To make it turquoise, set theme.primaryColor in .streamlit/config.toml (e.g. #20C997)
+# Streamlit configuration for PanPhy Skill Builder
+# Modern theme with clean, accessible colors for both light and dark modes
 
 [theme]
-primaryColor = "#20C997"  # turquoise
+# Primary accent color - used for interactive elements, links, and highlights
+primaryColor = "#3b82f6"
+
+# Background colors - Streamlit auto-switches between light/dark
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f8fafc"
+
+# Text color
+textColor = "#1e293b"
+
+# Font family
+font = "sans serif"
+
+[server]
+headless = true
+enableCORS = false
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats = false
