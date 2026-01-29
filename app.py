@@ -1374,11 +1374,14 @@ with header_right:
 with header_left:
     logo_col, title_col = st.columns([1, 5])
     with logo_col:
-        st.image(PANPHY_LOGO_URL, width=64)
+        st.markdown(
+            f'<a href="https://panphy.github.io/" target="_blank" rel="noopener noreferrer">'
+            f'<img src="{PANPHY_LOGO_URL}" width="64" alt="PanPhy logo"/></a>',
+            unsafe_allow_html=True,
+        )
     with title_col:
         st.title("PanPhy Skill Builder")
         st.caption(f"Powered by OpenAI {MODEL_NAME}")
-    st.markdown("[PanPhy Home](https://panphy.github.io/?)")
 with header_right:
     issues = []
     if not AI_READY:
@@ -1439,8 +1442,11 @@ elif nav in ("Teacher Dashboard", "Question Bank"):
     render_teacher_page(nav, _ui_helpers)
 
 st.divider()
-st.caption("© 2026 PanPhy Projects")
 st.markdown(
-    "[Contact Me](mailto:panphyprojects@icloud.com) • "
-    "[Support My Projects](https://buymeacoffee.com/panphy)"
+    "<div style='text-align: center;'>"
+    "© 2026 PanPhy Projects<br>"
+    "<a href='mailto:panphyprojects@icloud.com'>Contact Me</a> • "
+    "<a href='https://buymeacoffee.com/panphy'>Support My Projects</a>"
+    "</div>",
+    unsafe_allow_html=True,
 )
