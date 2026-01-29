@@ -137,10 +137,6 @@ body,
   --pp-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
   --pp-shadow-primary: 0 4px 14px rgba(59, 130, 246, 0.25);
 
-  /* Hero section */
-  --pp-hero-bg: linear-gradient(135deg, #eef4ff 0%, #f8fafc 55%, #e9edff 100%);
-  --pp-hero-border: rgba(148, 163, 184, 0.55);
-
   /* Card colors */
   --pp-card-bg: rgba(255, 255, 255, 0.8);
   --pp-card-border: rgba(148, 163, 184, 0.2);
@@ -215,10 +211,6 @@ body,
     --pp-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.55);
     --pp-shadow-primary: 0 6px 18px rgba(59, 130, 246, 0.35);
 
-    /* Hero section */
-    --pp-hero-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, rgba(139, 92, 246, 0.16) 100%);
-    --pp-hero-border: rgba(148, 163, 184, 0.35);
-
     /* Card colors */
     --pp-card-bg: rgba(15, 23, 42, 0.85);
     --pp-card-border: rgba(148, 163, 184, 0.35);
@@ -286,114 +278,6 @@ div[data-testid="stButton"] > button:disabled {
   box-shadow: none;
   transform: none;
   cursor: not-allowed;
-}
-
-/* ============================================================
-   Hero Section
-   ============================================================ */
-.pp-hero {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2rem 2.5rem;
-  border-radius: 16px;
-  background: var(--pp-hero-bg);
-  border: 1px solid var(--pp-hero-border);
-  box-shadow: var(--pp-shadow-md);
-  margin-bottom: 1.5rem;
-}
-
-.pp-hero-content {
-  flex: 1 1 360px;
-  min-width: 280px;
-}
-
-.pp-hero-kicker {
-  font-size: 0.85rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #3b82f6;
-  color: var(--pp-primary, #3b82f6);
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-}
-
-.pp-hero-title {
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 1.2;
-  margin-bottom: 0.75rem;
-  color: #1e293b;
-  color: var(--pp-text-primary, #1e293b);
-}
-
-.pp-hero-subtitle {
-  font-size: 1rem;
-  color: #475569;
-  color: var(--pp-text-secondary, #475569);
-  margin-bottom: 1rem;
-  line-height: 1.5;
-}
-
-.pp-hero-list {
-  margin: 0;
-  padding-left: 1.25rem;
-  color: #475569;
-  color: var(--pp-text-secondary, #475569);
-  line-height: 1.7;
-}
-
-.pp-hero-list li {
-  margin-bottom: 0.25rem;
-}
-
-.pp-hero-card {
-  flex: 0 1 260px;
-  background: rgba(30, 41, 59, 0.9);
-  background: var(--pp-card-bg, rgba(30, 41, 59, 0.9));
-  border-radius: 12px;
-  padding: 1.25rem 1.5rem;
-  border: 1px solid rgba(71, 85, 105, 0.4);
-  border-color: var(--pp-card-border, rgba(71, 85, 105, 0.4));
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  box-shadow: var(--pp-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.08));
-}
-
-.pp-hero-card h4 {
-  margin: 0 0 0.5rem 0;
-  color: #f1f5f9;
-  color: var(--pp-text-primary, #f1f5f9);
-  font-weight: 600;
-}
-
-.pp-hero-card p,
-.pp-hero-card div:not(.pp-hero-metric) {
-  color: #cbd5e1;
-  color: var(--pp-text-secondary, #cbd5e1);
-}
-
-.pp-hero-metric {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-  color: #60a5fa;
-  color: var(--pp-primary, #60a5fa);
-}
-
-.pp-hero-callout {
-  margin-top: 1rem;
-  padding: 0.85rem 1rem;
-  border-radius: 8px;
-  background: rgba(59, 130, 246, 0.06);
-  background: var(--pp-callout-bg, rgba(59, 130, 246, 0.06));
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-color: var(--pp-callout-border, rgba(59, 130, 246, 0.2));
-  color: #1e40af;
-  color: var(--pp-callout-text, #1e40af);
-  font-size: 0.95rem;
-  line-height: 1.5;
 }
 
 /* ============================================================
@@ -1951,37 +1835,6 @@ with header_right:
         st.caption("⚠️ System status")
         for msg in issues:
             st.caption(msg)
-
-if nav == "Student":
-    st.markdown(
-        """
-<div class="pp-hero">
-  <div class="pp-hero-content">
-    <div class="pp-hero-kicker">Personalised practice</div>
-    <div class="pp-hero-title">Build confident GCSE physicists in minutes.</div>
-    <div class="pp-hero-subtitle">
-      Generate spec-aligned questions, capture handwritten working, and give instant feedback
-      - all in one place.
-    </div>
-    <div class="pp-hero-callout">
-      <strong>Start here:</strong> Students select Student to practice. Teachers upload or generate
-      questions in Question Bank and review progress in Teacher Dashboard.
-    </div>
-    <ul class="pp-hero-list">
-      <li>AI practice questions tailored to topic and difficulty.</li>
-      <li>Topic Journeys that guide students step-by-step.</li>
-      <li>Teacher-uploaded questions with instant feedback and marks.</li>
-    </ul>
-  </div>
-  <div class="pp-hero-card">
-    <h4>Getting started</h4>
-    <div class="pp-hero-metric">3 steps</div>
-    <div>Pick a topic, choose a track, and start practicing.</div>
-  </div>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
 
 # ============================================================
 # STUDENT / TEACHER PAGES
