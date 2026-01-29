@@ -520,7 +520,7 @@ def render_student_page(helpers: dict):
                 if str(mode_single).startswith("Type"):
                     text_expanded = bool(st.session_state.get("text_expanded_single", False))
                     if st.button(
-                        "🔼" if text_expanded else "🔽",
+                        "▲" if text_expanded else "▼",
                         help=("Collapse working area" if text_expanded else "Expand working area"),
                         key="text_expand_btn_single",
                     ):
@@ -529,7 +529,7 @@ def render_student_page(helpers: dict):
                 else:
                     canvas_expanded = bool(st.session_state.get("canvas_expanded_single", False))
                     if st.button(
-                        "🔼" if canvas_expanded else "🔽",
+                        "▲" if canvas_expanded else "▼",
                         help=("Collapse working area" if canvas_expanded else "Expand working area"),
                         key="canvas_expand_btn_single",
                     ):
@@ -865,7 +865,7 @@ def render_student_page(helpers: dict):
                     if str(mode_journey).startswith("Type"):
                         text_expanded = bool(st.session_state.get("text_expanded_journey", False))
                         if st.button(
-                            "🔼" if text_expanded else "🔽",
+                            "▲" if text_expanded else "▼",
                             help=("Collapse working area" if text_expanded else "Expand working area"),
                             key="text_expand_btn_journey",
                         ):
@@ -874,7 +874,7 @@ def render_student_page(helpers: dict):
                     else:
                         canvas_expanded = bool(st.session_state.get("canvas_expanded_journey", False))
                         if st.button(
-                            "🔼" if canvas_expanded else "🔽",
+                            "▲" if canvas_expanded else "▼",
                             help=("Collapse working area" if canvas_expanded else "Expand working area"),
                             key="canvas_expand_btn_journey",
                         ):
