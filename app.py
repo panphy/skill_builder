@@ -795,12 +795,13 @@ html[data-pp-theme="light"] [data-testid="stTextArea"] textarea:hover,
   border-color: rgba(59, 130, 246, 0.4) !important;
 }
 
-/* Dark theme text area */
+/* Dark theme text area - use light background for readability */
 html[data-pp-theme="dark"] [data-testid="stTextArea"] textarea,
 @media (prefers-color-scheme: dark) {
   [data-testid="stTextArea"] textarea {
-    border: 1px solid #475569 !important;
-    background: #1e293b !important;
+    border: 1px solid #cbd5e1 !important;
+    background: #ffffff !important;
+    color: #1e293b !important;
   }
 }
 
@@ -828,6 +829,31 @@ html[data-pp-theme="dark"] div[data-testid="stButton"] > button:hover,
 @media (prefers-color-scheme: dark) {
   div[data-testid="stButton"] > button:hover {
     background: var(--pp-btn-secondary-hover) !important;
+  }
+}
+
+/* ============================================================
+   Bordered Container Styling - visible borders in both themes
+   (Question box, AI Feedback box, etc.)
+   ============================================================ */
+/* Target Streamlit's bordered containers */
+[data-testid="stVerticalBlockBorderWrapper"] {
+  border: 2px solid var(--pp-primary-border) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+/* Light theme - visible blue-tinted border */
+html[data-pp-theme="light"] [data-testid="stVerticalBlockBorderWrapper"],
+:root [data-testid="stVerticalBlockBorderWrapper"] {
+  border: 2px solid rgba(59, 130, 246, 0.35) !important;
+}
+
+/* Dark theme - visible blue-tinted border */
+html[data-pp-theme="dark"] [data-testid="stVerticalBlockBorderWrapper"],
+@media (prefers-color-scheme: dark) {
+  [data-testid="stVerticalBlockBorderWrapper"] {
+    border: 2px solid rgba(96, 165, 250, 0.5) !important;
   }
 }
 </style>
