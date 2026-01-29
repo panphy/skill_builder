@@ -347,10 +347,22 @@ footer a:hover {
   gap: 12px;
 }
 
+.app-title-row h1 {
+  color: var(--text-color);
+}
+
 .app-title {
   margin: 0;
   font-size: 2rem;
   font-weight: 700;
+  color: var(--text-color) !important;
+}
+
+.app-title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--pp-text-primary) !important;
 }
 
 /* ============================================================
@@ -385,11 +397,9 @@ footer a:hover {
   transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
 }
 
-@media (prefers-color-scheme: light) {
-  [data-testid="stTextInput"] input {
-    background-color: var(--pp-bg-tertiary) !important;
-    color: var(--pp-text-primary) !important;
-  }
+[data-testid="stTextInput"] input {
+  background-color: var(--secondary-background-color) !important;
+  color: var(--text-color) !important;
 }
 
 /* ============================================================
