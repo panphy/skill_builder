@@ -178,6 +178,85 @@ body,
   --pp-progress-secondary: #93c5fd;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root,
+  html,
+  body,
+  [data-testid="stAppViewContainer"],
+  .stApp {
+    /* Primary colors */
+    --pp-primary: #60a5fa;
+    --pp-primary-hover: #3b82f6;
+    --pp-primary-active: #2563eb;
+    --pp-primary-light: rgba(59, 130, 246, 0.2);
+    --pp-primary-border: rgba(96, 165, 250, 0.35);
+
+    /* Background colors */
+    --pp-bg-primary: #0f172a;
+    --pp-bg-secondary: #111827;
+    --pp-bg-tertiary: #1f2937;
+    --pp-bg-elevated: #111827;
+
+    /* Text colors */
+    --pp-text-primary: #f8fafc;
+    --pp-text-secondary: #cbd5e1;
+    --pp-text-tertiary: #94a3b8;
+    --pp-text-muted: #64748b;
+    --pp-text-on-primary: #0f172a;
+
+    /* Border colors */
+    --pp-border: rgba(148, 163, 184, 0.3);
+    --pp-border-light: rgba(148, 163, 184, 0.2);
+    --pp-border-focus: var(--pp-primary);
+
+    /* Shadows */
+    --pp-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.4);
+    --pp-shadow-md: 0 6px 16px rgba(15, 23, 42, 0.5);
+    --pp-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.55);
+    --pp-shadow-primary: 0 6px 18px rgba(59, 130, 246, 0.35);
+
+    /* Hero section */
+    --pp-hero-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, rgba(139, 92, 246, 0.16) 100%);
+    --pp-hero-border: rgba(148, 163, 184, 0.35);
+
+    /* Card colors */
+    --pp-card-bg: rgba(15, 23, 42, 0.85);
+    --pp-card-border: rgba(148, 163, 184, 0.35);
+
+    /* Callout colors */
+    --pp-callout-bg: rgba(59, 130, 246, 0.18);
+    --pp-callout-border: rgba(99, 102, 241, 0.35);
+    --pp-callout-text: #e0e7ff;
+
+    /* Chip colors */
+    --pp-chip-bg: rgba(59, 130, 246, 0.2);
+    --pp-chip-text: #e0f2fe;
+
+    /* Footer */
+    --pp-footer-text: rgba(226, 232, 240, 0.7);
+    --pp-footer-border: rgba(148, 163, 184, 0.25);
+
+    /* Secondary button */
+    --pp-btn-secondary-bg: #1f2937;
+    --pp-btn-secondary-hover: #273449;
+    --pp-btn-secondary-text: #e2e8f0;
+    --pp-btn-secondary-border: rgba(148, 163, 184, 0.35);
+
+    /* Disabled state */
+    --pp-disabled-bg: rgba(148, 163, 184, 0.2);
+    --pp-disabled-text: #94a3b8;
+
+    /* Overlay */
+    --pp-overlay-bg: rgba(15, 23, 42, 0.6);
+    --pp-overlay-card: rgba(15, 23, 42, 0.95);
+
+    /* Progress */
+    --pp-progress-bg: rgba(59, 130, 246, 0.3);
+    --pp-progress-fill: #60a5fa;
+    --pp-progress-secondary: #93c5fd;
+  }
+}
+
 /* ============================================================
    Base Layout
    ============================================================ */
