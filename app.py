@@ -351,6 +351,13 @@ footer a:hover {
   color: var(--pp-text-primary);
 }
 
+.app-title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--pp-text-primary) !important;
+}
+
 /* ============================================================
    Section Headers
    ============================================================ */
@@ -1819,7 +1826,7 @@ with header_left:
           <a href="https://panphy.github.io/?" target="_blank" rel="noopener noreferrer">
             <img src="{PANPHY_LOGO_URL}" alt="PanPhy logo" class="app-logo" />
           </a>
-          <h1 style="margin: 0; font-size: 2rem; font-weight: 700;">PanPhy Skill Builder</h1>
+          <h1 class="app-title">PanPhy Skill Builder</h1>
         </div>
         """,
         unsafe_allow_html=True,
