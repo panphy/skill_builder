@@ -138,8 +138,8 @@ body,
   --pp-shadow-primary: 0 4px 14px rgba(59, 130, 246, 0.25);
 
   /* Hero section */
-  --pp-hero-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.14) 0%, rgba(139, 92, 246, 0.12) 100%);
-  --pp-hero-border: rgba(148, 163, 184, 0.4);
+  --pp-hero-bg: linear-gradient(135deg, #eef4ff 0%, #f8fafc 55%, #e9edff 100%);
+  --pp-hero-border: rgba(148, 163, 184, 0.55);
 
   /* Card colors */
   --pp-card-bg: rgba(255, 255, 255, 0.8);
