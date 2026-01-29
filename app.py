@@ -479,6 +479,20 @@ html[data-pp-theme="dark"] [data-testid="stExpander"] summary {
   color: #f1f5f9 !important;
 }
 
+/* Tooltip styling for dark mode */
+html[data-pp-theme="dark"] [data-baseweb="tooltip"],
+html[data-pp-theme="dark"] [role="tooltip"],
+html[data-pp-theme="dark"] .stTooltipContent {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border: 1px solid #475569 !important;
+}
+
+html[data-pp-theme="dark"] [data-baseweb="tooltip"] *,
+html[data-pp-theme="dark"] [role="tooltip"] * {
+  color: #f1f5f9 !important;
+}
+
 /* ============================================================
    Base Layout
    ============================================================ */
@@ -489,11 +503,11 @@ div[data-testid="stAppViewContainer"] > .main .block-container {
 /* ============================================================
    Button Styles
    ============================================================ */
-div[data-testid="stButton"] button[aria-label="Expand"] span,
-div[data-testid="stButton"] button[aria-label="Collapse"] span {
+/* Expand/Collapse emoji buttons */
+div[data-testid="stButton"] button[aria-label="🔼"] span,
+div[data-testid="stButton"] button[aria-label="🔽"] span {
   font-size: 20px;
   line-height: 1;
-  font-weight: 600;
 }
 
 div[data-testid="stButton"] > button {
