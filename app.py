@@ -347,8 +347,10 @@ footer a:hover {
   gap: 12px;
 }
 
-.app-title-row h1 {
-  color: var(--pp-text-primary);
+.app-title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
 }
 
 /* ============================================================
@@ -381,6 +383,13 @@ footer a:hover {
   border-radius: 10px !important;
   background: var(--pp-bg-primary) !important;
   transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+@media (prefers-color-scheme: light) {
+  [data-testid="stTextInput"] input {
+    background-color: var(--pp-bg-tertiary) !important;
+    color: var(--pp-text-primary) !important;
+  }
 }
 
 /* ============================================================
@@ -1819,7 +1828,7 @@ with header_left:
           <a href="https://panphy.github.io/?" target="_blank" rel="noopener noreferrer">
             <img src="{PANPHY_LOGO_URL}" alt="PanPhy logo" class="app-logo" />
           </a>
-          <h1 style="margin: 0; font-size: 2rem; font-weight: 700;">PanPhy Skill Builder</h1>
+          <h1 class="app-title">PanPhy Skill Builder</h1>
         </div>
         """,
         unsafe_allow_html=True,
