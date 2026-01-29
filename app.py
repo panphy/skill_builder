@@ -514,11 +514,24 @@ div[data-testid="stButton"] > button {
   transition: all 0.2s ease;
 }
 
+/* Force dark button colors when dark theme is active */
+html[data-pp-theme="dark"] div[data-testid="stButton"] > button:not([kind="primary"]) {
+  background: #1e293b !important;
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: #475569 !important;
+}
+
 div[data-testid="stButton"] > button:hover {
   background: var(--pp-btn-secondary-hover);
   border-color: var(--pp-border);
   box-shadow: var(--pp-shadow-md);
   transform: translateY(-1px);
+}
+
+html[data-pp-theme="dark"] div[data-testid="stButton"] > button:not([kind="primary"]):hover {
+  background: #334155 !important;
+  background-color: #334155 !important;
 }
 
 div[data-testid="stButton"] > button:active {
@@ -836,27 +849,48 @@ div[data-testid="column"]:last-child div[data-testid="stButton"] > button {
   padding: 0.35rem 0.5rem !important;
 }
 
-/* Dark theme button fix - attribute selector */
-html[data-pp-theme="dark"] div[data-testid="stButton"] > button {
+/* Dark theme button fix - multiple selectors for maximum specificity */
+/* Target ALL buttons that are not primary in dark theme */
+html[data-pp-theme="dark"] div[data-testid="stButton"] > button:not([kind="primary"]),
+html[data-pp-theme="dark"] .stButton > button:not([kind="primary"]),
+html[data-pp-theme="dark"] [data-testid="stButton"] button:not([kind="primary"]),
+html[data-pp-theme="dark"] [data-baseweb="button"]:not([kind="primary"]),
+html[data-pp-theme="dark"] [data-testid="stColumn"] button:not([kind="primary"]),
+html[data-pp-theme="dark"] [data-testid="column"] button:not([kind="primary"]) {
   background: #1e293b !important;
+  background-color: #1e293b !important;
   color: #e2e8f0 !important;
   border: 1px solid #475569 !important;
+  border-color: #475569 !important;
 }
 
-html[data-pp-theme="dark"] div[data-testid="stButton"] > button:hover {
+html[data-pp-theme="dark"] div[data-testid="stButton"] > button:not([kind="primary"]):hover,
+html[data-pp-theme="dark"] .stButton > button:not([kind="primary"]):hover,
+html[data-pp-theme="dark"] [data-baseweb="button"]:not([kind="primary"]):hover,
+html[data-pp-theme="dark"] [data-testid="stColumn"] button:not([kind="primary"]):hover {
   background: #334155 !important;
+  background-color: #334155 !important;
 }
 
-/* Dark theme button fix - media query */
+/* Dark theme button fix - media query with strong selectors */
 @media (prefers-color-scheme: dark) {
-  div[data-testid="stButton"] > button {
+  div[data-testid="stButton"] > button:not([kind="primary"]),
+  .stButton > button:not([kind="primary"]),
+  [data-testid="stButton"] button:not([kind="primary"]),
+  [data-baseweb="button"]:not([kind="primary"]),
+  [data-testid="stColumn"] button:not([kind="primary"]) {
     background: #1e293b !important;
+    background-color: #1e293b !important;
     color: #e2e8f0 !important;
     border: 1px solid #475569 !important;
+    border-color: #475569 !important;
   }
 
-  div[data-testid="stButton"] > button:hover {
+  div[data-testid="stButton"] > button:not([kind="primary"]):hover,
+  .stButton > button:not([kind="primary"]):hover,
+  [data-baseweb="button"]:not([kind="primary"]):hover {
     background: #334155 !important;
+    background-color: #334155 !important;
   }
 }
 
