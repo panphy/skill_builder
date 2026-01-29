@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import logging
 
 LOGGER = logging.getLogger("panphy")
@@ -2150,7 +2151,9 @@ def _apply_theme_script(theme_value: str):
     theme_value = (theme_value or "system").strip().lower()
     if theme_value not in ("light", "dark", "system"):
         theme_value = "system"
-    st.markdown(
+    # Use components.html() for reliable JavaScript execution
+    # Access parent.document since this runs in an iframe context
+    components.html(
         f"""
 <script>
 (function() {{
@@ -2158,7 +2161,8 @@ def _apply_theme_script(theme_value: str):
   const theme = {json.dumps(theme_value)};
 
   function applyTheme(t) {{
-    const html = document.documentElement;
+    // Access parent document since we're in an iframe
+    const html = parent.document.documentElement;
     if (t === 'system') {{
       html.removeAttribute('data-pp-theme');
       // Let CSS media queries handle it
@@ -2167,32 +2171,34 @@ def _apply_theme_script(theme_value: str):
     }}
   }}
 
-  // Save to localStorage
-  try {{ window.localStorage.setItem(KEY, theme); }} catch (e) {{}}
+  // Save to localStorage (use parent window for consistency)
+  try {{ parent.window.localStorage.setItem(KEY, theme); }} catch (e) {{}}
 
   // Apply theme
   applyTheme(theme);
 }})();
 </script>
 """,
-        unsafe_allow_html=True
+        height=0
     )
 
 def _restore_theme_from_storage():
     """Inject JavaScript to restore theme from localStorage on first load."""
-    st.markdown(
+    # Use components.html() for reliable JavaScript execution
+    # Access parent.document since this runs in an iframe context
+    components.html(
         f"""
 <script>
 (function() {{
   const KEY = {json.dumps(THEME_STORAGE_KEY)};
-  const saved = window.localStorage.getItem(KEY);
+  const saved = parent.window.localStorage.getItem(KEY);
   if (saved === 'light' || saved === 'dark') {{
-    document.documentElement.setAttribute('data-pp-theme', saved);
+    parent.document.documentElement.setAttribute('data-pp-theme', saved);
   }}
 }})();
 </script>
 """,
-        unsafe_allow_html=True
+        height=0
     )
 
 # Restore theme from localStorage on page load
