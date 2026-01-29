@@ -178,321 +178,6 @@ body,
   --pp-progress-secondary: #93c5fd;
 }
 
-/* Force light mode when user selects light theme */
-html[data-pp-theme="light"],
-html[data-pp-theme="light"] body,
-html[data-pp-theme="light"] [data-testid="stAppViewContainer"],
-html[data-pp-theme="light"] .stApp {
-  --pp-primary: #3b82f6 !important;
-  --pp-primary-hover: #2563eb !important;
-  --pp-primary-active: #1d4ed8 !important;
-  --pp-primary-light: rgba(59, 130, 246, 0.12) !important;
-  --pp-primary-border: rgba(59, 130, 246, 0.3) !important;
-  --pp-bg-primary: #ffffff !important;
-  --pp-bg-secondary: #f8fafc !important;
-  --pp-bg-tertiary: #f1f5f9 !important;
-  --pp-bg-elevated: #ffffff !important;
-  --pp-text-primary: #1e293b !important;
-  --pp-text-secondary: #475569 !important;
-  --pp-text-tertiary: #64748b !important;
-  --pp-text-muted: #94a3b8 !important;
-  --pp-text-on-primary: #ffffff !important;
-  --pp-border: #e2e8f0 !important;
-  --pp-border-light: rgba(0, 0, 0, 0.06) !important;
-  --pp-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
-  --pp-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
-  --pp-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1) !important;
-  --pp-shadow-primary: 0 4px 14px rgba(59, 130, 246, 0.25) !important;
-  --pp-hero-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(139, 92, 246, 0.06) 100%) !important;
-  --pp-hero-border: rgba(148, 163, 184, 0.25) !important;
-  --pp-card-bg: rgba(255, 255, 255, 0.8) !important;
-  --pp-card-border: rgba(148, 163, 184, 0.2) !important;
-  --pp-callout-bg: rgba(59, 130, 246, 0.06) !important;
-  --pp-callout-border: rgba(59, 130, 246, 0.2) !important;
-  --pp-callout-text: #1e40af !important;
-  --pp-chip-bg: rgba(59, 130, 246, 0.1) !important;
-  --pp-chip-text: #1e40af !important;
-  --pp-footer-text: rgba(30, 41, 59, 0.6) !important;
-  --pp-footer-border: rgba(0, 0, 0, 0.08) !important;
-  --pp-btn-secondary-bg: #f8fafc !important;
-  --pp-btn-secondary-hover: #f1f5f9 !important;
-  --pp-btn-secondary-text: #334155 !important;
-  --pp-btn-secondary-border: #cbd5e1 !important;
-  --pp-disabled-bg: #e2e8f0 !important;
-  --pp-disabled-text: #94a3b8 !important;
-  --pp-overlay-bg: rgba(0, 0, 0, 0.3) !important;
-  --pp-overlay-card: rgba(255, 255, 255, 0.98) !important;
-  --pp-progress-bg: rgba(59, 130, 246, 0.15) !important;
-  --pp-progress-fill: #3b82f6 !important;
-  --pp-progress-secondary: #93c5fd !important;
-}
-
-/* Force dark mode when user selects dark theme */
-html[data-pp-theme="dark"],
-html[data-pp-theme="dark"] body,
-html[data-pp-theme="dark"] [data-testid="stAppViewContainer"],
-html[data-pp-theme="dark"] .stApp {
-  --pp-primary: #60a5fa !important;
-  --pp-primary-hover: #3b82f6 !important;
-  --pp-primary-active: #2563eb !important;
-  --pp-primary-light: rgba(96, 165, 250, 0.15) !important;
-  --pp-primary-border: rgba(96, 165, 250, 0.35) !important;
-  --pp-bg-primary: #0f172a !important;
-  --pp-bg-secondary: #1e293b !important;
-  --pp-bg-tertiary: #334155 !important;
-  --pp-bg-elevated: #1e293b !important;
-  --pp-text-primary: #f1f5f9 !important;
-  --pp-text-secondary: #cbd5e1 !important;
-  --pp-text-tertiary: #94a3b8 !important;
-  --pp-text-muted: #64748b !important;
-  --pp-text-on-primary: #0f172a !important;
-  --pp-border: #334155 !important;
-  --pp-border-light: rgba(255, 255, 255, 0.08) !important;
-  --pp-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
-  --pp-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-  --pp-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
-  --pp-shadow-primary: 0 4px 14px rgba(96, 165, 250, 0.3) !important;
-  --pp-hero-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%) !important;
-  --pp-hero-border: rgba(71, 85, 105, 0.5) !important;
-  --pp-card-bg: rgba(30, 41, 59, 0.9) !important;
-  --pp-card-border: rgba(71, 85, 105, 0.4) !important;
-  --pp-callout-bg: rgba(96, 165, 250, 0.1) !important;
-  --pp-callout-border: rgba(96, 165, 250, 0.25) !important;
-  --pp-callout-text: #93c5fd !important;
-  --pp-chip-bg: rgba(96, 165, 250, 0.15) !important;
-  --pp-chip-text: #93c5fd !important;
-  --pp-footer-text: rgba(203, 213, 225, 0.7) !important;
-  --pp-footer-border: rgba(255, 255, 255, 0.1) !important;
-  --pp-btn-secondary-bg: #1e293b !important;
-  --pp-btn-secondary-hover: #334155 !important;
-  --pp-btn-secondary-text: #e2e8f0 !important;
-  --pp-btn-secondary-border: #475569 !important;
-  --pp-disabled-bg: #334155 !important;
-  --pp-disabled-text: #64748b !important;
-  --pp-overlay-bg: rgba(0, 0, 0, 0.6) !important;
-  --pp-overlay-card: rgba(30, 41, 59, 0.98) !important;
-  --pp-progress-bg: rgba(96, 165, 250, 0.2) !important;
-  --pp-progress-fill: #60a5fa !important;
-  --pp-progress-secondary: #3b82f6 !important;
-}
-
-/* CSS Variables for Dark Mode */
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Primary colors */
-    --pp-primary: #60a5fa;
-    --pp-primary-hover: #3b82f6;
-    --pp-primary-active: #2563eb;
-    --pp-primary-light: rgba(96, 165, 250, 0.15);
-    --pp-primary-border: rgba(96, 165, 250, 0.35);
-
-    /* Background colors */
-    --pp-bg-primary: #0f172a;
-    --pp-bg-secondary: #1e293b;
-    --pp-bg-tertiary: #334155;
-    --pp-bg-elevated: #1e293b;
-
-    /* Text colors */
-    --pp-text-primary: #f1f5f9;
-    --pp-text-secondary: #cbd5e1;
-    --pp-text-tertiary: #94a3b8;
-    --pp-text-muted: #64748b;
-    --pp-text-on-primary: #0f172a;
-
-    /* Border colors */
-    --pp-border: #334155;
-    --pp-border-light: rgba(255, 255, 255, 0.08);
-
-    /* Shadows */
-    --pp-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --pp-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-    --pp-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-    --pp-shadow-primary: 0 4px 14px rgba(96, 165, 250, 0.3);
-
-    /* Hero section */
-    --pp-hero-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%);
-    --pp-hero-border: rgba(71, 85, 105, 0.5);
-
-    /* Card colors */
-    --pp-card-bg: rgba(30, 41, 59, 0.9);
-    --pp-card-border: rgba(71, 85, 105, 0.4);
-
-    /* Callout colors */
-    --pp-callout-bg: rgba(96, 165, 250, 0.1);
-    --pp-callout-border: rgba(96, 165, 250, 0.25);
-    --pp-callout-text: #93c5fd;
-
-    /* Chip colors */
-    --pp-chip-bg: rgba(96, 165, 250, 0.15);
-    --pp-chip-text: #93c5fd;
-
-    /* Footer */
-    --pp-footer-text: rgba(203, 213, 225, 0.7);
-    --pp-footer-border: rgba(255, 255, 255, 0.1);
-
-    /* Secondary button */
-    --pp-btn-secondary-bg: #1e293b;
-    --pp-btn-secondary-hover: #334155;
-    --pp-btn-secondary-text: #e2e8f0;
-    --pp-btn-secondary-border: #475569;
-
-    /* Disabled state */
-    --pp-disabled-bg: #334155;
-    --pp-disabled-text: #64748b;
-
-    /* Overlay */
-    --pp-overlay-bg: rgba(0, 0, 0, 0.6);
-    --pp-overlay-card: rgba(30, 41, 59, 0.98);
-
-    /* Progress */
-    --pp-progress-bg: rgba(96, 165, 250, 0.2);
-    --pp-progress-fill: #60a5fa;
-    --pp-progress-secondary: #3b82f6;
-  }
-}
-
-/* Streamlit-specific dark mode detection */
-[data-testid="stAppViewContainer"][data-theme="dark"],
-.stApp[data-theme="dark"],
-html[data-theme="dark"] {
-  --pp-primary: #60a5fa;
-  --pp-primary-hover: #3b82f6;
-  --pp-primary-active: #2563eb;
-  --pp-primary-light: rgba(96, 165, 250, 0.15);
-  --pp-primary-border: rgba(96, 165, 250, 0.35);
-  --pp-bg-primary: #0f172a;
-  --pp-bg-secondary: #1e293b;
-  --pp-bg-tertiary: #334155;
-  --pp-bg-elevated: #1e293b;
-  --pp-text-primary: #f1f5f9;
-  --pp-text-secondary: #cbd5e1;
-  --pp-text-tertiary: #94a3b8;
-  --pp-text-muted: #64748b;
-  --pp-text-on-primary: #0f172a;
-  --pp-border: #334155;
-  --pp-border-light: rgba(255, 255, 255, 0.08);
-  --pp-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --pp-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --pp-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --pp-shadow-primary: 0 4px 14px rgba(96, 165, 250, 0.3);
-  --pp-hero-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%);
-  --pp-hero-border: rgba(71, 85, 105, 0.5);
-  --pp-card-bg: rgba(30, 41, 59, 0.9);
-  --pp-card-border: rgba(71, 85, 105, 0.4);
-  --pp-callout-bg: rgba(96, 165, 250, 0.1);
-  --pp-callout-border: rgba(96, 165, 250, 0.25);
-  --pp-callout-text: #93c5fd;
-  --pp-chip-bg: rgba(96, 165, 250, 0.15);
-  --pp-chip-text: #93c5fd;
-  --pp-footer-text: rgba(203, 213, 225, 0.7);
-  --pp-footer-border: rgba(255, 255, 255, 0.1);
-  --pp-btn-secondary-bg: #1e293b;
-  --pp-btn-secondary-hover: #334155;
-  --pp-btn-secondary-text: #e2e8f0;
-  --pp-btn-secondary-border: #475569;
-  --pp-disabled-bg: #334155;
-  --pp-disabled-text: #64748b;
-  --pp-overlay-bg: rgba(0, 0, 0, 0.6);
-  --pp-overlay-card: rgba(30, 41, 59, 0.98);
-  --pp-progress-bg: rgba(96, 165, 250, 0.2);
-  --pp-progress-fill: #60a5fa;
-  --pp-progress-secondary: #3b82f6;
-}
-
-/* ============================================================
-   Theme-specific Streamlit overrides for Light mode
-   ============================================================ */
-html[data-pp-theme="light"] [data-testid="stAppViewContainer"],
-html[data-pp-theme="light"] [data-testid="stHeader"],
-html[data-pp-theme="light"] .main {
-  background-color: #ffffff !important;
-}
-
-html[data-pp-theme="light"] [data-testid="stSidebar"],
-html[data-pp-theme="light"] [data-testid="stSidebar"] > div {
-  background-color: #f8fafc !important;
-}
-
-html[data-pp-theme="light"] p,
-html[data-pp-theme="light"] span,
-html[data-pp-theme="light"] label,
-html[data-pp-theme="light"] .stMarkdown,
-html[data-pp-theme="light"] [data-testid="stMarkdownContainer"] {
-  color: #1e293b !important;
-}
-
-html[data-pp-theme="light"] h1,
-html[data-pp-theme="light"] h2,
-html[data-pp-theme="light"] h3,
-html[data-pp-theme="light"] h4,
-html[data-pp-theme="light"] h5,
-html[data-pp-theme="light"] h6 {
-  color: #0f172a !important;
-}
-
-html[data-pp-theme="light"] .stSelectbox label,
-html[data-pp-theme="light"] .stRadio label,
-html[data-pp-theme="light"] .stTextInput label {
-  color: #1e293b !important;
-}
-
-/* ============================================================
-   Theme-specific Streamlit overrides for Dark mode
-   ============================================================ */
-html[data-pp-theme="dark"] [data-testid="stAppViewContainer"],
-html[data-pp-theme="dark"] [data-testid="stHeader"],
-html[data-pp-theme="dark"] .main {
-  background-color: #0f172a !important;
-}
-
-html[data-pp-theme="dark"] [data-testid="stSidebar"],
-html[data-pp-theme="dark"] [data-testid="stSidebar"] > div {
-  background-color: #1e293b !important;
-}
-
-html[data-pp-theme="dark"] p,
-html[data-pp-theme="dark"] span,
-html[data-pp-theme="dark"] label,
-html[data-pp-theme="dark"] .stMarkdown,
-html[data-pp-theme="dark"] [data-testid="stMarkdownContainer"] {
-  color: #f1f5f9 !important;
-}
-
-html[data-pp-theme="dark"] h1,
-html[data-pp-theme="dark"] h2,
-html[data-pp-theme="dark"] h3,
-html[data-pp-theme="dark"] h4,
-html[data-pp-theme="dark"] h5,
-html[data-pp-theme="dark"] h6 {
-  color: #f8fafc !important;
-}
-
-html[data-pp-theme="dark"] .stSelectbox label,
-html[data-pp-theme="dark"] .stRadio label,
-html[data-pp-theme="dark"] .stTextInput label {
-  color: #f1f5f9 !important;
-}
-
-html[data-pp-theme="dark"] [data-testid="stExpander"],
-html[data-pp-theme="dark"] [data-testid="stExpander"] summary {
-  background-color: #1e293b !important;
-  color: #f1f5f9 !important;
-}
-
-/* Tooltip styling for dark mode */
-html[data-pp-theme="dark"] [data-baseweb="tooltip"],
-html[data-pp-theme="dark"] [role="tooltip"],
-html[data-pp-theme="dark"] .stTooltipContent {
-  background-color: #1e293b !important;
-  color: #f1f5f9 !important;
-  border: 1px solid #475569 !important;
-}
-
-html[data-pp-theme="dark"] [data-baseweb="tooltip"] *,
-html[data-pp-theme="dark"] [role="tooltip"] * {
-  color: #f1f5f9 !important;
-}
-
 /* ============================================================
    Base Layout
    ============================================================ */
@@ -505,81 +190,23 @@ div[data-testid="stAppViewContainer"] > .main .block-container {
    ============================================================ */
 /* Base button styling - applies to all buttons */
 div[data-testid="stButton"] > button {
-  background: var(--pp-btn-secondary-bg);
-  color: var(--pp-btn-secondary-text);
-  border: 1px solid var(--pp-btn-secondary-border);
   border-radius: 8px;
   font-weight: 600;
-  box-shadow: var(--pp-shadow-sm);
   transition: all 0.2s ease;
 }
 
-/* Force dark button colors when dark theme is active */
-html[data-pp-theme="dark"] div[data-testid="stButton"] > button:not([kind="primary"]) {
-  background: #1e293b !important;
-  background-color: #1e293b !important;
-  color: #e2e8f0 !important;
-  border-color: #475569 !important;
-}
-
 div[data-testid="stButton"] > button:hover {
-  background: var(--pp-btn-secondary-hover);
-  border-color: var(--pp-border);
-  box-shadow: var(--pp-shadow-md);
   transform: translateY(-1px);
 }
 
-html[data-pp-theme="dark"] div[data-testid="stButton"] > button:not([kind="primary"]):hover {
-  background: #334155 !important;
-  background-color: #334155 !important;
-}
-
 div[data-testid="stButton"] > button:active {
-  background: var(--pp-bg-tertiary);
   transform: translateY(0);
 }
 
 div[data-testid="stButton"] > button:disabled {
-  background: var(--pp-disabled-bg);
-  color: var(--pp-disabled-text);
-  border-color: var(--pp-disabled-bg);
   box-shadow: none;
   transform: none;
   cursor: not-allowed;
-}
-
-/* Primary button styling (Submit buttons) */
-div[data-testid="stButton"] > button[kind="primary"] {
-  background: var(--pp-primary);
-  color: var(--pp-text-on-primary);
-  border: 1px solid var(--pp-primary-hover);
-  box-shadow: var(--pp-shadow-primary);
-}
-
-div[data-testid="stButton"] > button[kind="primary"]:hover {
-  background: var(--pp-primary-hover);
-  border-color: var(--pp-primary-active);
-}
-
-div[data-testid="stButton"] > button[kind="primary"]:active {
-  background: var(--pp-primary-active);
-}
-
-/* Secondary button styling (kept for explicit secondary buttons) */
-div[data-testid="stButton"] > button[kind="secondary"] {
-  background: var(--pp-btn-secondary-bg);
-  color: var(--pp-btn-secondary-text);
-  border: 1px solid var(--pp-btn-secondary-border);
-  box-shadow: var(--pp-shadow-sm);
-}
-
-div[data-testid="stButton"] > button[kind="secondary"]:hover {
-  background: var(--pp-btn-secondary-hover);
-  border-color: var(--pp-border);
-}
-
-div[data-testid="stButton"] > button[kind="secondary"]:active {
-  background: var(--pp-bg-tertiary);
 }
 
 /* ============================================================
@@ -792,55 +419,8 @@ footer a:hover {
   transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
 }
 
-[data-testid="stTextArea"] textarea:focus {
-  border-color: var(--pp-primary-border) !important;
-  box-shadow: 0 0 0 2px var(--pp-primary-light) !important;
-}
-
-/* Light theme specific - more visible border */
-html[data-pp-theme="light"] [data-testid="stTextArea"] textarea,
-:root [data-testid="stTextArea"] textarea {
-  border: 1px solid #cbd5e1 !important;
-}
-
-html[data-pp-theme="light"] [data-testid="stTextArea"] textarea:hover,
-:root [data-testid="stTextArea"] textarea:hover {
-  border-color: rgba(59, 130, 246, 0.4) !important;
-}
-
-/* Dark theme text area - use light background for readability */
-/* Force light grey background with dark text in ALL dark mode scenarios */
-html[data-pp-theme="dark"] [data-testid="stTextArea"] textarea,
-html[data-pp-theme="dark"] .stTextArea textarea,
-[data-theme="dark"] [data-testid="stTextArea"] textarea,
-[data-theme="dark"] .stTextArea textarea {
-  border: 1px solid #cbd5e1 !important;
-  background-color: #f8fafc !important;
-  background: #f8fafc !important;
-  color: #1e293b !important;
-  -webkit-text-fill-color: #1e293b !important;
-}
-
-@media (prefers-color-scheme: dark) {
-  [data-testid="stTextArea"] textarea,
-  .stTextArea textarea {
-    border: 1px solid #cbd5e1 !important;
-    background-color: #f8fafc !important;
-    background: #f8fafc !important;
-    color: #1e293b !important;
-    -webkit-text-fill-color: #1e293b !important;
-  }
-}
-
-/* Also fix placeholder text color in dark mode */
-html[data-pp-theme="dark"] [data-testid="stTextArea"] textarea::placeholder,
-[data-theme="dark"] [data-testid="stTextArea"] textarea::placeholder {
-  color: #94a3b8 !important;
-  -webkit-text-fill-color: #94a3b8 !important;
-}
-
 /* ============================================================
-   Expand Button Styling - fix dark theme background
+   Expand Button Styling
    ============================================================ */
 /* Target the expand/collapse buttons specifically */
 div[data-testid="stButton"] > button:has([data-testid="stMarkdownContainer"]),
@@ -849,74 +429,15 @@ div[data-testid="column"]:last-child div[data-testid="stButton"] > button {
   padding: 0.35rem 0.5rem !important;
 }
 
-/* Dark theme button fix - multiple selectors for maximum specificity */
-/* Target ALL buttons that are not primary in dark theme */
-html[data-pp-theme="dark"] div[data-testid="stButton"] > button:not([kind="primary"]),
-html[data-pp-theme="dark"] .stButton > button:not([kind="primary"]),
-html[data-pp-theme="dark"] [data-testid="stButton"] button:not([kind="primary"]),
-html[data-pp-theme="dark"] [data-baseweb="button"]:not([kind="primary"]),
-html[data-pp-theme="dark"] [data-testid="stColumn"] button:not([kind="primary"]),
-html[data-pp-theme="dark"] [data-testid="column"] button:not([kind="primary"]) {
-  background: #1e293b !important;
-  background-color: #1e293b !important;
-  color: #e2e8f0 !important;
-  border: 1px solid #475569 !important;
-  border-color: #475569 !important;
-}
-
-html[data-pp-theme="dark"] div[data-testid="stButton"] > button:not([kind="primary"]):hover,
-html[data-pp-theme="dark"] .stButton > button:not([kind="primary"]):hover,
-html[data-pp-theme="dark"] [data-baseweb="button"]:not([kind="primary"]):hover,
-html[data-pp-theme="dark"] [data-testid="stColumn"] button:not([kind="primary"]):hover {
-  background: #334155 !important;
-  background-color: #334155 !important;
-}
-
-/* Dark theme button fix - media query with strong selectors */
-@media (prefers-color-scheme: dark) {
-  div[data-testid="stButton"] > button:not([kind="primary"]),
-  .stButton > button:not([kind="primary"]),
-  [data-testid="stButton"] button:not([kind="primary"]),
-  [data-baseweb="button"]:not([kind="primary"]),
-  [data-testid="stColumn"] button:not([kind="primary"]) {
-    background: #1e293b !important;
-    background-color: #1e293b !important;
-    color: #e2e8f0 !important;
-    border: 1px solid #475569 !important;
-    border-color: #475569 !important;
-  }
-
-  div[data-testid="stButton"] > button:not([kind="primary"]):hover,
-  .stButton > button:not([kind="primary"]):hover,
-  [data-baseweb="button"]:not([kind="primary"]):hover {
-    background: #334155 !important;
-    background-color: #334155 !important;
-  }
-}
-
 /* ============================================================
-   Bordered Container Styling - visible borders in both themes
+   Bordered Container Styling
    (Question box, AI Feedback box, etc.)
    ============================================================ */
 /* Target Streamlit's bordered containers */
 [data-testid="stVerticalBlockBorderWrapper"] {
-  border: 2px solid var(--pp-primary-border) !important;
+  border: 2px solid rgba(59, 130, 246, 0.35) !important;
   border-radius: 12px !important;
   overflow: hidden;
-}
-
-/* Light theme - visible blue-tinted border */
-html[data-pp-theme="light"] [data-testid="stVerticalBlockBorderWrapper"],
-:root [data-testid="stVerticalBlockBorderWrapper"] {
-  border: 2px solid rgba(59, 130, 246, 0.35) !important;
-}
-
-/* Dark theme - visible blue-tinted border */
-html[data-pp-theme="dark"] [data-testid="stVerticalBlockBorderWrapper"],
-@media (prefers-color-scheme: dark) {
-  [data-testid="stVerticalBlockBorderWrapper"] {
-    border: 2px solid rgba(96, 165, 250, 0.5) !important;
-  }
 }
 </style>
 """,
@@ -955,7 +476,6 @@ def _ss_init(k: str, v):
 
 _ss_init("canvas_key", 0)
 _ss_init("feedback", None)
-_ss_init("app_theme", "system")  # "light", "dark", or "system"
 _ss_init("student_answer_text_single", "")
 _ss_init("student_answer_text_journey", "")
 _ss_init("anon_id", pysecrets.token_hex(4))
@@ -2307,92 +1827,6 @@ with st.sidebar:
         else:
             st.markdown(":blue-badge[SEPARATE]")
     st.caption("The badge shows whether COMBINED or SEPARATED Physics selected.")
-
-# ============================================================
-# THEME TOGGLE
-# ============================================================
-THEME_STORAGE_KEY = f"panphy_theme_{SUBJECT_SITE}"
-THEME_OPTIONS = {"Light": "light", "Dark": "dark", "System": "system"}
-THEME_OPTIONS_REV = {v: k for k, v in THEME_OPTIONS.items()}
-
-def _apply_theme_script(theme_value: str):
-    """Inject JavaScript to apply theme attribute to HTML element and persist to localStorage."""
-    theme_value = (theme_value or "system").strip().lower()
-    if theme_value not in ("light", "dark", "system"):
-        theme_value = "system"
-    # Use components.html() for reliable JavaScript execution
-    # Access parent.document since this runs in an iframe context
-    components.html(
-        f"""
-<script>
-(function() {{
-  const KEY = {json.dumps(THEME_STORAGE_KEY)};
-  const theme = {json.dumps(theme_value)};
-
-  function applyTheme(t) {{
-    // Access parent document since we're in an iframe
-    const html = parent.document.documentElement;
-    if (t === 'system') {{
-      html.removeAttribute('data-pp-theme');
-      // Let CSS media queries handle it
-    }} else {{
-      html.setAttribute('data-pp-theme', t);
-    }}
-  }}
-
-  // Save to localStorage (use parent window for consistency)
-  try {{ parent.window.localStorage.setItem(KEY, theme); }} catch (e) {{}}
-
-  // Apply theme
-  applyTheme(theme);
-}})();
-</script>
-""",
-        height=0
-    )
-
-def _restore_theme_from_storage():
-    """Inject JavaScript to restore theme from localStorage on first load."""
-    # Use components.html() for reliable JavaScript execution
-    # Access parent.document since this runs in an iframe context
-    components.html(
-        f"""
-<script>
-(function() {{
-  const KEY = {json.dumps(THEME_STORAGE_KEY)};
-  const saved = parent.window.localStorage.getItem(KEY);
-  if (saved === 'light' || saved === 'dark') {{
-    parent.document.documentElement.setAttribute('data-pp-theme', saved);
-  }}
-}})();
-</script>
-""",
-        height=0
-    )
-
-# Restore theme from localStorage on page load
-_restore_theme_from_storage()
-
-# Theme selector in sidebar
-with st.sidebar:
-    st.markdown("---")
-    current_theme = st.session_state.get("app_theme", "system")
-    current_label = THEME_OPTIONS_REV.get(current_theme, "System")
-
-    theme_label = st.selectbox(
-        "Theme",
-        list(THEME_OPTIONS.keys()),
-        index=list(THEME_OPTIONS.keys()).index(current_label),
-        key="sidebar_theme_select",
-        help="Choose Light, Dark, or System (follows your device settings)."
-    )
-    selected_theme = THEME_OPTIONS.get(theme_label, "system")
-
-    if selected_theme != st.session_state.get("app_theme", "system"):
-        st.session_state["app_theme"] = selected_theme
-
-# Apply the selected theme
-_apply_theme_script(st.session_state.get("app_theme", "system"))
 
 header_left, header_mid, header_right = st.columns([3, 2, 1])
 
