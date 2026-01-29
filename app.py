@@ -836,20 +836,27 @@ div[data-testid="column"]:last-child div[data-testid="stButton"] > button {
   padding: 0.35rem 0.5rem !important;
 }
 
-/* Dark theme expand button fix */
-html[data-pp-theme="dark"] div[data-testid="stButton"] > button,
-@media (prefers-color-scheme: dark) {
-  div[data-testid="stButton"] > button {
-    background: var(--pp-btn-secondary-bg) !important;
-    color: var(--pp-btn-secondary-text) !important;
-    border: 1px solid var(--pp-btn-secondary-border) !important;
-  }
+/* Dark theme button fix - attribute selector */
+html[data-pp-theme="dark"] div[data-testid="stButton"] > button {
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #475569 !important;
 }
 
-html[data-pp-theme="dark"] div[data-testid="stButton"] > button:hover,
+html[data-pp-theme="dark"] div[data-testid="stButton"] > button:hover {
+  background: #334155 !important;
+}
+
+/* Dark theme button fix - media query */
 @media (prefers-color-scheme: dark) {
+  div[data-testid="stButton"] > button {
+    background: #1e293b !important;
+    color: #e2e8f0 !important;
+    border: 1px solid #475569 !important;
+  }
+
   div[data-testid="stButton"] > button:hover {
-    background: var(--pp-btn-secondary-hover) !important;
+    background: #334155 !important;
   }
 }
 
