@@ -768,6 +768,68 @@ footer a:hover {
   border-radius: 6px;
   font-size: 14px;
 }
+
+/* ============================================================
+   Text Area Styling - visible borders
+   ============================================================ */
+[data-testid="stTextArea"] textarea {
+  border: 1px solid var(--pp-border) !important;
+  border-radius: 10px !important;
+  background: var(--pp-bg-primary) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+[data-testid="stTextArea"] textarea:focus {
+  border-color: var(--pp-primary-border) !important;
+  box-shadow: 0 0 0 2px var(--pp-primary-light) !important;
+}
+
+/* Light theme specific - more visible border */
+html[data-pp-theme="light"] [data-testid="stTextArea"] textarea,
+:root [data-testid="stTextArea"] textarea {
+  border: 1px solid #cbd5e1 !important;
+}
+
+html[data-pp-theme="light"] [data-testid="stTextArea"] textarea:hover,
+:root [data-testid="stTextArea"] textarea:hover {
+  border-color: rgba(59, 130, 246, 0.4) !important;
+}
+
+/* Dark theme text area */
+html[data-pp-theme="dark"] [data-testid="stTextArea"] textarea,
+@media (prefers-color-scheme: dark) {
+  [data-testid="stTextArea"] textarea {
+    border: 1px solid #475569 !important;
+    background: #1e293b !important;
+  }
+}
+
+/* ============================================================
+   Expand Button Styling - fix dark theme background
+   ============================================================ */
+/* Target the expand/collapse buttons specifically */
+div[data-testid="stButton"] > button:has([data-testid="stMarkdownContainer"]),
+div[data-testid="column"]:last-child div[data-testid="stButton"] > button {
+  min-width: 44px !important;
+  padding: 0.35rem 0.5rem !important;
+}
+
+/* Dark theme expand button fix */
+html[data-pp-theme="dark"] div[data-testid="stButton"] > button,
+@media (prefers-color-scheme: dark) {
+  div[data-testid="stButton"] > button {
+    background: var(--pp-btn-secondary-bg) !important;
+    color: var(--pp-btn-secondary-text) !important;
+    border: 1px solid var(--pp-btn-secondary-border) !important;
+  }
+}
+
+html[data-pp-theme="dark"] div[data-testid="stButton"] > button:hover,
+@media (prefers-color-scheme: dark) {
+  div[data-testid="stButton"] > button:hover {
+    background: var(--pp-btn-secondary-hover) !important;
+  }
+}
 </style>
 """,
     unsafe_allow_html=True,
