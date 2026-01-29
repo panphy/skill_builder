@@ -348,7 +348,14 @@ footer a:hover {
 }
 
 .app-title-row h1 {
-  color: var(--pp-text-primary);
+  color: var(--text-color);
+}
+
+.app-title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-color) !important;
 }
 
 .app-title {
@@ -388,6 +395,11 @@ footer a:hover {
   border-radius: 10px !important;
   background: var(--pp-bg-primary) !important;
   transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+[data-testid="stTextInput"] input {
+  background-color: var(--secondary-background-color) !important;
+  color: var(--text-color) !important;
 }
 
 /* ============================================================
