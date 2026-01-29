@@ -503,31 +503,26 @@ div[data-testid="stAppViewContainer"] > .main .block-container {
 /* ============================================================
    Button Styles
    ============================================================ */
-/* Expand/Collapse emoji buttons */
-div[data-testid="stButton"] button[aria-label="🔼"] span,
-div[data-testid="stButton"] button[aria-label="🔽"] span {
-  font-size: 20px;
-  line-height: 1;
-}
-
+/* Base button styling - applies to all buttons */
 div[data-testid="stButton"] > button {
-  background: var(--pp-primary);
-  color: var(--pp-text-on-primary);
-  border: 1px solid var(--pp-primary-hover);
+  background: var(--pp-btn-secondary-bg);
+  color: var(--pp-btn-secondary-text);
+  border: 1px solid var(--pp-btn-secondary-border);
   border-radius: 8px;
   font-weight: 600;
-  box-shadow: var(--pp-shadow-primary);
+  box-shadow: var(--pp-shadow-sm);
   transition: all 0.2s ease;
 }
 
 div[data-testid="stButton"] > button:hover {
-  background: var(--pp-primary-hover);
+  background: var(--pp-btn-secondary-hover);
+  border-color: var(--pp-border);
   box-shadow: var(--pp-shadow-md);
   transform: translateY(-1px);
 }
 
 div[data-testid="stButton"] > button:active {
-  background: var(--pp-primary-active);
+  background: var(--pp-bg-tertiary);
   transform: translateY(0);
 }
 
@@ -537,8 +532,27 @@ div[data-testid="stButton"] > button:disabled {
   border-color: var(--pp-disabled-bg);
   box-shadow: none;
   transform: none;
+  cursor: not-allowed;
 }
 
+/* Primary button styling (Submit buttons) */
+div[data-testid="stButton"] > button[kind="primary"] {
+  background: var(--pp-primary);
+  color: var(--pp-text-on-primary);
+  border: 1px solid var(--pp-primary-hover);
+  box-shadow: var(--pp-shadow-primary);
+}
+
+div[data-testid="stButton"] > button[kind="primary"]:hover {
+  background: var(--pp-primary-hover);
+  border-color: var(--pp-primary-active);
+}
+
+div[data-testid="stButton"] > button[kind="primary"]:active {
+  background: var(--pp-primary-active);
+}
+
+/* Secondary button styling (kept for explicit secondary buttons) */
 div[data-testid="stButton"] > button[kind="secondary"] {
   background: var(--pp-btn-secondary-bg);
   color: var(--pp-btn-secondary-text);
@@ -553,15 +567,6 @@ div[data-testid="stButton"] > button[kind="secondary"]:hover {
 
 div[data-testid="stButton"] > button[kind="secondary"]:active {
   background: var(--pp-bg-tertiary);
-}
-
-div[data-testid="stButton"] > button[kind="primary"] {
-  background: var(--pp-primary-hover);
-  border-color: var(--pp-primary-active);
-}
-
-div[data-testid="stButton"] > button[kind="primary"]:hover {
-  background: var(--pp-primary-active);
 }
 
 /* ============================================================
