@@ -1005,26 +1005,59 @@ def _run_ai_with_progress(
             step_label = f"Question {step_index} of {total_steps}"
             step_percent = min(100, max(0, int((step_index / total_steps) * 100)))
 
-        # Build step progress HTML if applicable
-        step_html = ""
-        if step_label:
-            step_html = f'<div class="ai-popup-step-label">{step_label}</div><div class="ai-popup-progress-bar"><div class="ai-popup-progress-fill" style="width: {step_percent}%;"></div></div>'
-
-        # Build subtitle HTML if applicable
-        subtitle_html = f'<div class="ai-popup-subtitle">{subtitle}</div>' if subtitle else ""
-
-        # JavaScript to inject overlay into parent document (breaks out of Streamlit iframe)
+        # JavaScript to inject/update overlay in parent document (breaks out of Streamlit iframe)
+        # Only creates the overlay once, then updates dynamic content to avoid flashing
         popup_script = f"""
 <script>
 (function() {{
-    // Target the parent document (Streamlit's main document)
     var doc = window.parent.document;
+    var overlay = doc.getElementById('ai-loading-overlay');
 
-    // Remove existing overlay if present
-    var existing = doc.getElementById('ai-loading-overlay');
-    if (existing) existing.remove();
+    // Dynamic values to update
+    var percent = {percent};
+    var subtitle = "{subtitle}";
+    var stepLabel = "{step_label}";
+    var stepPercent = {step_percent};
+    var estimateLabel = "{estimate_label}";
 
-    // Create and inject styles
+    // If overlay already exists, just update the dynamic content
+    if (overlay) {{
+        var progressFill = overlay.querySelector('.ai-popup-progress-fill');
+        var percentText = overlay.querySelector('.ai-popup-percent');
+        var subtitleEl = overlay.querySelector('.ai-popup-subtitle');
+        var estimateEl = overlay.querySelector('.ai-popup-estimate');
+        var stepContainer = overlay.querySelector('.ai-popup-step-container');
+
+        if (progressFill) progressFill.style.width = percent + '%';
+        if (percentText) percentText.textContent = percent + '%';
+        if (estimateEl) estimateEl.textContent = 'Estimate: ' + estimateLabel;
+
+        // Update subtitle
+        if (subtitleEl) {{
+            if (subtitle) {{
+                subtitleEl.textContent = subtitle;
+                subtitleEl.style.display = 'block';
+            }} else {{
+                subtitleEl.style.display = 'none';
+            }}
+        }}
+
+        // Update step progress if applicable
+        if (stepContainer) {{
+            if (stepLabel) {{
+                var stepLabelEl = stepContainer.querySelector('.ai-popup-step-label');
+                var stepFill = stepContainer.querySelector('.ai-popup-progress-fill');
+                if (stepLabelEl) stepLabelEl.textContent = stepLabel;
+                if (stepFill) stepFill.style.width = stepPercent + '%';
+                stepContainer.style.display = 'block';
+            }} else {{
+                stepContainer.style.display = 'none';
+            }}
+        }}
+        return; // Don't recreate, just updated
+    }}
+
+    // Create and inject styles (only once)
     var styleId = 'ai-loading-styles';
     if (!doc.getElementById(styleId)) {{
         var style = doc.createElement('style');
@@ -1079,7 +1112,8 @@ def _run_ai_with_progress(
             .ai-popup-percent {{ font-size: 14px; color: #333; font-weight: 500; }}
             .ai-popup-estimate {{ font-size: 13px; color: #888; margin-top: 4px; }}
             .ai-popup-note {{ font-size: 12px; color: #999; margin-top: 16px; font-style: italic; }}
-            .ai-popup-step-label {{ font-size: 13px; color: #666; margin-top: 16px; margin-bottom: 8px; }}
+            .ai-popup-step-container {{ margin-top: 16px; }}
+            .ai-popup-step-label {{ font-size: 13px; color: #666; margin-bottom: 8px; }}
             @media (prefers-color-scheme: dark) {{
                 .ai-loading-popup {{ background: #2d2d2d; }}
                 .ai-popup-title {{ color: #f0f0f0; }}
@@ -1094,20 +1128,23 @@ def _run_ai_with_progress(
         doc.head.appendChild(style);
     }}
 
-    // Create overlay element
-    var overlay = doc.createElement('div');
+    // Create overlay element (first time only)
+    overlay = doc.createElement('div');
     overlay.id = 'ai-loading-overlay';
     overlay.innerHTML = `
         <div class="ai-loading-popup">
             <div class="ai-popup-spinner"></div>
             <div class="ai-popup-title">AI is working</div>
-            {subtitle_html}
+            <div class="ai-popup-subtitle" style="display: ${{subtitle ? 'block' : 'none'}};">${{subtitle}}</div>
             <div class="ai-popup-progress-container">
-                <div class="ai-popup-progress-bar"><div class="ai-popup-progress-fill" style="width: {percent}%;"></div></div>
-                <div class="ai-popup-percent">{percent}%</div>
-                <div class="ai-popup-estimate">Estimate: {estimate_label}</div>
+                <div class="ai-popup-progress-bar"><div class="ai-popup-progress-fill" style="width: ${{percent}}%;"></div></div>
+                <div class="ai-popup-percent">${{percent}}%</div>
+                <div class="ai-popup-estimate">Estimate: ${{estimateLabel}}</div>
             </div>
-            {step_html}
+            <div class="ai-popup-step-container" style="display: ${{stepLabel ? 'block' : 'none'}};">
+                <div class="ai-popup-step-label">${{stepLabel}}</div>
+                <div class="ai-popup-progress-bar"><div class="ai-popup-progress-fill" style="width: ${{stepPercent}}%;"></div></div>
+            </div>
             <div class="ai-popup-note">May take longer for complex tasks</div>
         </div>
     `;
