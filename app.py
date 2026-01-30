@@ -1004,16 +1004,166 @@ def _run_ai_with_progress(
         if total_steps and total_steps > 0 and step_index:
             step_label = f"Question {step_index} of {total_steps}"
             step_percent = min(100, max(0, int((step_index / total_steps) * 100)))
+
+        # Build step progress HTML if applicable
+        step_html = ""
+        if step_label:
+            step_html = f"""
+                <div class="ai-popup-step-label">{step_label}</div>
+                <div class="ai-popup-progress-bar">
+                    <div class="ai-popup-progress-fill" style="width: {step_percent}%;"></div>
+                </div>
+            """
+
+        # Build subtitle HTML if applicable
+        subtitle_html = f'<div class="ai-popup-subtitle">{subtitle}</div>' if subtitle else ""
+
+        popup_html = f"""
+        <style>
+            .ai-loading-overlay {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.6);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 999999;
+                backdrop-filter: blur(4px);
+            }}
+            .ai-loading-popup {{
+                background: white;
+                border-radius: 16px;
+                padding: 32px 40px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                text-align: center;
+                max-width: 420px;
+                width: 90%;
+                animation: ai-popup-appear 0.3s ease-out;
+            }}
+            @keyframes ai-popup-appear {{
+                from {{
+                    opacity: 0;
+                    transform: scale(0.9) translateY(-10px);
+                }}
+                to {{
+                    opacity: 1;
+                    transform: scale(1) translateY(0);
+                }}
+            }}
+            .ai-popup-spinner {{
+                width: 48px;
+                height: 48px;
+                border: 4px solid #e0e0e0;
+                border-top: 4px solid #4A90D9;
+                border-radius: 50%;
+                animation: ai-spin 1s linear infinite;
+                margin: 0 auto 20px auto;
+            }}
+            @keyframes ai-spin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+            .ai-popup-title {{
+                font-size: 20px;
+                font-weight: 600;
+                color: #1a1a1a;
+                margin-bottom: 8px;
+            }}
+            .ai-popup-subtitle {{
+                font-size: 14px;
+                color: #666;
+                margin-bottom: 16px;
+            }}
+            .ai-popup-progress-container {{
+                margin: 20px 0;
+            }}
+            .ai-popup-progress-bar {{
+                width: 100%;
+                height: 8px;
+                background: #e0e0e0;
+                border-radius: 4px;
+                overflow: hidden;
+                margin-bottom: 8px;
+            }}
+            .ai-popup-progress-fill {{
+                height: 100%;
+                background: linear-gradient(90deg, #4A90D9, #6BA3E0);
+                border-radius: 4px;
+                transition: width 0.3s ease;
+            }}
+            .ai-popup-percent {{
+                font-size: 14px;
+                color: #333;
+                font-weight: 500;
+            }}
+            .ai-popup-estimate {{
+                font-size: 13px;
+                color: #888;
+                margin-top: 4px;
+            }}
+            .ai-popup-note {{
+                font-size: 12px;
+                color: #999;
+                margin-top: 16px;
+                font-style: italic;
+            }}
+            .ai-popup-step-label {{
+                font-size: 13px;
+                color: #666;
+                margin-top: 16px;
+                margin-bottom: 8px;
+            }}
+            /* Dark mode support */
+            @media (prefers-color-scheme: dark) {{
+                .ai-loading-popup {{
+                    background: #2d2d2d;
+                }}
+                .ai-popup-title {{
+                    color: #f0f0f0;
+                }}
+                .ai-popup-subtitle {{
+                    color: #aaa;
+                }}
+                .ai-popup-progress-bar {{
+                    background: #404040;
+                }}
+                .ai-popup-percent {{
+                    color: #e0e0e0;
+                }}
+                .ai-popup-estimate {{
+                    color: #888;
+                }}
+                .ai-popup-note {{
+                    color: #777;
+                }}
+                .ai-popup-step-label {{
+                    color: #aaa;
+                }}
+            }}
+        </style>
+        <div class="ai-loading-overlay">
+            <div class="ai-loading-popup">
+                <div class="ai-popup-spinner"></div>
+                <div class="ai-popup-title">AI is working</div>
+                {subtitle_html}
+                <div class="ai-popup-progress-container">
+                    <div class="ai-popup-progress-bar">
+                        <div class="ai-popup-progress-fill" style="width: {percent}%;"></div>
+                    </div>
+                    <div class="ai-popup-percent">{percent}%</div>
+                    <div class="ai-popup-estimate">Estimate: {estimate_label}</div>
+                </div>
+                {step_html}
+                <div class="ai-popup-note">May take longer for complex tasks</div>
+            </div>
+        </div>
+        """
+
         with overlay.container():
-            st.info("AI is working. Please wait...")
-            if subtitle:
-                st.caption(subtitle)
-            st.caption(f"{percent}% • Estimate: {estimate_label}")
-            st.caption("May take longer for complex tasks.")
-            st.progress(percent)
-            if step_label:
-                st.caption(step_label)
-                st.progress(step_percent)
+            st.markdown(popup_html, unsafe_allow_html=True)
 
     def _calc_percent(elapsed_s: float, done: bool = False) -> int:
         if done:
