@@ -1,1 +1,31 @@
+# OS files
 .DS_Store
+
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage*
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment & local secrets
+.env
+.env.*
+.streamlit/secrets.toml
+
+# Logs / runtime artifacts
+*.log
+panphy_app.log
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
