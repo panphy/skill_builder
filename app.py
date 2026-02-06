@@ -82,8 +82,8 @@ LOGGER = setup_logging()
 # =========================
 # --- PAGE CONFIG ---
 # =========================
-PANPHY_LOGO_URL = "https://panphy.github.io/panphy.png"
-PANPHY_FAVICON_URL = "https://panphy.github.io/favicon.png"
+PANPHY_LOGO_URL = "https://panphy.github.io/assets/panphy.png"
+PANPHY_FAVICON_URL = "https://panphy.github.io/assets/favicon.png"
 
 st.set_page_config(
     page_title="PanPhy Skill Builder",
