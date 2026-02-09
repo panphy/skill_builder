@@ -1597,7 +1597,7 @@ st.divider()
 st.markdown(
     "<div style='text-align: center;'>"
     "© 2026 PanPhy Projects<br>"
-    "<a href='mailto:panphyprojects@icloud.com'>Contact Me</a> • "
+    "<a href='mailto:panphylabs@icloud.com'>Contact Me</a> • "
     "<a href='https://buymeacoffee.com/panphy'>Support My Projects</a>"
     "</div>",
     unsafe_allow_html=True,
