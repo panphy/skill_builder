@@ -26,6 +26,10 @@ create table if not exists public.rate_limits (
   last_refill_at timestamptz not null default now(),
   primary key (subject_site, student_id)
 );
+""".strip()
+
+
+RATE_LIMITS_INDEX_DDL = """
 create index if not exists idx_rate_limits_window_start_time
   on public.rate_limits (window_start_time);
 create index if not exists idx_rate_limits_last_refill_at
@@ -62,6 +66,10 @@ def ensure_rate_limits_table() -> None:
     alter table public.rate_limits
       add column if not exists subject_site text not null default '{SUBJECT_SITE}';
     alter table public.rate_limits
+      add column if not exists submission_count int not null default 0;
+    alter table public.rate_limits
+      add column if not exists window_start_time timestamptz not null default now();
+    alter table public.rate_limits
       add column if not exists tokens double precision;
     alter table public.rate_limits
       add column if not exists last_refill_at timestamptz;
@@ -93,6 +101,7 @@ def ensure_rate_limits_table() -> None:
         with eng.begin() as conn:
             _exec_sql_many(conn, RATE_LIMITS_DDL)
             _exec_sql_many(conn, ddl_migrate)
+            _exec_sql_many(conn, RATE_LIMITS_INDEX_DDL)
         st.session_state["rate_limits_table_ready"] = True
         LOGGER.info("Rate limits table ready", extra={"ctx": {"component": "db", "table": "rate_limits"}})
     except Exception as exc:
