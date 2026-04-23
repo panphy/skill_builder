@@ -3,6 +3,11 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 import streamlit as st
+try:
+    from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
+except ImportError:
+    add_script_run_ctx = None
+    get_script_run_ctx = None
 
 from attempts import insert_ai_timing, load_ai_timing_average_cached
 from config import SUBJECT_SITE, _safe_secret
@@ -20,6 +25,11 @@ def _resolve_timing_type(ctx: dict) -> Optional[str]:
     if mode == "topic_journey":
         return "topic_journey_generation"
     return None
+
+
+def _attach_script_run_ctx(script_ctx) -> None:
+    if add_script_run_ctx is not None and script_ctx is not None:
+        add_script_run_ctx(ctx=script_ctx)
 
 
 def _run_ai_with_progress(
@@ -208,7 +218,13 @@ def _run_ai_with_progress(
     report = None
     success = False
     try:
-        with ThreadPoolExecutor(max_workers=1) as executor:
+        script_ctx = get_script_run_ctx(suppress_warning=True) if get_script_run_ctx is not None else None
+        executor_kwargs = (
+            {"initializer": _attach_script_run_ctx, "initargs": (script_ctx,)}
+            if script_ctx is not None
+            else {}
+        )
+        with ThreadPoolExecutor(max_workers=1, **executor_kwargs) as executor:
             future = executor.submit(task_fn)
             while not future.done():
                 elapsed = time.monotonic() - start_t
