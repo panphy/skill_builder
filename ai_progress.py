@@ -3,7 +3,6 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from attempts import insert_ai_timing, load_ai_timing_average_cached
 from config import SUBJECT_SITE, _safe_secret
@@ -195,7 +194,7 @@ def _run_ai_with_progress(
 """
 
         with overlay.container():
-            components.html(popup_script, height=0, scrolling=False)
+            st.iframe(popup_script, height=1, tab_index=-1)
 
     def _calc_percent(elapsed_s: float, done: bool = False) -> int:
         if done:
@@ -235,4 +234,4 @@ def _run_ai_with_progress(
 })();
 </script>
 """
-        components.html(cleanup_script, height=0, scrolling=False)
+        st.iframe(cleanup_script, height=1, tab_index=-1)
