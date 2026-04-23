@@ -1,57 +1,65 @@
-import streamlit as st
-import streamlit.components.v1 as components
 import logging
-
-LOGGER = logging.getLogger("panphy")
-try:
-    from components.panphy_stylus_canvas import stylus_canvas
-except Exception:
-    LOGGER.exception("Failed to import stylus_canvas; canvas features disabled.")
-    stylus_canvas = None  # fallback handled later
-from PIL import Image
-import io
-import base64
-import json
-import re
-import numpy as np
-import pandas as pd
-from sqlalchemy import text
-
-from logging.handlers import RotatingFileHandler
 import os
-import time
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
-from concurrent.futures import ThreadPoolExecutor
-from typing import Tuple, Optional, Dict, Any, List
+from logging.handlers import RotatingFileHandler
 
-import secrets as pysecrets
+import streamlit as st
 
-from ai_generation import AI_READY, MODEL_NAME, client, _render_template
-from config import FEEDBACK_SYSTEM_TPL, SUBJECT_SITE, _safe_secret
-from db import db_ready, get_db_driver_type, get_db_engine, insert_question_bank_row
+from ai_feedback import get_gpt_feedback_from_bank
+from ai_generation import AI_READY, MODEL_NAME
+from ai_progress import _run_ai_with_progress
+from attempts import delete_attempt_by_id, ensure_attempts_table, insert_attempt, load_attempts_df
+from canvas_utils import canvas_has_ink, data_url_to_image_data, preprocess_canvas_image
+from db import db_ready, get_db_driver_type, insert_question_bank_row
 from image_utils import _compress_bytes_to_limit, _encode_image_bytes, validate_image_file
+from markdown_rendering import normalize_markdown_math, render_md_box, render_report
+from rate_limiter import RATE_LIMIT_MAX, _check_rate_limit_db, _effective_student_id
+from session_state import init_session_state
+from storage import (
+    bytes_to_pil,
+    cached_download_from_storage,
+    safe_bytes_to_pil,
+    slugify,
+    supabase_ready,
+    upload_to_storage,
+)
+from track_state import (
+    TRACK_DEFAULT,
+    TRACK_PARAM,
+    init_track_state,
+    persist_track_to_browser,
+    set_query_param,
+)
 from ui_student import render_student_page
 from ui_teacher import render_teacher_page
-from utils.json_utils import safe_parse_json
 
-# ============================================================
-# LOGGING
-# ============================================================
+
+PANPHY_LOGO_URL = "https://panphy.github.io/assets/panphy.png"
+PANPHY_FAVICON_URL = "https://panphy.github.io/assets/favicon.png"
+
+CANVAS_BG_HEX = "#ffffff"
+TEXTAREA_HEIGHT_DEFAULT = 420
+TEXTAREA_HEIGHT_EXPANDED = 640
+CANVAS_HEIGHT_DEFAULT = 640
+CANVAS_HEIGHT_EXPANDED = 860
+
+QUESTION_MAX_MB = 5.0
+MARKSCHEME_MAX_MB = 5.0
+CANVAS_MAX_MB = 2.0
+
+
 class KVFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         base = super().format(record)
         ctx = getattr(record, "ctx", None)
         if isinstance(ctx, dict) and ctx:
             keys = sorted(ctx.keys())
-            kv = " ".join([f"[{k}={ctx[k]}]" for k in keys if ctx[k] is not None and ctx[k] != ""])
+            kv = " ".join([f"[{key}={ctx[key]}]" for key in keys if ctx[key] is not None and ctx[key] != ""])
             if kv:
                 return f"{base} {kv}"
         return base
 
 
 class SessionIDFilter(logging.Filter):
-    """Injects the per-session ID into every log record's ctx dict."""
     def filter(self, record: logging.LogRecord) -> bool:
         try:
             sid = st.session_state.get("session_id", "")
@@ -94,1533 +102,161 @@ def setup_logging() -> logging.Logger:
     return logger
 
 
-LOGGER = setup_logging()
-
-# =========================
-# --- PAGE CONFIG ---
-# =========================
-PANPHY_LOGO_URL = "https://panphy.github.io/assets/panphy.png"
-PANPHY_FAVICON_URL = "https://panphy.github.io/assets/favicon.png"
-
 st.set_page_config(
     page_title="PanPhy Skill Builder",
     page_icon=PANPHY_FAVICON_URL,
-    layout="wide"
+    layout="wide",
 )
 
+init_session_state()
+LOGGER = setup_logging()
 
-# =========================
-# --- CONSTANTS ---
-# =========================
-CANVAS_BG_HEX = "#ffffff"
-CANVAS_BG_RGB = (255, 255, 255)
-MAX_IMAGE_WIDTH = 1024
-TEXTAREA_HEIGHT_DEFAULT = 420
-TEXTAREA_HEIGHT_EXPANDED = 640
-CANVAS_HEIGHT_DEFAULT = 640
-CANVAS_HEIGHT_EXPANDED = 860
-
-STORAGE_BUCKET = "physics-bank"
-
-# Rate limiting
-RATE_LIMIT_MAX = 10
-RATE_LIMIT_WINDOW_SECONDS = 60 * 60  # 1 hour
-
-# Image limits
-QUESTION_MAX_MB = 5.0
-MARKSCHEME_MAX_MB = 5.0
-CANVAS_MAX_MB = 2.0
-
-# =========================
-# --- SESSION STATE ---
-# =========================
-def _ss_init(k: str, v):
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-
-_ss_init("canvas_key", 0)
-_ss_init("feedback", None)
-_ss_init("student_answer_text_single", "")
-_ss_init("student_answer_text_journey", "")
-_ss_init("anon_id", pysecrets.token_hex(4))
-_ss_init("session_id", pysecrets.token_hex(6))
-_ss_init("db_last_error", "")
-_ss_init("db_table_ready", False)
-_ss_init("bank_table_ready", False)
-_ss_init("is_teacher", False)
-
-# Canvas robustness cache
-_ss_init("last_canvas_image_data", None)  # legacy
-_ss_init("last_canvas_image_data_single", None)
-_ss_init("last_canvas_image_data_journey", None)
-_ss_init("last_canvas_data_url_single", None)
-_ss_init("last_canvas_data_url_journey", None)
-_ss_init("stylus_only_enabled", True)
-_ss_init("canvas_cmd_nonce_single", 0)
-_ss_init("canvas_cmd_nonce_journey", 0)
-
-# Question selection cache
-_ss_init("selected_qid", None)
-_ss_init("cached_q_row", None)
-_ss_init("cached_question_img", None)
-_ss_init("cached_q_path", None)
-_ss_init("cached_ms_path", None)
-
-# AI generator draft cache (teacher-only)
-_ss_init("ai_draft", None)
-
-# Topic Journey state (student)
-_ss_init("journey_step_index", 0)          # 0-based
-_ss_init("journey_step_reports", [])       # list of per-step reports
-_ss_init("journey_checkpoint_notes", {})   # step_index -> markdown
-_ss_init("journey_active_id", None)        # question_bank_v2.id of current journey
-_ss_init("journey_json_cache", None)       # parsed journey JSON for current selection
-
-# Topic Journey draft (teacher)
-_ss_init("journey_draft", None)
-
-_ss_init("journey_topics_selected", [])
-_ss_init("journey_gen_error_details", None)
-_ss_init("journey_show_error", False)
-
-# ============================================================
-# TRACK (combined vs separate) - sticky via device localStorage + URL query param
-# ============================================================
-TRACK_PARAM = "track"
-TRACK_DEFAULT = "combined"
-TRACK_ALLOWED = {"combined", "separate"}
-TRACK_STORAGE_KEY = f"panphy_track_{SUBJECT_SITE}"
-
-def _get_query_param(key: str) -> str:
-    # Streamlit changed query param APIs across versions; support both.
-    try:
-        v = st.query_params.get(key)
-        if isinstance(v, list):
-            return (v[0] or "").strip()
-        return (v or "").strip()
-    except Exception:
-        qp = st.experimental_get_query_params()
-        v = qp.get(key, [""])[0]
-        return (v or "").strip()
-
-def _set_query_param(**kwargs):
-    try:
-        for k, v in kwargs.items():
-            st.query_params[k] = v
-    except Exception:
-        st.experimental_set_query_params(**kwargs)
-
-def _inject_track_restore_script():
-    # If URL has no ?track=..., restore from localStorage and hard-reload once.
-    st.markdown(
-        f"""
-<script>
-(function() {{
-  const KEY = {json.dumps(TRACK_STORAGE_KEY)};
-  const DEFAULT = {json.dumps(TRACK_DEFAULT)};
-  const url = new URL(window.location.href);
-  const hasTrack = url.searchParams.has({json.dumps(TRACK_PARAM)});
-  if (!hasTrack) {{
-    const saved = window.localStorage.getItem(KEY);
-    const useVal = (saved === "combined" || saved === "separate") ? saved : DEFAULT;
-    url.searchParams.set({json.dumps(TRACK_PARAM)}, useVal);
-    window.location.replace(url.toString());
-  }}
-}})();
-</script>
-""",
-        unsafe_allow_html=True
-    )
-
-def _persist_track_to_browser(track_value: str):
-    track_value = (track_value or "").strip().lower()
-    if track_value not in TRACK_ALLOWED:
-        track_value = TRACK_DEFAULT
-    st.markdown(
-        f"""
-<script>
-(function() {{
-  const KEY = {json.dumps(TRACK_STORAGE_KEY)};
-  try {{ window.localStorage.setItem(KEY, {json.dumps(track_value)}); }} catch (e) {{}}
-}})();
-</script>
-""",
-        unsafe_allow_html=True
-    )
-
-def init_track_state():
-    # Run restore script first so first load picks up localStorage
-    if "track_init_done" not in st.session_state:
-        st.session_state["track_init_done"] = True
-        _inject_track_restore_script()
-
-    qp_track = _get_query_param(TRACK_PARAM).lower()
-    if qp_track not in TRACK_ALLOWED:
-        qp_track = TRACK_DEFAULT
-
-    if st.session_state.get("track") not in TRACK_ALLOWED:
-        st.session_state["track"] = qp_track
-
-    # Keep URL in sync if needed
-    if _get_query_param(TRACK_PARAM).lower() != st.session_state["track"]:
-        _set_query_param(**{TRACK_PARAM: st.session_state["track"]})
-
-
-# Initialize track selection (combined vs separate) early
-init_track_state()
-
-# ============================================================
-# DATABASE DDLs
-#   IMPORTANT: avoid $$ PL/pgSQL blocks inside app DDL to prevent split/execution issues.
-# ============================================================
-RATE_LIMITS_DDL = """
-create table if not exists public.rate_limits (
-  subject_site text not null default '{SUBJECT_SITE}',
-  student_id text not null,
-  submission_count int not null default 0,
-  window_start_time timestamptz not null default now(),
-  primary key (subject_site, student_id)
-);
-create index if not exists idx_rate_limits_window_start_time
-  on public.rate_limits (window_start_time);
-""".strip()
-
-# NOTE: No trigger/function here. Keeping DDL simple avoids "unterminated dollar-quoted string" errors.
-
-# =========================
-# --- STYLUS CANVAS HELPERS ---
-# =========================
-def data_url_to_image_data(data_url: str) -> np.ndarray:
-    """Convert data:image/png;base64,... into an RGBA numpy array."""
-    if not data_url or not isinstance(data_url, str):
-        raise ValueError("Missing data URL")
-    if "," not in data_url:
-        raise ValueError("Invalid data URL")
-    _header, b64 = data_url.split(",", 1)
-    raw = base64.b64decode(b64)
-    img = Image.open(io.BytesIO(raw)).convert("RGBA")
-    return np.array(img)
+try:
+    from components.panphy_stylus_canvas import stylus_canvas
+except Exception:
+    LOGGER.exception("Failed to import stylus_canvas; canvas features disabled.")
+    stylus_canvas = None
 
 
 def _stylus_canvas_available() -> bool:
     return stylus_canvas is not None
 
-# ============================================================
-#  DATABASE HELPERS
-# ============================================================
-def _split_sql_statements(sql_blob: str) -> List[str]:
-    """
 
-
-    Split SQL blob into statements at semicolons, but ignore semicolons in:
-    - single-quoted strings
-    - double-quoted identifiers
-    This is enough for our simple DDL blobs (no $$ blocks in-app).
-    """
-    s = sql_blob or ""
-    out: List[str] = []
-    buf: List[str] = []
-    in_sq = False
-    in_dq = False
-    esc = False
-
-    for ch in s:
-        if esc:
-            buf.append(ch)
-            esc = False
-            continue
-
-        if ch == "\\":
-            buf.append(ch)
-            if in_sq:
-                esc = True
-            continue
-
-        if ch == "'" and not in_dq:
-            in_sq = not in_sq
-            buf.append(ch)
-            continue
-
-        if ch == '"' and not in_sq:
-            in_dq = not in_dq
-            buf.append(ch)
-            continue
-
-        if ch == ";" and (not in_sq) and (not in_dq):
-            stmt = "".join(buf).strip()
-            if stmt:
-                out.append(stmt)
-            buf = []
-            continue
-
-        buf.append(ch)
-
-    tail = "".join(buf).strip()
-    if tail:
-        out.append(tail)
-    return out
-
-
-def _exec_sql_many(conn, sql_blob: str):
-    for stmt in _split_sql_statements(sql_blob):
-        conn.execute(text(stmt))
-
-
-ATTEMPTS_TABLE = "attempts_v1"
-AI_TIMINGS_TABLE = "ai_timings_v1"
-# Naming strategy: use a shared attempts_v1 table and filter by subject_site.
-# Migration note (from legacy physics_attempts_v1):
-#   INSERT INTO public.attempts_v1 SELECT * FROM public.physics_attempts_v1;
-
-
-def ensure_attempts_table():
-    if st.session_state.get("db_table_ready", False):
-        return
-    eng = get_db_engine()
-    if eng is None:
-        return
-
-    ddl_create = f"""
-    create table if not exists public.{ATTEMPTS_TABLE} (
-      id bigserial primary key,
-      created_at timestamptz not null default now(),
-      student_id text not null,
-      question_key text not null,
-      question_bank_id bigint,
-      step_index int,
-      mode text not null,
-      marks_awarded int not null,
-      max_marks int not null,
-      summary text,
-      feedback_points jsonb,
-      next_steps jsonb
-    );
-    """
-
-    ddl_alter = f"""
-    alter table public.{ATTEMPTS_TABLE}
-      add column if not exists question_bank_id bigint;
-    alter table public.{ATTEMPTS_TABLE}
-      add column if not exists step_index int;
-
-    alter table public.{ATTEMPTS_TABLE}
-      add column if not exists readback_type text;
-    alter table public.{ATTEMPTS_TABLE}
-      add column if not exists readback_markdown text;
-    alter table public.{ATTEMPTS_TABLE}
-      add column if not exists readback_warnings jsonb;
-    alter table public.{ATTEMPTS_TABLE}
-      add column if not exists subject_site text not null default '{SUBJECT_SITE}';
-    alter table public.{ATTEMPTS_TABLE}
-      add column if not exists track text not null default 'combined';
-
-"""
-
-    try:
-        with eng.begin() as conn:
-            _exec_sql_many(conn, ddl_create)
-            _exec_sql_many(conn, ddl_alter)
-        st.session_state["db_last_error"] = ""
-        st.session_state["db_table_ready"] = True
-        LOGGER.info("Attempts table ready", extra={"ctx": {"component": "db", "table": ATTEMPTS_TABLE}})
-    except Exception as e:
-        st.session_state["db_last_error"] = f"Table Creation Error: {type(e).__name__}"
-        st.session_state["db_table_ready"] = False
-        LOGGER.exception("Attempts table ensure failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
-
-
-def ensure_ai_timings_table():
-    if st.session_state.get("db_ai_timings_ready", False):
-        return
-    eng = get_db_engine()
-    if eng is None:
-        return
-
-    ddl_create = f"""
-    create table if not exists public.{AI_TIMINGS_TABLE} (
-      id bigserial primary key,
-      created_at timestamptz not null default now(),
-      subject_site text not null default '{SUBJECT_SITE}',
-      timing_type text not null,
-      duration_seconds double precision not null,
-      success boolean not null default true
-    );
-
-    create index if not exists idx_ai_timings_subject_type_created
-      on public.{AI_TIMINGS_TABLE} (subject_site, timing_type, created_at desc);
-    """
-    try:
-        with eng.begin() as conn:
-            _exec_sql_many(conn, ddl_create)
-        st.session_state["db_ai_timings_ready"] = True
-        st.session_state["db_last_error"] = ""
-        LOGGER.info("AI timings table ready", extra={"ctx": {"component": "db", "table": AI_TIMINGS_TABLE}})
-    except Exception as e:
-        st.session_state["db_last_error"] = f"Table Creation Error: {type(e).__name__}"
-        st.session_state["db_ai_timings_ready"] = False
-        LOGGER.exception("AI timings table ensure failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
-
-
-def insert_ai_timing(timing_type: str, duration_seconds: float, success: bool = True) -> None:
-    eng = get_db_engine()
-    if eng is None:
-        return
-    ensure_ai_timings_table()
-    timing_type = (timing_type or "").strip().lower()
-    if not timing_type:
-        return
-    query = f"""
-        insert into public.{AI_TIMINGS_TABLE}
-        (subject_site, timing_type, duration_seconds, success)
-        values
-        (:subject_site, :timing_type, :duration_seconds, :success)
-    """
-    try:
-        with eng.begin() as conn:
-            conn.execute(text(query), {
-                "subject_site": SUBJECT_SITE,
-                "timing_type": timing_type,
-                "duration_seconds": float(duration_seconds),
-                "success": bool(success),
-            })
-        st.session_state["db_last_error"] = ""
-    except Exception as e:
-        st.session_state["db_last_error"] = f"Insert Error: {type(e).__name__}"
-        LOGGER.exception("insert_ai_timing failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
-
-
-@st.cache_data(ttl=120)
-def load_ai_timing_average_cached(_fp: str, subject_site: str, timing_type: str, min_samples: int = 5) -> tuple[Optional[float], int]:
-    eng = get_db_engine()
-    if eng is None:
-        return None, 0
-    ensure_ai_timings_table()
-    subject_site = (subject_site or "").strip().lower() or SUBJECT_SITE
-    timing_type = (timing_type or "").strip().lower()
-    if not timing_type:
-        return None, 0
-    query = text(
-        f"""
-        select avg(duration_seconds) as avg_s, count(*) as n
-        from public.{AI_TIMINGS_TABLE}
-        where subject_site = :subject_site
-          and timing_type = :timing_type
-          and success = true
-        """
-    )
-    with eng.connect() as conn:
-        row = conn.execute(
-            query,
-            {"subject_site": subject_site, "timing_type": timing_type},
-        ).fetchone()
-    if not row:
-        return None, 0
-    avg_s = float(row[0]) if row[0] is not None else None
-    count = int(row[1] or 0)
-    if avg_s is None or count < max(1, int(min_samples)):
-        return None, count
-    return avg_s, count
-
-
-def ensure_rate_limits_table():
-    eng = get_db_engine()
-    if eng is None:
-        return
-    ddl_migrate = f"""
-    alter table public.rate_limits
-      add column if not exists subject_site text not null default '{SUBJECT_SITE}';
-    update public.rate_limits
-      set subject_site = '{SUBJECT_SITE}'
-      where subject_site is null or subject_site = '';
-    alter table public.rate_limits
-      drop constraint if exists rate_limits_pkey;
-    alter table public.rate_limits
-      add primary key (subject_site, student_id);
-    """
-    try:
-        with eng.begin() as conn:
-            _exec_sql_many(conn, RATE_LIMITS_DDL)
-            _exec_sql_many(conn, ddl_migrate)
-        LOGGER.info("Rate limits table ready", extra={"ctx": {"component": "db", "table": "rate_limits"}})
-    except Exception as e:
-        st.session_state["db_last_error"] = f"Rate Limits Table Error: {type(e).__name__}"
-        LOGGER.exception("Rate limits table ensure failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
-
-# ============================================================
-# RATE LIMITING (Per Student, stored in Postgres)
-# ============================================================
-def _effective_student_id(student_id: str) -> str:
-    sid = (student_id or "").strip()
-    if sid:
-        return sid
-    return f"anon_{st.session_state['anon_id']}"
-
-
-def _format_reset_time(dt_utc: datetime) -> str:
-    try:
-        tz = ZoneInfo("Europe/London")
-        local = dt_utc.astimezone(tz)
-        return local.strftime("%H:%M on %d %b %Y")
-    except Exception:
-        return dt_utc.strftime("%H:%M UTC on %d %b %Y")
-
-
-def _check_rate_limit_db(student_id: str) -> Tuple[bool, int, str]:
-    if st.session_state.get("is_teacher", False):
-        return True, RATE_LIMIT_MAX, ""
-
-    eng = get_db_engine()
-    if eng is None:
-        return True, RATE_LIMIT_MAX, ""
-
-    ensure_rate_limits_table()
-
-    sid = (student_id or "").strip() or f"anon_{st.session_state['anon_id']}"
-    subject_site = SUBJECT_SITE
-    now_utc = datetime.now(timezone.utc)
-
-    with eng.begin() as conn:
-        row = conn.execute(
-            text("""
-                select subject_site, student_id, submission_count, window_start_time
-                from public.rate_limits
-                where subject_site = :subject_site
-                  and student_id = :sid
-                for update
-            """),
-            {"subject_site": subject_site, "sid": sid},
-        ).mappings().first()
-
-        if not row:
-            conn.execute(
-                text("""
-                    insert into public.rate_limits (subject_site, student_id, submission_count, window_start_time)
-                    values (:subject_site, :sid, 0, now())
-                """),
-                {"subject_site": subject_site, "sid": sid},
-            )
-            submission_count = 0
-            window_start = now_utc
-        else:
-            submission_count = int(row["submission_count"] or 0)
-            window_start = row["window_start_time"]
-            if isinstance(window_start, datetime):
-                if window_start.tzinfo is None:
-                    window_start = window_start.replace(tzinfo=timezone.utc)
-                else:
-                    window_start = window_start.astimezone(timezone.utc)
-            else:
-                window_start = now_utc
-
-        elapsed = (now_utc - window_start).total_seconds()
-        if elapsed >= RATE_LIMIT_WINDOW_SECONDS:
-            conn.execute(
-                text("""
-                    update public.rate_limits
-                    set submission_count = 0,
-                        window_start_time = now()
-                    where subject_site = :subject_site
-                      and student_id = :sid
-                """),
-                {"subject_site": subject_site, "sid": sid},
-            )
-            submission_count = 0
-            window_start = now_utc
-
-        updated = conn.execute(
-            text("""
-                update public.rate_limits
-                set submission_count = submission_count + 1
-                where subject_site = :subject_site
-                  and student_id = :sid
-                  and submission_count < :limit
-                returning submission_count, window_start_time
-            """),
-            {"subject_site": subject_site, "sid": sid, "limit": RATE_LIMIT_MAX},
-        ).mappings().first()
-
-        allowed = updated is not None
-        if updated:
-            submission_count = int(updated["submission_count"] or 0)
-            window_start = updated["window_start_time"] or window_start
-            if isinstance(window_start, datetime):
-                if window_start.tzinfo is None:
-                    window_start = window_start.replace(tzinfo=timezone.utc)
-                else:
-                    window_start = window_start.astimezone(timezone.utc)
-            else:
-                window_start = now_utc
-
-        remaining = max(0, RATE_LIMIT_MAX - submission_count)
-        reset_time_utc = window_start + timedelta(seconds=RATE_LIMIT_WINDOW_SECONDS)
-        reset_str = _format_reset_time(reset_time_utc)
-        return allowed, remaining, reset_str
-
-# ============================================================
-# =========================
-# --- SUPABASE STORAGE CLIENT (CACHED) ---
-# =========================
-@st.cache_resource
-def get_supabase_client():
-    url = (_safe_secret("SUPABASE_URL", "") or "").strip()
-    key = (_safe_secret("SUPABASE_SERVICE_ROLE_KEY", "") or "").strip()
-    if not url or not key:
-        return None
-    try:
-        from supabase import create_client
-    except Exception:
-        return None
-    return create_client(url, key)
-
-
-def supabase_ready() -> bool:
-    return get_supabase_client() is not None
-
-# STORAGE HELPERS
-# ============================================================
-def slugify(s: str) -> str:
-    s = (s or "").strip().lower()
-    s = re.sub(r"[^a-z0-9]+", "-", s)
-    s = re.sub(r"-{2,}", "-", s).strip("-")
-    return s or "untitled"
-
-
-def _clean_storage_path(path: str) -> str:
-    if not isinstance(path, str):
-        return ""
-    p = path.strip().lstrip("/")
-    p = p.replace("\\", "/")
-    p = re.sub(r"/{2,}", "/", p)
-    return p
-
-
-def upload_to_storage(path: str, file_bytes: bytes, content_type: str) -> bool:
-    sb = get_supabase_client()
-    if sb is None:
-        st.session_state["db_last_error"] = "Supabase Storage not configured."
-        return False
-
-    p = _clean_storage_path(path)
-    if not p:
-        st.session_state["db_last_error"] = "Storage Upload Error: empty path."
-        return False
-
-    # Header values must be strings (avoid booleans).
-    file_options = {
-        "contentType": str(content_type),
-        "content-type": str(content_type),
-        "cacheControl": "3600",
-        "cache-control": "3600",
-        "upsert": "true",
-        "x-upsert": "true",
-    }
-
-    try:
-        try:
-            res = sb.storage.from_(STORAGE_BUCKET).upload(p, file_bytes, file_options)
-        except TypeError:
-            res = sb.storage.from_(STORAGE_BUCKET).upload(path=p, file=file_bytes, file_options=file_options)
-
-        err = None
-        if hasattr(res, "error"):
-            err = getattr(res, "error")
-        elif isinstance(res, dict):
-            err = res.get("error")
-        if err:
-            raise RuntimeError(str(err))
-        return True
-    except Exception as e:
-        st.session_state["db_last_error"] = f"Storage Upload Error: {type(e).__name__}"
-        LOGGER.exception(
-            "Storage upload failed",
-            extra={"ctx": {"component": "storage", "op": "upload", "path": p, "error": type(e).__name__}},
-        )
-        return False
-
-
-def download_from_storage(path: str) -> bytes:
-    sb = get_supabase_client()
-    if sb is None:
-        return b""
-
-    p = _clean_storage_path(path)
-    if not p:
-        return b""
-
-    try:
-        res = sb.storage.from_(STORAGE_BUCKET).download(p)
-
-        if isinstance(res, (bytes, bytearray)):
-            return bytes(res)
-
-        if hasattr(res, "data") and res.data is not None:
-            if isinstance(res.data, (bytes, bytearray)):
-                return bytes(res.data)
-
-        if hasattr(res, "content") and res.content is not None:
-            if isinstance(res.content, (bytes, bytearray)):
-                return bytes(res.content)
-
-        if hasattr(res, "read"):
-            try:
-                out = res.read()
-                if isinstance(out, (bytes, bytearray)):
-                    return bytes(out)
-            except Exception:
-                pass
-
-        return b""
-    except Exception as e:
-        st.session_state["db_last_error"] = f"Storage Download Error: {type(e).__name__}"
-        LOGGER.exception(
-            "Storage download failed",
-            extra={"ctx": {"component": "storage", "op": "download", "path": p, "error": type(e).__name__}},
-        )
-        return b""
-
-
-@st.cache_data(ttl=300)
-def cached_download_from_storage(path: str, _fp: str = "") -> bytes:
-    return download_from_storage(path)
-
-
-def bytes_to_pil(img_bytes: bytes) -> Image.Image:
-    img = Image.open(io.BytesIO(img_bytes))
-    img.load()
-    if img.mode not in ("RGB", "RGBA"):
-        img = img.convert("RGB")
-    return img
-
-
-def safe_bytes_to_pil(img_bytes: bytes) -> Optional[Image.Image]:
-    if not img_bytes:
-        return None
-    try:
-        return bytes_to_pil(img_bytes)
-    except Exception as e:
-        LOGGER.error(
-            "Failed to decode image bytes",
-            extra={"ctx": {"component": "image", "error": type(e).__name__}},
-        )
-        return None
-
-# ============================================================
-# CANVAS HELPERS
-# ============================================================
-def canvas_has_ink(image_data: np.ndarray) -> bool:
-    """
-    More reliable detection (especially for light pencil strokes / iPad).
-    Uses per-channel max difference against background and counts pixels.
-    """
-    if image_data is None:
-        return False
-    try:
-        arr = np.asarray(image_data)
-        if arr.dtype != np.uint8:
-            arr = arr.astype(np.uint8)
-    except Exception:
-        return False
-
-    if arr.ndim != 3 or arr.shape[2] < 3:
-        return False
-
-    rgb = arr[:, :, :3]
-    bg = np.array(CANVAS_BG_RGB, dtype=np.uint8)
-
-    diff = np.max(np.abs(rgb.astype(np.int16) - bg.astype(np.int16)), axis=2)
-    ink_pixels = int(np.count_nonzero(diff > 10))
-    return ink_pixels >= 25
-
-
-def preprocess_canvas_image(image_data: np.ndarray) -> Image.Image:
-    raw_img = Image.fromarray(np.asarray(image_data).astype("uint8"))
-    if raw_img.mode == "RGBA":
-        white_bg = Image.new("RGB", raw_img.size, (255, 255, 255))
-        white_bg.paste(raw_img, mask=raw_img.split()[3])
-        img = white_bg
-    else:
-        img = raw_img.convert("RGB")
-    if img.width > MAX_IMAGE_WIDTH:
-        ratio = MAX_IMAGE_WIDTH / img.width
-        img = img.resize((MAX_IMAGE_WIDTH, max(1, int(img.height * ratio))))
-    return img
-
-# ============================================================
-# JSON HELPERS
-# ============================================================
-def encode_image(image_pil: Image.Image) -> str:
-    buffered = io.BytesIO()
-    image_pil.save(buffered, format="PNG", optimize=True)
-    return base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-
-def clamp_int(value, lo, hi, default=0):
-    try:
-        v = int(value)
-    except Exception:
-        v = default
-    return max(lo, min(hi, v))
-
-
-# ============================================================
-# MARKDOWN + LaTeX RENDER HELPERS (robust)
-# ============================================================
-_MD_TOKEN_CODEBLOCK = re.compile(r"```.*?```", re.DOTALL)
-_MD_TOKEN_INLINECODE = re.compile(r"`[^`\n]+`")
-_MD_TOKEN_MATHBLOCK = re.compile(r"\$\$.*?\$\$", re.DOTALL)
-# Inline math: a single $...$ on one line (avoid $$...$$ which is handled above)
-_MD_TOKEN_MATHINLINE = re.compile(r"(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)")
-
-def _protect_segments(pattern: re.Pattern, text_in: str, store: Dict[str, str], prefix: str) -> str:
-    def _repl(m):
-        key = f"@@{prefix}{len(store)}@@"
-        store[key] = m.group(0)
-        return key
-    return pattern.sub(_repl, text_in)
-
-def _restore_segments(text_in: str, store: Dict[str, str]) -> str:
-    out = text_in
-    # restore in reverse insertion order to reduce accidental nested replacement
-    for k in sorted(store.keys(), key=lambda x: -len(x)):
-        out = out.replace(k, store[k])
-    return out
-
-def normalize_markdown_math(md_text: str) -> str:
-    r"""
-    Heuristic normalizer for Streamlit Markdown + MathJax rendering.
-
-    Goals:
-    - Preserve Markdown structure and existing math ($...$, $$...$$)
-    - Preserve fenced code blocks and inline code
-    - Convert \(...\) -> $...$ and \[...] -> $$...$$
-    - Wrap simple 'standalone' math tokens like 3^2, v^2, a_t, a_{t} in $...$
-    """
-    s = (md_text or "")
-    if not s.strip():
-        return ""
-
-    # Normalize newlines
-    s = s.replace("\r\n", "\n").replace("\r", "\n")
-    # Fix double-escaped LaTeX sequences from JSON-encoded model output.
-    # Example: "\\Delta" -> "\Delta"
-    s = re.sub(r"\\\\([A-Za-z])", r"\\\1", s)
-    s = re.sub(r"\\\\([\\[\\]{}()^_])", r"\\\1", s)
-
-    protected: Dict[str, str] = {}
-    s = _protect_segments(_MD_TOKEN_CODEBLOCK, s, protected, "CB")
-    s = _protect_segments(_MD_TOKEN_INLINECODE, s, protected, "IC")
-
-    # Convert common LaTeX delimiters to MathJax-friendly ones
-    s = re.sub(r"\\\((.*?)\\\)", r"$\1$", s, flags=re.DOTALL)
-    s = re.sub(r"\\\[(.*?)\\\]", r"$$\1$$", s, flags=re.DOTALL)
-
-    def _normalize_unit_escapes(math_text: str) -> str:
-        out = math_text
-        out = re.sub(r"\\m\s*\^\s*\{?\s*-?1\s*\}?", r"\\,m^{-1}", out)
-        out = re.sub(r"\\m\b", r"\\,m", out)
-        out = re.sub(r"\\s\b", r"\\,s", out)
-        out = re.sub(r"\\kg\b", r"\\,kg", out)
-        return out
-
-    def _normalize_units_in_math(text_in: str) -> str:
-        def _fix_block(m: re.Match) -> str:
-            return f"$${_normalize_unit_escapes(m.group(1))}$$"
-
-        def _fix_inline(m: re.Match) -> str:
-            return f"${_normalize_unit_escapes(m.group(1))}$"
-
-        out = re.sub(r"\$\$(.*?)\$\$", _fix_block, text_in, flags=re.DOTALL)
-        out = re.sub(r"(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)", _fix_inline, out, flags=re.DOTALL)
-        return out
-
-    s = _normalize_units_in_math(s)
-
-    s = _protect_segments(_MD_TOKEN_MATHBLOCK, s, protected, "MB")
-    s = _protect_segments(_MD_TOKEN_MATHINLINE, s, protected, "MI")
-
-    # Wrap simple math tokens not already protected
-    # Examples: 3^2, v^2, a_t, a_{t}, m/s^2 (will wrap s^2)
-    token_pat = re.compile(
-        r"(?<!\$)(?<!\\)(?<![A-Za-z0-9])"
-        r"([A-Za-z0-9]+(?:/[A-Za-z0-9]+)*"
-        r"(?:\s*(?:\^\s*[-+]?\d+|_\{[^}]+\}|_[A-Za-z0-9]+)))"
-        r"(?![A-Za-z0-9])"
-    )
-
-    def _wrap(m: re.Match) -> str:
-        expr = m.group(1)
-        # tighten spacing around ^ and _
-        expr = re.sub(r"\s*(\^|_)\s*", r"\1", expr)
-        expr = expr.strip()
-        return f"${expr}$"
-
-    s = token_pat.sub(_wrap, s)
-
-    s = _restore_segments(s, protected)
-    return s
-
-
-def render_md_box(title: str, md_text: str, caption: str = "", empty_text: str = ""):
-    st.markdown(f"**{title}**")
-    with st.container(border=True):
-        txt = normalize_markdown_math((md_text or "").strip())
-        if txt:
-            st.markdown(txt)
-        else:
-            st.caption(empty_text or "No content.")
-    if caption:
-        st.caption(caption)
-
-
-# ============================================================
-# PROGRESS INDICATORS
-# ============================================================
-def _resolve_timing_type(ctx: dict) -> Optional[str]:
-    mode = str((ctx or {}).get("mode", "") or "").strip().lower()
-    if not mode:
-        return None
-    if mode in {"text", "writing"} or mode.startswith("journey_"):
-        return "ai_marking"
-    if mode == "ai_generator":
-        return "single_question_generation"
-    if mode == "topic_journey":
-        return "topic_journey_generation"
-    return None
-
-
-def _run_ai_with_progress(
-    task_fn,
-    ctx: dict,
-    typical_range: str,
-    est_seconds: float,
-    subtitle: str | None = None,
-    step_index: int | None = None,
-    total_steps: int | None = None,
-) -> dict:
-    """Run a blocking task while showing a full-page overlay to prevent mid-run interaction.
-
-    IMPORTANT: Keep the progress display simple and avoid presenting a precise ETA.
-    """
-    overlay = st.empty()
-    start_t = time.monotonic()
-    timing_type = _resolve_timing_type(ctx)
-    effective_est_seconds = est_seconds
-    estimate_label = typical_range
-    if timing_type and db_ready():
-        avg_s, _count = load_ai_timing_average_cached(
-            _safe_secret("DATABASE_URL", "") or "",
-            SUBJECT_SITE,
-            timing_type,
-        )
-        if avg_s is not None:
-            effective_est_seconds = avg_s
-            estimate_label = f"{avg_s:.0f} seconds (avg)"
-
-    def _render_overlay(subtitle: str, percent: int):
-        step_label = ""
-        step_percent = 0
-        if total_steps and total_steps > 0 and step_index:
-            step_label = f"Question {step_index} of {total_steps}"
-            step_percent = min(100, max(0, int((step_index / total_steps) * 100)))
-
-        # JavaScript to inject/update overlay in parent document (breaks out of Streamlit iframe)
-        # Only creates the overlay once, then updates dynamic content to avoid flashing
-        popup_script = f"""
-<script>
-(function() {{
-    var doc = window.parent.document;
-    var overlay = doc.getElementById('ai-loading-overlay');
-
-    // Dynamic values to update
-    var percent = {percent};
-    var subtitle = "{subtitle}";
-    var stepLabel = "{step_label}";
-    var stepPercent = {step_percent};
-    var estimateLabel = "{estimate_label}";
-
-    // If overlay already exists, just update the dynamic content
-    if (overlay) {{
-        var progressFill = overlay.querySelector('.ai-popup-progress-fill');
-        var percentText = overlay.querySelector('.ai-popup-percent');
-        var subtitleEl = overlay.querySelector('.ai-popup-subtitle');
-        var estimateEl = overlay.querySelector('.ai-popup-estimate');
-        var stepContainer = overlay.querySelector('.ai-popup-step-container');
-
-        if (progressFill) progressFill.style.width = percent + '%';
-        if (percentText) percentText.textContent = percent + '%';
-        if (estimateEl) estimateEl.textContent = 'Estimate: ' + estimateLabel;
-
-        // Update subtitle
-        if (subtitleEl) {{
-            if (subtitle) {{
-                subtitleEl.textContent = subtitle;
-                subtitleEl.style.display = 'block';
-            }} else {{
-                subtitleEl.style.display = 'none';
-            }}
-        }}
-
-        // Update step progress if applicable
-        if (stepContainer) {{
-            if (stepLabel) {{
-                var stepLabelEl = stepContainer.querySelector('.ai-popup-step-label');
-                var stepFill = stepContainer.querySelector('.ai-popup-progress-fill');
-                if (stepLabelEl) stepLabelEl.textContent = stepLabel;
-                if (stepFill) stepFill.style.width = stepPercent + '%';
-                stepContainer.style.display = 'block';
-            }} else {{
-                stepContainer.style.display = 'none';
-            }}
-        }}
-        return; // Don't recreate, just updated
-    }}
-
-    // Create and inject styles (only once)
-    var styleId = 'ai-loading-styles';
-    if (!doc.getElementById(styleId)) {{
-        var style = doc.createElement('style');
-        style.id = styleId;
-        style.textContent = `
-            #ai-loading-overlay {{
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100vw;
-                height: 100vh;
-                background: rgba(0, 0, 0, 0.6);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 999999;
-                backdrop-filter: blur(4px);
-            }}
-            .ai-loading-popup {{
-                background: white;
-                border-radius: 16px;
-                padding: 32px 40px;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-                text-align: center;
-                max-width: 420px;
-                width: 90%;
-                animation: ai-popup-appear 0.3s ease-out;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            }}
-            @keyframes ai-popup-appear {{
-                from {{ opacity: 0; transform: scale(0.9) translateY(-10px); }}
-                to {{ opacity: 1; transform: scale(1) translateY(0); }}
-            }}
-            .ai-popup-spinner {{
-                width: 48px;
-                height: 48px;
-                border: 4px solid #e0e0e0;
-                border-top: 4px solid #4A90D9;
-                border-radius: 50%;
-                animation: ai-spin 1s linear infinite;
-                margin: 0 auto 20px auto;
-            }}
-            @keyframes ai-spin {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
-            }}
-            .ai-popup-title {{ font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 8px; }}
-            .ai-popup-subtitle {{ font-size: 14px; color: #666; margin-bottom: 16px; }}
-            .ai-popup-progress-container {{ margin: 20px 0; }}
-            .ai-popup-progress-bar {{ width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }}
-            .ai-popup-progress-fill {{ height: 100%; background: linear-gradient(90deg, #4A90D9, #6BA3E0); border-radius: 4px; transition: width 0.3s ease; }}
-            .ai-popup-percent {{ font-size: 14px; color: #333; font-weight: 500; }}
-            .ai-popup-estimate {{ font-size: 13px; color: #888; margin-top: 4px; }}
-            .ai-popup-note {{ font-size: 12px; color: #999; margin-top: 16px; font-style: italic; }}
-            .ai-popup-step-container {{ margin-top: 16px; }}
-            .ai-popup-step-label {{ font-size: 13px; color: #666; margin-bottom: 8px; }}
-            @media (prefers-color-scheme: dark) {{
-                .ai-loading-popup {{ background: #2d2d2d; }}
-                .ai-popup-title {{ color: #f0f0f0; }}
-                .ai-popup-subtitle {{ color: #aaa; }}
-                .ai-popup-progress-bar {{ background: #404040; }}
-                .ai-popup-percent {{ color: #e0e0e0; }}
-                .ai-popup-estimate {{ color: #888; }}
-                .ai-popup-note {{ color: #777; }}
-                .ai-popup-step-label {{ color: #aaa; }}
-            }}
-        `;
-        doc.head.appendChild(style);
-    }}
-
-    // Create overlay element (first time only)
-    overlay = doc.createElement('div');
-    overlay.id = 'ai-loading-overlay';
-    overlay.innerHTML = `
-        <div class="ai-loading-popup">
-            <div class="ai-popup-spinner"></div>
-            <div class="ai-popup-title">AI is working</div>
-            <div class="ai-popup-subtitle" style="display: ${{subtitle ? 'block' : 'none'}};">${{subtitle}}</div>
-            <div class="ai-popup-progress-container">
-                <div class="ai-popup-progress-bar"><div class="ai-popup-progress-fill" style="width: ${{percent}}%;"></div></div>
-                <div class="ai-popup-percent">${{percent}}%</div>
-                <div class="ai-popup-estimate">Estimate: ${{estimateLabel}}</div>
-            </div>
-            <div class="ai-popup-step-container" style="display: ${{stepLabel ? 'block' : 'none'}};">
-                <div class="ai-popup-step-label">${{stepLabel}}</div>
-                <div class="ai-popup-progress-bar"><div class="ai-popup-progress-fill" style="width: ${{stepPercent}}%;"></div></div>
-            </div>
-            <div class="ai-popup-note">May take longer for complex tasks</div>
-        </div>
-    `;
-    doc.body.appendChild(overlay);
-}})();
-</script>
-"""
-
-        with overlay.container():
-            components.html(popup_script, height=0, scrolling=False)
-
-    def _calc_percent(elapsed_s: float, done: bool = False) -> int:
-        if done:
-            return 100
-        if effective_est_seconds <= 0:
-            return 0
-        return min(95, max(0, int((elapsed_s / effective_est_seconds) * 100)))
-
-    _render_overlay(subtitle or "", 0)
-
-    report = None
-    success = False
-    try:
-        with ThreadPoolExecutor(max_workers=1) as ex:
-            fut = ex.submit(task_fn)
-            # Update the elapsed timer a few times per second.
-            while not fut.done():
-                elapsed = time.monotonic() - start_t
-                _render_overlay(subtitle or "", _calc_percent(elapsed))
-                time.sleep(0.35)
-
-            report = fut.result()
-            success = True
-
-        done_subtitle = "Done. Updating the page…"
-        _render_overlay(done_subtitle, _calc_percent(time.monotonic() - start_t, done=True))
-        time.sleep(0.08)
-        return report
-    finally:
-        if timing_type and success and report is not None:
-            insert_ai_timing(timing_type, time.monotonic() - start_t, success=True)
-        # Always remove the overlay, even if the AI call errors.
-        overlay.empty()
-        # Also remove the overlay from parent document via JavaScript
-        cleanup_script = """
-<script>
-(function() {
-    var doc = window.parent.document;
-    var overlay = doc.getElementById('ai-loading-overlay');
-    if (overlay) overlay.remove();
-})();
-</script>
-"""
-        components.html(cleanup_script, height=0, scrolling=False)
-
-
-
-def insert_attempt(student_id: str, question_key: str, report: dict, mode: str, question_bank_id: Optional[int] = None, step_index: Optional[int] = None):
-    eng = get_db_engine()
-    if eng is None:
-        return
-    ensure_attempts_table()
-
-    sid = (student_id or "").strip() or f"anon_{st.session_state['anon_id']}"
-
-    m_awarded = int(report.get("marks_awarded", 0))
-    m_max = int(report.get("max_marks", 1))
-    summ = str(report.get("summary", ""))[:1000]
-    fb_json = json.dumps(report.get("feedback_points", [])[:6])
-    ns_json = json.dumps(report.get("next_steps", [])[:6])
-
-    rb_type = str(report.get("readback_type", "") or "")[:40]
-    rb_md = str(report.get("readback_markdown", "") or "")[:8000]
-    rb_warn = json.dumps(report.get("readback_warnings", [])[:6])
-
-    query = f"""
-        insert into public.{ATTEMPTS_TABLE}
-        (subject_site, track, student_id, question_key, question_bank_id, step_index, mode, marks_awarded, max_marks, summary, feedback_points, next_steps,
-         readback_type, readback_markdown, readback_warnings)
-        values
-        (:subject_site, :track, :student_id, :question_key, :question_bank_id, :step_index, :mode, :marks_awarded, :max_marks, :summary,
-         CAST(:feedback_points AS jsonb), CAST(:next_steps AS jsonb),
-         :readback_type, :readback_markdown, CAST(:readback_warnings AS jsonb))
-    """
-    try:
-        with eng.begin() as conn:
-            conn.execute(text(query), {
-                "subject_site": SUBJECT_SITE,
-                "track": st.session_state.get("track","combined"),
-                "student_id": sid,
-                "question_key": question_key,
-                "question_bank_id": int(question_bank_id) if question_bank_id is not None else None,
-                "step_index": int(step_index) if step_index is not None else None,
-                "mode": mode,
-                "marks_awarded": m_awarded,
-                "max_marks": m_max,
-                "summary": summ,
-                "feedback_points": fb_json,
-                "next_steps": ns_json,
-                "readback_type": rb_type if rb_type else None,
-                "readback_markdown": rb_md if rb_md else None,
-                "readback_warnings": rb_warn
-            })
-        st.session_state["db_last_error"] = ""
-    except Exception as e:
-        st.session_state["db_last_error"] = f"Insert Error: {type(e).__name__}"
-        LOGGER.exception("insert_attempt failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
-
-
-@st.cache_data(ttl=20)
-def load_attempts_df_cached(_fp: str, subject_site: str, limit: int = 5000) -> pd.DataFrame:
-    eng = get_db_engine()
-    if eng is None:
-        return pd.DataFrame()
-    ensure_attempts_table()
-    subject_site = (subject_site or "").strip().lower() or SUBJECT_SITE
-    with eng.connect() as conn:
-        df = pd.read_sql(
-            text(f"""
-                select id, created_at, student_id, question_key, question_bank_id, step_index, mode,
-                       marks_awarded, max_marks, readback_type
-                from public.{ATTEMPTS_TABLE}
-                where subject_site = :subject_site
-                order by created_at desc
-                limit :limit
-            """),
-            conn,
-            params={"limit": int(limit), "subject_site": subject_site},
-        )
-    if not df.empty:
-        df["marks_awarded"] = pd.to_numeric(df["marks_awarded"], errors="coerce").fillna(0).astype(int)
-        df["max_marks"] = pd.to_numeric(df["max_marks"], errors="coerce").fillna(0).astype(int)
-    return df
-
-
-def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
-    fp = (_safe_secret("DATABASE_URL", "") or "")[:40]
-    subject_site = (SUBJECT_SITE or "").strip().lower()
-    try:
-        return load_attempts_df_cached(fp, subject_site=subject_site, limit=limit)
-    except Exception as e:
-        st.session_state["db_last_error"] = f"Load Error: {type(e).__name__}"
-        LOGGER.exception("load_attempts_df failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
-        return pd.DataFrame()
-
-
-def delete_attempt_by_id(attempt_id: int) -> bool:
-    eng = get_db_engine()
-    if eng is None:
-        return False
-    ensure_attempts_table()
-    try:
-        with eng.begin() as conn:
-            res = conn.execute(
-                text(f"delete from public.{ATTEMPTS_TABLE} where id = :id and subject_site = :subject_site"),
-                {"id": int(attempt_id), "subject_site": SUBJECT_SITE},
-            )
-        st.session_state["db_last_error"] = ""
-        try:
-            load_attempts_df_cached.clear()
-        except Exception:
-            pass
-        return res.rowcount > 0
-    except Exception as e:
-        st.session_state["db_last_error"] = f"Delete Attempt Error: {type(e).__name__}"
-        LOGGER.exception("delete_attempt_by_id failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
-        return False
-
-# ============================================================
-# MARKING (unified for question_bank_v2 rows)
-# ============================================================
-def _mk_system_schema(max_marks: int, question_text: str = "") -> str:
-    qt = f"\nQuestion (student-facing):\n{question_text}\n" if question_text else "\n"
-    tpl = (FEEDBACK_SYSTEM_TPL or "").strip()
-    if not tpl:
-        # Fallback: should not happen if prompts.json is present
-        tpl = "You are a strict GCSE examiner. Output ONLY JSON."
-    return _render_template(tpl, {
-        "QT": qt,
-        "MAX_MARKS": int(max_marks),
-    })
-
-
-
-def _finalize_report(data: dict, max_marks: int) -> dict:
-    def _norm(s: str) -> str:
-        return normalize_markdown_math(str(s or "").strip())
-
-    readback_md = _norm(data.get("readback_markdown", ""))
-    readback_type = str(data.get("readback_type", "") or "").strip()
-    readback_warn = data.get("readback_warnings", [])
-    if not isinstance(readback_warn, list):
-        readback_warn = []
-
-    feedback_points = data.get("feedback_points", [])
-    if not isinstance(feedback_points, list):
-        feedback_points = []
-    next_steps = data.get("next_steps", [])
-    if not isinstance(next_steps, list):
-        next_steps = []
-
-    return {
-        "readback_type": readback_type,
-        "readback_markdown": readback_md,
-        "readback_warnings": [str(x) for x in readback_warn][:6],
-        "marks_awarded": clamp_int(data.get("marks_awarded", 0), 0, int(max_marks)),
-        "max_marks": int(max_marks),
-        "summary": _norm(data.get("summary", "")),
-        "feedback_points": [_norm(x) for x in feedback_points][:6],
-        "next_steps": [_norm(x) for x in next_steps][:6]
-    }
-
-
-def get_gpt_feedback_from_bank(
-    student_answer,
-    q_row: Dict[str, Any],
-    is_student_image: bool,
-    question_img: Optional[Image.Image],
-    markscheme_img: Optional[Image.Image],
-) -> dict:
-    if client is None or not AI_READY:
-        max_marks = int(q_row.get("max_marks", 1))
-        return {
-            "readback_type": "",
-            "readback_markdown": "",
-            "readback_warnings": [],
-            "marks_awarded": 0,
-            "max_marks": max_marks,
-            "summary": "The examiner could not process this attempt (AI unavailable).",
-            "feedback_points": ["Please configure the OpenAI API key in Streamlit Secrets and try again."],
-            "next_steps": []
-        }
-
-    max_marks = int(q_row.get("max_marks", 1))
-    question_text = (q_row.get("question_text") or "").strip()
-    markscheme_text = (q_row.get("markscheme_text") or "").strip()
-
-    system_instr = _mk_system_schema(max_marks=max_marks, question_text=question_text if question_text else "")
-    messages = [{"role": "system", "content": system_instr}]
-
-    if markscheme_text:
-        messages.append({"role": "system", "content": f"CONFIDENTIAL MARKING SCHEME (DO NOT REVEAL):\n{markscheme_text}"})
-
-    content = [{"type": "text", "text": "Mark this work. Return JSON only."}]
-
-    if question_img is not None:
-        content.append({"type": "text", "text": "Question image:"})
-        content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encode_image(question_img)}"}})
-
-    if markscheme_img is not None:
-        content.append({"type": "text", "text": "Mark scheme image (confidential):"})
-        content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encode_image(markscheme_img)}"}})
-
-    if question_text:
-        content.append({"type": "text", "text": f"Question text (if present):\n{question_text}"})
-
-    if not is_student_image:
-        content.append({"type": "text", "text": f"Student Answer (text):\n{student_answer}\n(readback_markdown can be empty for typed answers)"})
-    else:
-        sa_b64 = encode_image(student_answer)
-        content.append({"type": "text", "text": "Student answer (image):"})
-        content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{sa_b64}"}})
-
-    messages.append({"role": "user", "content": content})
-
-    try:
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=messages,
-            max_completion_tokens=2500,
-            response_format={"type": "json_object"}
-        )
-
-        raw = response.choices[0].message.content or ""
-        if not raw.strip():
-            raise ValueError("Empty response from AI.")
-
-        data = safe_parse_json(raw)
-        if not data:
-            raise ValueError("No valid JSON parsed from response.")
-
-        return _finalize_report(data, max_marks=max_marks)
-
-    except Exception as e:
-        return {
-            "readback_type": "",
-            "readback_markdown": "",
-            "readback_warnings": [],
-            "marks_awarded": 0,
-            "max_marks": max_marks,
-            "summary": "The examiner could not process this attempt (AI Error).",
-            "feedback_points": ["Please try submitting again.", f"Error details: {str(e)[:120]}"],
-            "next_steps": []
-        }
-
-# ============================================================
-# REPORT RENDERER
-# ============================================================
-def render_report(report: dict):
-    readback_md = (report.get("readback_markdown") or "").strip()
-    if readback_md:
-        st.markdown("**AI readback (what it thinks you wrote/drew):**")
-        with st.container(border=True):
-            st.markdown(normalize_markdown_math(readback_md))
-
-        rb_warn = report.get("readback_warnings", [])
-        if rb_warn:
-            st.caption("Readback notes:")
-            for w in rb_warn[:6]:
-                st.markdown(normalize_markdown_math(f"- {w}"))
-        st.divider()
-
-    st.markdown(f"**Marks:** {int(report.get('marks_awarded', 0))} / {int(report.get('max_marks', 0))}")
-    if report.get("summary"):
-        st.markdown(normalize_markdown_math(f"**Summary:** {report.get('summary')}"))
-    if report.get("feedback_points"):
-        st.markdown("**Feedback:**")
-        for p in report["feedback_points"]:
-            st.markdown(normalize_markdown_math(f"- {p}"))
-    if report.get("next_steps"):
-        st.markdown("**Next steps:**")
-        for n in report["next_steps"]:
-            st.markdown(normalize_markdown_math(f"- {n}"))
-
-# ============================================================
-# NAVIGATION
-# ============================================================
-nav = st.sidebar.radio(
-    "Navigate",
-    ["Student", "Teacher Dashboard", "Question Bank"],
-    index=0,
-    key="nav_page",
-)
-
-# Track selector (sticky via localStorage + URL param)
-_sb_track_label = st.sidebar.selectbox(
-    "Track",
-    ["Combined", "Separate"],
-    index=0 if st.session_state.get("track", TRACK_DEFAULT) == "combined" else 1,
-    key="sidebar_track_label",
-    help="Combined hides Separate-only topics/questions. Separate shows everything.",
-)
-_sb_track = "combined" if _sb_track_label == "Combined" else "separate"
-if _sb_track != st.session_state.get("track", TRACK_DEFAULT):
-    st.session_state["track"] = _sb_track
-    _set_query_param(**{TRACK_PARAM: _sb_track})
-_persist_track_to_browser(st.session_state.get("track", TRACK_DEFAULT))
-
-with st.sidebar:
-    if st.session_state.get("track", TRACK_DEFAULT) == "combined":
-        if hasattr(st, "badge"):
-            st.badge("COMBINED", color="orange")
-        else:
-            st.markdown(":orange-badge[COMBINED]")
-    else:
-        if hasattr(st, "badge"):
-            st.badge("SEPARATE", color="primary")
-        else:
-            st.markdown(":blue-badge[SEPARATE]")
-    st.caption("The badge shows whether COMBINED or SEPARATED Physics selected.")
-
-header_left, header_mid, header_right = st.columns([3, 2, 1])
-
-# Track badge (visual cue)
-_track = st.session_state.get("track", TRACK_DEFAULT)
-
-def _render_badge(label: str, *, color: str, icon: str | None = None):
-    # st.badge exists in newer Streamlit. Fall back to the markdown badge directive if needed.
+def _render_badge(label: str, *, color: str, icon: str | None = None) -> None:
     if hasattr(st, "badge"):
         st.badge(label, color=color, icon=icon)
     else:
-        # markdown directive supports only the basic palette (no 'primary')
-        md_color = color if color in {"red","orange","yellow","blue","green","violet","gray","grey"} else "blue"
+        md_color = color if color in {"red", "orange", "yellow", "blue", "green", "violet", "gray", "grey"} else "blue"
         st.markdown(f":{md_color}-badge[{label}]")
 
-with header_right:
-    if _track == "combined":
-        _render_badge("COMBINED", color="orange", icon=":material/merge_type:")
-    else:
-        _render_badge("SEPARATE", color="primary", icon=":material/call_split:")
 
-with header_left:
-    logo_col, title_col = st.columns([1, 5])
-    with logo_col:
-        st.markdown(
-            f'<a href="https://panphy.github.io/" target="_blank" rel="noopener noreferrer">'
-            f'<img src="{PANPHY_LOGO_URL}" width="64" alt="PanPhy logo"/></a>',
-            unsafe_allow_html=True,
-        )
-    with title_col:
-        st.title("PanPhy Skill Builder")
-        st.caption(f"Powered by OpenAI {MODEL_NAME}")
-with header_right:
-    issues = []
-    if not AI_READY:
-        issues.append("AI model not connected.")
-    if not db_ready():
-        issues.append("Database not connected.")
-    if issues:
-        st.caption("⚠️ System status")
-        for msg in issues:
-            st.caption(msg)
+def _render_sidebar() -> str:
+    nav = st.sidebar.radio(
+        "Navigate",
+        ["Student", "Teacher Dashboard", "Question Bank"],
+        index=0,
+        key="nav_page",
+    )
 
-# ============================================================
-# STUDENT / TEACHER PAGES
-# ============================================================
-_ui_helpers = {
-    "CANVAS_BG_HEX": CANVAS_BG_HEX,
-    "CANVAS_HEIGHT_DEFAULT": CANVAS_HEIGHT_DEFAULT,
-    "CANVAS_HEIGHT_EXPANDED": CANVAS_HEIGHT_EXPANDED,
-    "CANVAS_MAX_MB": CANVAS_MAX_MB,
-    "RATE_LIMIT_MAX": RATE_LIMIT_MAX,
-    "TEXTAREA_HEIGHT_DEFAULT": TEXTAREA_HEIGHT_DEFAULT,
-    "TEXTAREA_HEIGHT_EXPANDED": TEXTAREA_HEIGHT_EXPANDED,
-    "QUESTION_MAX_MB": QUESTION_MAX_MB,
-    "MARKSCHEME_MAX_MB": MARKSCHEME_MAX_MB,
-    "_check_rate_limit_db": _check_rate_limit_db,
-    "_compress_bytes_to_limit": _compress_bytes_to_limit,
-    "_effective_student_id": _effective_student_id,
-    "_encode_image_bytes": _encode_image_bytes,
-    "_run_ai_with_progress": _run_ai_with_progress,
-    "_stylus_canvas_available": _stylus_canvas_available,
-    "cached_download_from_storage": cached_download_from_storage,
-    "canvas_has_ink": canvas_has_ink,
-    "data_url_to_image_data": data_url_to_image_data,
-    "db_ready": db_ready,
-    "get_db_driver_type": get_db_driver_type,
-    "ensure_attempts_table": ensure_attempts_table,
-    "load_attempts_df": load_attempts_df,
-    "delete_attempt_by_id": delete_attempt_by_id,
-    "supabase_ready": supabase_ready,
-    "get_gpt_feedback_from_bank": get_gpt_feedback_from_bank,
-    "insert_attempt": insert_attempt,
-    "normalize_markdown_math": normalize_markdown_math,
-    "preprocess_canvas_image": preprocess_canvas_image,
-    "render_report": render_report,
-    "render_md_box": render_md_box,
-    "safe_bytes_to_pil": safe_bytes_to_pil,
-    "slugify": slugify,
-    "stylus_canvas": stylus_canvas,
-    "upload_to_storage": upload_to_storage,
-    "validate_image_file": validate_image_file,
-    "bytes_to_pil": bytes_to_pil,
-    "insert_question_bank_row": insert_question_bank_row,
-}
+    track_label = st.sidebar.selectbox(
+        "Track",
+        ["Combined", "Separate"],
+        index=0 if st.session_state.get("track", TRACK_DEFAULT) == "combined" else 1,
+        key="sidebar_track_label",
+        help="Combined hides Separate-only topics/questions. Separate shows everything.",
+    )
+    selected_track = "combined" if track_label == "Combined" else "separate"
+    if selected_track != st.session_state.get("track", TRACK_DEFAULT):
+        st.session_state["track"] = selected_track
+        set_query_param(**{TRACK_PARAM: selected_track})
+    persist_track_to_browser(st.session_state.get("track", TRACK_DEFAULT))
 
-if nav == "Student":
-    render_student_page(_ui_helpers)
-elif nav in ("Teacher Dashboard", "Question Bank"):
-    render_teacher_page(nav, _ui_helpers)
+    with st.sidebar:
+        if st.session_state.get("track", TRACK_DEFAULT) == "combined":
+            _render_badge("COMBINED", color="orange")
+        else:
+            _render_badge("SEPARATE", color="primary")
+        st.caption("The badge shows whether COMBINED or SEPARATED Physics selected.")
 
-st.divider()
-st.markdown(
-    "<div style='text-align: center;'>"
-    "© 2026 PanPhy Projects<br>"
-    "<a href='mailto:panphylabs@icloud.com'>Contact Me</a> • "
-    "<a href='https://buymeacoffee.com/panphy'>Support My Projects</a>"
-    "</div>",
-    unsafe_allow_html=True,
-)
+    return nav
+
+
+def _render_header() -> None:
+    header_left, _header_mid, header_right = st.columns([3, 2, 1])
+    track = st.session_state.get("track", TRACK_DEFAULT)
+
+    with header_right:
+        if track == "combined":
+            _render_badge("COMBINED", color="orange", icon=":material/merge_type:")
+        else:
+            _render_badge("SEPARATE", color="primary", icon=":material/call_split:")
+
+    with header_left:
+        logo_col, title_col = st.columns([1, 5])
+        with logo_col:
+            st.markdown(
+                f'<a href="https://panphy.github.io/" target="_blank" rel="noopener noreferrer">'
+                f'<img src="{PANPHY_LOGO_URL}" width="64" alt="PanPhy logo"/></a>',
+                unsafe_allow_html=True,
+            )
+        with title_col:
+            st.title("PanPhy Skill Builder")
+            st.caption(f"Powered by OpenAI {MODEL_NAME}")
+
+    with header_right:
+        issues = []
+        if not AI_READY:
+            issues.append("AI model not connected.")
+        if not db_ready():
+            issues.append("Database not connected.")
+        if issues:
+            st.caption("⚠️ System status")
+            for message in issues:
+                st.caption(message)
+
+
+def _build_ui_helpers() -> dict:
+    return {
+        "CANVAS_BG_HEX": CANVAS_BG_HEX,
+        "CANVAS_HEIGHT_DEFAULT": CANVAS_HEIGHT_DEFAULT,
+        "CANVAS_HEIGHT_EXPANDED": CANVAS_HEIGHT_EXPANDED,
+        "CANVAS_MAX_MB": CANVAS_MAX_MB,
+        "RATE_LIMIT_MAX": RATE_LIMIT_MAX,
+        "TEXTAREA_HEIGHT_DEFAULT": TEXTAREA_HEIGHT_DEFAULT,
+        "TEXTAREA_HEIGHT_EXPANDED": TEXTAREA_HEIGHT_EXPANDED,
+        "QUESTION_MAX_MB": QUESTION_MAX_MB,
+        "MARKSCHEME_MAX_MB": MARKSCHEME_MAX_MB,
+        "_check_rate_limit_db": _check_rate_limit_db,
+        "_compress_bytes_to_limit": _compress_bytes_to_limit,
+        "_effective_student_id": _effective_student_id,
+        "_encode_image_bytes": _encode_image_bytes,
+        "_run_ai_with_progress": _run_ai_with_progress,
+        "_stylus_canvas_available": _stylus_canvas_available,
+        "cached_download_from_storage": cached_download_from_storage,
+        "canvas_has_ink": canvas_has_ink,
+        "data_url_to_image_data": data_url_to_image_data,
+        "db_ready": db_ready,
+        "get_db_driver_type": get_db_driver_type,
+        "ensure_attempts_table": ensure_attempts_table,
+        "load_attempts_df": load_attempts_df,
+        "delete_attempt_by_id": delete_attempt_by_id,
+        "supabase_ready": supabase_ready,
+        "get_gpt_feedback_from_bank": get_gpt_feedback_from_bank,
+        "insert_attempt": insert_attempt,
+        "normalize_markdown_math": normalize_markdown_math,
+        "preprocess_canvas_image": preprocess_canvas_image,
+        "render_report": render_report,
+        "render_md_box": render_md_box,
+        "safe_bytes_to_pil": safe_bytes_to_pil,
+        "slugify": slugify,
+        "stylus_canvas": stylus_canvas,
+        "upload_to_storage": upload_to_storage,
+        "validate_image_file": validate_image_file,
+        "bytes_to_pil": bytes_to_pil,
+        "insert_question_bank_row": insert_question_bank_row,
+    }
+
+
+def main() -> None:
+    init_track_state()
+    nav = _render_sidebar()
+    _render_header()
+
+    helpers = _build_ui_helpers()
+    if nav == "Student":
+        render_student_page(helpers)
+    elif nav in ("Teacher Dashboard", "Question Bank"):
+        render_teacher_page(nav, helpers)
+
+    st.divider()
+    st.markdown(
+        "<div style='text-align: center;'>"
+        "© 2026 PanPhy Projects<br>"
+        "<a href='mailto:panphylabs@icloud.com'>Contact Me</a> • "
+        "<a href='https://buymeacoffee.com/panphy'>Support My Projects</a>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+main()

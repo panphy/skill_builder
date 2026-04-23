@@ -66,23 +66,25 @@ Tasks in a **SEQUENCE** must follow a specific order but can be done separately 
 > Doing C before A means merge conflicts or duplicated effort.
 > Do NOT interleave C with any other task.
 
-### C1 — Break up `app.py` into focused modules
-`app.py` is 1604 lines and mixes six unrelated concerns. Extract each into its own module:
+### C1 — Break up `app.py` into focused modules ✅ DONE
+`app.py` was reduced from 1626 lines to 262 lines and now acts as a thin orchestration layer for page config, logging, navigation, header/footer rendering, and UI helper wiring.
 
-- [ ] **`storage.py`** — Move all Supabase Storage upload/download logic out of `app.py`. Functions: anything calling `supabase.storage`.
-- [ ] **`rate_limiter.py`** — Move rate-limit check and increment logic (~`app.py:550–639`) into a standalone module. This also makes it independently testable.
-- [ ] **`session_state.py`** — Move all `_ss_init(...)` calls and session-state setup into an explicit initialization module called once at startup.
-- [ ] Keep `app.py` as a thin orchestration layer: page config, routing, and `main()`. Target < 400 lines after extraction.
-- [ ] After each extraction step, run `streamlit run app.py` and verify the app loads correctly before moving to the next.
-- [ ] Run `python -m unittest discover tests` after all extractions are done.
+- [x] **`storage.py`** — Moved Supabase Storage client setup, upload/download helpers, cached downloads, image byte decoding, and `slugify`.
+- [x] **`rate_limiter.py`** — Moved rate-limit table setup, student ID normalization, reset-time formatting, and submission checks into a standalone module.
+- [x] **`session_state.py`** — Moved all `_ss_init(...)` calls and session-state setup into `init_session_state()`, called once during startup.
+- [x] Additional focused modules extracted to keep `app.py` under 400 lines: `attempts.py`, `ai_feedback.py`, `ai_progress.py`, `canvas_utils.py`, `markdown_rendering.py`, and `track_state.py`.
+- [x] Verified startup with `.venv/bin/streamlit run app.py --server.headless true --server.port 8502 --browser.gatherUsageStats false`; local HTTP check returned `HTTP/1.1 200 OK`.
+- [x] Ran `.venv/bin/python -m unittest discover tests` after extraction: 6 tests passed.
 
-### C2 — Improve rate limiting to prevent burst abuse
+### C2 — Improve rate limiting to prevent burst abuse ✅ DONE
 > **SEQUENCE DEPENDENCY**: Do after C1 (rate limit logic will have been moved to `rate_limiter.py`).
 
-- [ ] Replace the current fixed-window reset (resets at submission time on boundary) with a sliding-window or token-bucket implementation.
-- [ ] Ensure the rejection response is explicit to the user — currently the limit may silently truncate without a clear UI message.
-- [ ] Consider adding a per-IP limit in addition to per-student-ID, especially for anonymous users.
-- **Files touched**: `rate_limiter.py` (after C1), `db.py` (schema changes to `rate_limits_v2` if needed).
+- [x] Replaced the fixed-window reset with a database-backed token-bucket limiter in `rate_limiter.py`. Capacity remains 10 submissions, refilling evenly over 1 hour.
+- [x] Added `tokens` and `last_refill_at` migration columns to the existing `public.rate_limits` table while preserving legacy `submission_count` / `window_start_time` columns for compatibility.
+- [x] Rejection remains explicit through the existing student UI error paths; reset time now points to the next available token rather than the old fixed-window boundary.
+- [x] Considered per-IP limiting and intentionally did not add it because classroom users often share school NAT/proxy IPs, which could block unrelated students. Anonymous users continue to be limited by the existing per-browser anonymous ID.
+- [x] Added `tests/test_rate_limiter.py` for token-bucket refill and reset-time math.
+- **Files touched**: `rate_limiter.py`, `tests/test_rate_limiter.py`.
 
 ---
 
@@ -98,7 +100,7 @@ Tasks in a **SEQUENCE** must follow a specific order but can be done separately 
 | A6 — Correlation IDs | Yes | `app.py` | ✅ Done |
 | A7 — Query row limit | Yes | `db.py` | ✅ Done |
 | B1 — Extract canvas helper | Single file | `ui_student.py` | ✅ Done |
-| C1 — Refactor `app.py` | After all A + B tasks | `app.py` + new modules | ⬜ Todo |
-| C2 — Token bucket rate limit | After C1 | `rate_limiter.py`, `db.py` | ⬜ Todo |
+| C1 — Refactor `app.py` | After all A + B tasks | `app.py` + new modules | ✅ Done |
+| C2 — Token bucket rate limit | After C1 | `rate_limiter.py`, tests | ✅ Done |
 
-**Recommended order if tackling one at a time**: ~~A1~~ ~~A2~~ ~~A3~~ ~~A4~~ ~~A5~~ ~~A6~~ ~~A7~~ ~~B1~~ → C1 → C2
+**Recommended order if tackling one at a time**: ~~A1~~ ~~A2~~ ~~A3~~ ~~A4~~ ~~A5~~ ~~A6~~ ~~A7~~ ~~B1~~ ~~C1~~ ~~C2~~
