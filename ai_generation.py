@@ -27,7 +27,7 @@ from config import (
 
 LOGGER = logging.getLogger("panphy")
 
-MODEL_NAME = "gpt-5-mini"
+MODEL_NAME = "gpt-5.4-mini"
 TRACK_DEFAULT = "combined"
 
 ATOMS_ISOTOPES_SUB_TOPIC = "Atomic structure: Atoms and isotopes"
