@@ -58,8 +58,8 @@ def get_db_engine():
     try:
         return _cached_engine(url)
     except Exception as e:
-        st.session_state["db_last_error"] = f"DB Engine Error: {type(e).__name__}: {e}"
-        LOGGER.error("DB engine creation failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
+        st.session_state["db_last_error"] = f"DB Engine Error: {type(e).__name__}"
+        LOGGER.exception("DB engine creation failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
         return None
 
 
@@ -303,12 +303,13 @@ def load_question_bank_df_cached(_fp: str, track: str, subject_site: str, limit:
 
 
 
-def load_question_bank_df(limit: int = 5000, include_inactive: bool = False) -> pd.DataFrame:
+def load_question_bank_df(limit: int = 1000, include_inactive: bool = False) -> pd.DataFrame:
     fp = (_safe_secret("DATABASE_URL", "") or "")[:40]
     try:
         return load_question_bank_df_cached(fp, track=st.session_state.get('track','combined'), subject_site=SUBJECT_SITE, limit=limit, include_inactive=include_inactive)
     except Exception as e:
-        st.session_state["db_last_error"] = f"Load Question Bank Error: {type(e).__name__}: {e}"
+        st.session_state["db_last_error"] = f"Load Question Bank Error: {type(e).__name__}"
+        LOGGER.exception("load_question_bank_df failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
         return pd.DataFrame()
 
 

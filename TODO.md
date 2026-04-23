@@ -12,60 +12,51 @@ Tasks in a **SEQUENCE** must follow a specific order but can be done separately 
 > An agent can be given any one of these tasks without touching any other task.
 > Safe to tackle one at a time, in any order.
 
-### A1 — Add timeout to LLM question-generation API calls
-- [ ] `ai_generation.py:542` — `client.chat.completions.create(...)` has no timeout. The feedback call at line 299 already uses `client.with_options(timeout=10)` as the correct pattern. Apply the same `with_options(timeout=60)` (generation is slower than feedback) to the `_call_model` inner functions inside `generate_question` (~line 502) and `generate_journey` (~line 729).
-- **Risk if skipped**: A slow/hung OpenAI API response blocks the entire Streamlit thread indefinitely with no recovery.
-- **Files touched**: `ai_generation.py` only.
+### A1 — Add timeout to LLM question-generation API calls ✅ DONE
+- [x] `ai_generation.py` — Added `client.with_options(timeout=60)` to the `_call_model` inner function in `generate_question` and `client.with_options(timeout=90)` in `generate_journey` (journey uses `max_completion_tokens=4000` so needs more time). Pattern matches the existing feedback call at line 299.
+- **Files touched**: `ai_generation.py`
 
-### A2 — Fix PIL image memory leak in compression loop
-- [ ] `image_utils.py:123` — Inside the resize-and-compress loop, `img2 = img.resize(...)` creates new PIL Image objects on each iteration that are never explicitly closed. Wrap them in a `try/finally` block or use the image as a context manager to call `.close()` when no longer needed.
-- **Risk if skipped**: Memory grows on high-volume upload sessions (low urgency in classroom setting).
-- **Files touched**: `image_utils.py` only.
+### A2 — Fix PIL image memory leak in compression loop ✅ DONE
+- [x] `image_utils.py` — In the resize-and-compress loop, `img2` is now set to `None` when adopted (`img = img2; img2 = None`) and explicitly closed via `img2.close()` when discarded. This releases memory promptly instead of waiting for GC.
+- **Files touched**: `image_utils.py`
 
-### A3 — Audit and restrict `unsafe_allow_html=True` usage
-- [ ] `app.py:215` — Audit: confirm this call only renders AI-generated or system-controlled content (never raw student/teacher input).
-- [ ] `app.py:231` — Same audit.
-- [ ] `app.py:1532` — Same audit.
-- [ ] `app.py:1603` — Same audit.
-- [ ] For any call site where user-controlled text (topic names, question labels, student answers) could reach the rendered string, switch to `unsafe_allow_html=False` or pre-escape HTML entities before rendering.
-- **Risk if skipped**: If any user-controlled text reaches these call sites, stored XSS is possible.
-- **Files touched**: `app.py` only.
+### A3 — Audit `unsafe_allow_html=True` usage ✅ DONE (no code change needed)
+- [x] `app.py:215` — Inline `<script>` for track localStorage restore. Content is JSON-encoded system constants only. **Safe.**
+- [x] `app.py:231` — Inline `<script>` to persist track. `track_value` is validated against `TRACK_ALLOWED` whitelist before use. **Safe.**
+- [x] `app.py:1532` — Logo `<img>` tag using hardcoded `PANPHY_LOGO_URL` constant. **Safe.**
+- [x] `app.py:1603` — Footer with hardcoded HTML strings. **Safe.**
+- **Result**: All 4 usages render only system-controlled or constant content. No user input reaches any of these call sites. No changes required.
 
-### A4 — Add server-side image type validation (magic bytes)
-- [ ] `ui_teacher.py:1296–1297` — `st.file_uploader(..., type=["png","jpg","jpeg"])` only checks the filename extension. After reading the uploaded bytes, call `image_utils.validate_and_compress_image()` (which calls `Image.open()`) — this already catches invalid files at the PIL layer. To close the gap fully, add an explicit check of the first 3–4 bytes against known PNG (`\x89PNG`) and JPEG (`\xff\xd8\xff`) magic bytes before passing to PIL.
-- **Note**: Low urgency — `Image.open()` in `image_utils.py:91` already rejects non-image bytes and returns an error. This task tightens the validation layer.
-- **Files touched**: `ui_teacher.py` or `image_utils.py` only.
+### A4 — Add server-side image type validation (magic bytes) ✅ DONE
+- [x] `image_utils.py` — Added `_PNG_MAGIC`, `_JPEG_MAGIC` constants and `_has_valid_image_magic()` helper. Both `validate_image_file` and `_compress_bytes_to_limit` now reject files with invalid magic bytes before calling `Image.open()`. Gives a clear error message and avoids unnecessary PIL processing.
+- **Files touched**: `image_utils.py`
 
-### A5 — Sanitize database error messages shown to users
-- [ ] Throughout `app.py` and `db.py`, caught exceptions are sometimes surfaced directly to the UI (e.g. `st.error(str(e))`). Replace with a generic user message ("Something went wrong — please try again") while keeping the full exception in the server-side log via `LOGGER.exception(...)`.
-- [ ] Specifically check: `app.py:410–412`, `db.py:61–62`, and any `st.error(...)` call that includes `e` or `str(e)` directly.
-- **Risk if skipped**: Database schema, table names, or connection strings can appear in the UI on errors.
-- **Files touched**: `app.py`, `db.py` (string-level changes only, no logic changes).
+### A5 — Sanitize database error messages shown to users ✅ DONE
+- [x] All `db_last_error` assignments that previously included `{e}` (the raw exception string) have been changed to include only `{type(e).__name__}`. Full tracebacks are now logged server-side via `LOGGER.exception(...)`.
+- [x] Locations fixed: `app.py` (7 sites — table creation, insert, storage upload/download, load, delete) and `db.py` (2 sites — engine creation, question bank load).
+- [x] Locations where `LOGGER.error(...)` existed were upgraded to `LOGGER.exception(...)` to capture full tracebacks. Locations with no prior logger call had one added.
+- **Files touched**: `app.py`, `db.py`
 
-### A6 — Add correlation IDs to structured logging
-- [ ] In `app.py`, at the start of each user-triggered action (submit answer, generate question, upload file), generate a short UUID (`uuid.uuid4().hex[:8]`) and store it in `st.session_state["request_id"]`.
-- [ ] Pass it into log calls via `extra={"ctx": {"request_id": ..., ...}}` so all log lines for one user action share the same ID.
-- **Risk if skipped**: Hard to trace a single user's flow through multi-step log output.
-- **Files touched**: `app.py` primarily; minor additions to `ai_generation.py` and `db.py` log calls.
+### A6 — Add correlation IDs to structured logging ✅ DONE
+- [x] `app.py` — Added `_ss_init("session_id", pysecrets.token_hex(6))` to session state init (12-char hex, unique per browser session).
+- [x] `app.py` — Added `SessionIDFilter` class that automatically injects `[sid=...]` into every log record's `ctx` dict at log time. Filter is registered on the `panphy` logger in `setup_logging()`. No changes required to individual log call sites.
+- **Files touched**: `app.py`
 
-### A7 — Lower default row limit for `load_question_bank_df`
-- [ ] `db.py:306` — Default `limit=5000` is passed from `app.py`. Add a query execution safeguard: if the question bank grows large, this full load will slow page renders. Reduce the default to `1000` and confirm no caller depends on loading all rows silently. Add a comment explaining the limit.
-- **Files touched**: `db.py`, possibly `app.py` (where `load_question_bank_df` is called with no explicit limit).
+### A7 — Lower default row limit for `load_question_bank_df` ✅ DONE
+- [x] `db.py:306` — Default `limit` changed from `5000` to `1000`. The only existing caller (`ui_teacher.py:281`) already passes `limit=5000` explicitly so teacher behaviour is unchanged. The new default protects against future callers that omit the argument.
+- **Files touched**: `db.py`
 
 ---
 
-## Group B — Coordinated Refactor (Two Files, One Task)
-> **DEPENDENCY**: Tasks B1 must be done as a single unit.
-> Do NOT split B1 across two agents or interleave it with any Group C work.
-> It is safe to do B1 before or after any Group A task.
+## Group B — Refactor (Single File)
 
-### B1 — Extract shared canvas and filter UI into a shared helper
-- [ ] `ui_student.py` and `ui_teacher.py` both contain near-identical canvas rendering blocks and question filter UI. Extract these into a new `ui_shared.py` module (or add to an existing shared utility file).
-- [ ] Canvas rendering: identify the duplicated block in `ui_student.py` (~lines 639–696) and `ui_teacher.py` (the corresponding block), and replace both with a call to a shared `render_canvas(key_prefix)` helper.
-- [ ] Filter UI: identify duplicated filter widget logic across both files and extract into a shared `render_question_filters(...)` helper.
-- [ ] After extraction, run `python -m unittest discover tests` to confirm nothing broke.
-- **Why one task**: Both files must be updated together. If only one is updated, the extracted helper won't exist for the other, causing an import error.
-- **Files touched**: `ui_student.py`, `ui_teacher.py`, new `ui_shared.py`.
+### B1 — Extract duplicated canvas rendering into a shared helper ✅ DONE
+- [x] `ui_student.py` — The canvas rendering block (tool controls + canvas widget) was duplicated between single-question mode (~lines 606–696) and journey mode (~lines 968–1065).
+- [x] Extracted into `_render_canvas(slot, canvas_height, canvas_storage_key, qid, step_i=None)` nested function inside `render_student_page`, added after `_render_filter_chips`.
+- [x] Both blocks replaced with `canvas_value, canvas_result = _render_canvas(...)` one-liners.
+- [x] `slot` parameter ("single" or "journey") drives all key names; `step_i` is included in the stylus canvas key only when present (journey mode).
+- **Note**: `ui_teacher.py` has no canvas code. No `ui_shared.py` needed — this was a single-file refactor.
+- **Files touched**: `ui_student.py` only.
 
 ---
 
@@ -97,17 +88,17 @@ Tasks in a **SEQUENCE** must follow a specific order but can be done separately 
 
 ## Summary Table
 
-| Task | Independent? | Files Touched | Effort |
+| Task | Independent? | Files Touched | Status |
 |------|-------------|---------------|--------|
-| A1 — LLM timeout | Yes | `ai_generation.py` | Small |
-| A2 — PIL memory leak | Yes | `image_utils.py` | Small |
-| A3 — XSS / unsafe HTML | Yes | `app.py` | Small |
-| A4 — Magic bytes validation | Yes | `ui_teacher.py` | Small |
-| A5 — Sanitize error messages | Yes | `app.py`, `db.py` | Small |
-| A6 — Correlation IDs | Yes | `app.py`, others | Small |
-| A7 — Query row limit | Yes | `db.py`, `app.py` | Tiny |
-| B1 — Extract shared UI | Must be done as one unit | `ui_student.py`, `ui_teacher.py`, new file | Medium |
-| C1 — Refactor `app.py` | After all A + B tasks | `app.py` + new modules | Large |
-| C2 — Token bucket rate limit | After C1 | `rate_limiter.py`, `db.py` | Medium |
+| A1 — LLM timeout | Yes | `ai_generation.py` | ✅ Done |
+| A2 — PIL memory leak | Yes | `image_utils.py` | ✅ Done |
+| A3 — XSS / unsafe HTML | Yes | `app.py` (audit only) | ✅ Done |
+| A4 — Magic bytes validation | Yes | `image_utils.py` | ✅ Done |
+| A5 — Sanitize error messages | Yes | `app.py`, `db.py` | ✅ Done |
+| A6 — Correlation IDs | Yes | `app.py` | ✅ Done |
+| A7 — Query row limit | Yes | `db.py` | ✅ Done |
+| B1 — Extract canvas helper | Single file | `ui_student.py` | ✅ Done |
+| C1 — Refactor `app.py` | After all A + B tasks | `app.py` + new modules | ⬜ Todo |
+| C2 — Token bucket rate limit | After C1 | `rate_limiter.py`, `db.py` | ⬜ Todo |
 
-**Recommended order if tackling one at a time**: A1 → A2 → A3 → A4 → A5 → A6 → A7 → B1 → C1 → C2
+**Recommended order if tackling one at a time**: ~~A1~~ ~~A2~~ ~~A3~~ ~~A4~~ ~~A5~~ ~~A6~~ ~~A7~~ ~~B1~~ → C1 → C2

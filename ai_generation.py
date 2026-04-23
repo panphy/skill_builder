@@ -539,7 +539,7 @@ def generate_practice_question_with_ai(
             user = user + "\n\nExtra constraints:\n" + extra_hint.strip()
 
 
-        response = client.chat.completions.create(
+        response = client.with_options(timeout=60).chat.completions.create(
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": system},
@@ -760,7 +760,7 @@ def generate_topic_journey_with_ai(
                 user = user + "\n\nExtra constraints:\n" + extra_hint.strip()
 
 
-        response = client.chat.completions.create(
+        response = client.with_options(timeout=90).chat.completions.create(
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": system},

@@ -50,6 +50,22 @@ class KVFormatter(logging.Formatter):
         return base
 
 
+class SessionIDFilter(logging.Filter):
+    """Injects the per-session ID into every log record's ctx dict."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            sid = st.session_state.get("session_id", "")
+        except Exception:
+            sid = ""
+        if sid:
+            ctx = getattr(record, "ctx", None)
+            if isinstance(ctx, dict):
+                ctx.setdefault("sid", sid)
+            else:
+                record.ctx = {"sid": sid}
+        return True
+
+
 def setup_logging() -> logging.Logger:
     logger = logging.getLogger("panphy")
     if logger.handlers:
@@ -73,6 +89,7 @@ def setup_logging() -> logging.Logger:
         pass
 
     logger.propagate = False
+    logger.addFilter(SessionIDFilter())
     logger.info("Logging configured", extra={"ctx": {"component": "startup"}})
     return logger
 
@@ -127,6 +144,7 @@ _ss_init("feedback", None)
 _ss_init("student_answer_text_single", "")
 _ss_init("student_answer_text_journey", "")
 _ss_init("anon_id", pysecrets.token_hex(4))
+_ss_init("session_id", pysecrets.token_hex(6))
 _ss_init("db_last_error", "")
 _ss_init("db_table_ready", False)
 _ss_init("bank_table_ready", False)
@@ -407,9 +425,9 @@ def ensure_attempts_table():
         st.session_state["db_table_ready"] = True
         LOGGER.info("Attempts table ready", extra={"ctx": {"component": "db", "table": ATTEMPTS_TABLE}})
     except Exception as e:
-        st.session_state["db_last_error"] = f"Table Creation Error: {type(e).__name__}: {e}"
+        st.session_state["db_last_error"] = f"Table Creation Error: {type(e).__name__}"
         st.session_state["db_table_ready"] = False
-        LOGGER.error("Attempts table ensure failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
+        LOGGER.exception("Attempts table ensure failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
 
 
 def ensure_ai_timings_table():
@@ -439,9 +457,9 @@ def ensure_ai_timings_table():
         st.session_state["db_last_error"] = ""
         LOGGER.info("AI timings table ready", extra={"ctx": {"component": "db", "table": AI_TIMINGS_TABLE}})
     except Exception as e:
-        st.session_state["db_last_error"] = f"Table Creation Error: {type(e).__name__}: {e}"
+        st.session_state["db_last_error"] = f"Table Creation Error: {type(e).__name__}"
         st.session_state["db_ai_timings_ready"] = False
-        LOGGER.error("AI timings table ensure failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
+        LOGGER.exception("AI timings table ensure failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
 
 
 def insert_ai_timing(timing_type: str, duration_seconds: float, success: bool = True) -> None:
@@ -468,7 +486,8 @@ def insert_ai_timing(timing_type: str, duration_seconds: float, success: bool = 
             })
         st.session_state["db_last_error"] = ""
     except Exception as e:
-        st.session_state["db_last_error"] = f"Insert Error: {type(e).__name__}: {e}"
+        st.session_state["db_last_error"] = f"Insert Error: {type(e).__name__}"
+        LOGGER.exception("insert_ai_timing failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
 
 
 @st.cache_data(ttl=120)
@@ -525,8 +544,8 @@ def ensure_rate_limits_table():
             _exec_sql_many(conn, ddl_migrate)
         LOGGER.info("Rate limits table ready", extra={"ctx": {"component": "db", "table": "rate_limits"}})
     except Exception as e:
-        st.session_state["db_last_error"] = f"Rate Limits Table Error: {type(e).__name__}: {e}"
-        LOGGER.error("Rate limits table ensure failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
+        st.session_state["db_last_error"] = f"Rate Limits Table Error: {type(e).__name__}"
+        LOGGER.exception("Rate limits table ensure failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
 
 # ============================================================
 # RATE LIMITING (Per Student, stored in Postgres)
@@ -712,8 +731,8 @@ def upload_to_storage(path: str, file_bytes: bytes, content_type: str) -> bool:
             raise RuntimeError(str(err))
         return True
     except Exception as e:
-        st.session_state["db_last_error"] = f"Storage Upload Error: {type(e).__name__}: {e}"
-        LOGGER.error(
+        st.session_state["db_last_error"] = f"Storage Upload Error: {type(e).__name__}"
+        LOGGER.exception(
             "Storage upload failed",
             extra={"ctx": {"component": "storage", "op": "upload", "path": p, "error": type(e).__name__}},
         )
@@ -753,8 +772,8 @@ def download_from_storage(path: str) -> bytes:
 
         return b""
     except Exception as e:
-        st.session_state["db_last_error"] = f"Storage Download Error: {type(e).__name__}: {e}"
-        LOGGER.error(
+        st.session_state["db_last_error"] = f"Storage Download Error: {type(e).__name__}"
+        LOGGER.exception(
             "Storage download failed",
             extra={"ctx": {"component": "storage", "op": "download", "path": p, "error": type(e).__name__}},
         )
@@ -1250,7 +1269,8 @@ def insert_attempt(student_id: str, question_key: str, report: dict, mode: str, 
             })
         st.session_state["db_last_error"] = ""
     except Exception as e:
-        st.session_state["db_last_error"] = f"Insert Error: {type(e).__name__}: {e}"
+        st.session_state["db_last_error"] = f"Insert Error: {type(e).__name__}"
+        LOGGER.exception("insert_attempt failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
 
 
 @st.cache_data(ttl=20)
@@ -1285,7 +1305,8 @@ def load_attempts_df(limit: int = 5000) -> pd.DataFrame:
     try:
         return load_attempts_df_cached(fp, subject_site=subject_site, limit=limit)
     except Exception as e:
-        st.session_state["db_last_error"] = f"Load Error: {type(e).__name__}: {e}"
+        st.session_state["db_last_error"] = f"Load Error: {type(e).__name__}"
+        LOGGER.exception("load_attempts_df failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
         return pd.DataFrame()
 
 
@@ -1307,7 +1328,8 @@ def delete_attempt_by_id(attempt_id: int) -> bool:
             pass
         return res.rowcount > 0
     except Exception as e:
-        st.session_state["db_last_error"] = f"Delete Attempt Error: {type(e).__name__}: {e}"
+        st.session_state["db_last_error"] = f"Delete Attempt Error: {type(e).__name__}"
+        LOGGER.exception("delete_attempt_by_id failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
         return False
 
 # ============================================================

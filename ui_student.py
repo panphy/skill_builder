@@ -90,6 +90,101 @@ def render_student_page(helpers: dict):
             return
         st.markdown("**Active filters:** " + ", ".join(chips))
 
+    def _render_canvas(slot: str, canvas_height: int, canvas_storage_key: str, qid, step_i=None):
+        canvas_value = None
+        canvas_result = None
+        if _stylus_canvas_available():
+            tool_row = st.columns([2.2, 1.4, 1, 1])
+            with tool_row[0]:
+                tool = st.radio(
+                    "Tool",
+                    ["Pen", "Eraser"],
+                    horizontal=True,
+                    label_visibility="collapsed",
+                    key=f"canvas_tool_{slot}",
+                )
+            with tool_row[1]:
+                st.checkbox(
+                    "Stylus-only",
+                    help="Best on iPad. When enabled, finger/palm touches are ignored.",
+                    key="stylus_only_enabled",
+                )
+            undo_clicked = tool_row[2].button("Undo", use_container_width=True, key=f"canvas_undo_{slot}")
+            clear_clicked = tool_row[3].button("Clear", use_container_width=True, key=f"canvas_clear_{slot}")
+            cmd = None
+            if undo_clicked:
+                st.session_state["feedback"] = None
+                st.session_state[f"canvas_cmd_nonce_{slot}"] = int(st.session_state.get(f"canvas_cmd_nonce_{slot}", 0) or 0) + 1
+                cmd = "undo"
+            if clear_clicked:
+                st.session_state["feedback"] = None
+                st.session_state[f"last_canvas_data_url_{slot}"] = None
+                st.session_state[f"last_canvas_image_data_{slot}"] = None
+                st.session_state[f"canvas_cmd_nonce_{slot}"] = int(st.session_state.get(f"canvas_cmd_nonce_{slot}", 0) or 0) + 1
+                st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
+                cmd = "clear"
+            stroke_width = 2 if tool == "Pen" else 30
+            stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
+            step_part = f"_{step_i}" if step_i is not None else ""
+            canvas_value = stylus_canvas(
+                stroke_width=stroke_width,
+                stroke_color=stroke_color,
+                background_color=CANVAS_BG_HEX,
+                height=canvas_height,
+                width=None,
+                min_height=CANVAS_HEIGHT_DEFAULT,
+                max_height=CANVAS_HEIGHT_EXPANDED,
+                storage_key=canvas_storage_key,
+                initial_data_url=st.session_state.get(f"last_canvas_data_url_{slot}"),
+                pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
+                tool=("pen" if tool == "Pen" else "eraser"),
+                command=cmd,
+                command_nonce=int(st.session_state.get(f"canvas_cmd_nonce_{slot}", 0) or 0),
+                key=f"stylus_canvas_{slot}_{qid or 'none'}{step_part}_{st.session_state['canvas_key']}",
+            )
+            if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
+                st.session_state[f"last_canvas_data_url_{slot}"] = canvas_value.get("data_url")
+        else:
+            tool_row = st.columns([2, 1])
+            with tool_row[0]:
+                tool = st.radio(
+                    "Tool",
+                    ["Pen", "Eraser"],
+                    horizontal=True,
+                    label_visibility="collapsed",
+                    key=f"canvas_tool_{slot}",
+                )
+            clear_clicked = tool_row[1].button("Clear", use_container_width=True, key=f"canvas_clear_{slot}")
+            if clear_clicked:
+                st.session_state["feedback"] = None
+                st.session_state[f"last_canvas_image_data_{slot}"] = None
+                st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
+                st.rerun()
+            stroke_width = 2 if tool == "Pen" else 30
+            stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
+            try:
+                from streamlit_drawable_canvas import st_canvas as _st_canvas
+            except Exception:
+                _st_canvas = None
+            if _st_canvas is None:
+                st.warning("Canvas unavailable. Add components folder or install streamlit-drawable-canvas.")
+            else:
+                canvas_result = _st_canvas(
+                    stroke_width=stroke_width,
+                    stroke_color=stroke_color,
+                    background_color=CANVAS_BG_HEX,
+                    height=canvas_height,
+                    width=600,
+                    drawing_mode="freedraw",
+                    key=f"canvas_{slot}_{st.session_state['canvas_key']}",
+                    display_toolbar=False,
+                    update_streamlit=True,
+                )
+                if canvas_result is not None and getattr(canvas_result, "image_data", None) is not None:
+                    if canvas_has_ink(canvas_result.image_data):
+                        st.session_state[f"last_canvas_image_data_{slot}"] = canvas_result.image_data
+        return canvas_value, canvas_result
+
     def _advance_question(
         choice_key: str | None,
         question_sequence: list[int],
@@ -603,97 +698,7 @@ def render_student_page(helpers: dict):
                     if canvas_expanded
                     else f"panphy_canvas_h_{SUBJECT_SITE}_single_v2"
                 )
-                if _stylus_canvas_available():
-                    tool_row = st.columns([2.2, 1.4, 1, 1])
-                    with tool_row[0]:
-                        tool = st.radio(
-                            "Tool",
-                            ["Pen", "Eraser"],
-                            horizontal=True,
-                            label_visibility="collapsed",
-                            key="canvas_tool_single",
-                        )
-                    with tool_row[1]:
-                        st.checkbox(
-                            "Stylus-only",
-                            help="Best on iPad. When enabled, finger/palm touches are ignored.",
-                            key="stylus_only_enabled",
-                        )
-                    undo_clicked = tool_row[2].button("Undo", use_container_width=True, key="canvas_undo_single")
-                    clear_clicked = tool_row[3].button("Clear", use_container_width=True, key="canvas_clear_single")
-                    cmd = None
-                    if undo_clicked:
-                        st.session_state["feedback"] = None
-                        st.session_state["canvas_cmd_nonce_single"] = int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0) + 1
-                        cmd = "undo"
-                    if clear_clicked:
-                        st.session_state["feedback"] = None
-                        st.session_state["last_canvas_data_url_single"] = None
-                        st.session_state["last_canvas_image_data_single"] = None
-                        st.session_state["canvas_cmd_nonce_single"] = int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0) + 1
-                        st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
-                        cmd = "clear"
-
-                    stroke_width = 2 if tool == "Pen" else 30
-                    stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
-                    canvas_value = stylus_canvas(
-                        stroke_width=stroke_width,
-                        stroke_color=stroke_color,
-                        background_color=CANVAS_BG_HEX,
-                        height=canvas_height,
-                        width=None,
-                        min_height=CANVAS_HEIGHT_DEFAULT,
-                        max_height=CANVAS_HEIGHT_EXPANDED,
-                        storage_key=canvas_storage_key,
-                        initial_data_url=st.session_state.get("last_canvas_data_url_single"),
-                        pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
-                        tool=("pen" if tool == "Pen" else "eraser"),
-                        command=cmd,
-                        command_nonce=int(st.session_state.get("canvas_cmd_nonce_single", 0) or 0),
-                        key=f"stylus_canvas_single_{qid or 'none'}_{st.session_state['canvas_key']}",
-                    )
-                    if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
-                        st.session_state["last_canvas_data_url_single"] = canvas_value.get("data_url")
-                else:
-                    tool_row = st.columns([2, 1])
-                    with tool_row[0]:
-                        tool = st.radio(
-                            "Tool",
-                            ["Pen", "Eraser"],
-                            horizontal=True,
-                            label_visibility="collapsed",
-                            key="canvas_tool_single",
-                        )
-                    clear_clicked = tool_row[1].button("Clear", use_container_width=True, key="canvas_clear_single")
-                    if clear_clicked:
-                        st.session_state["feedback"] = None
-                        st.session_state["last_canvas_image_data_single"] = None
-                        st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
-                        st.rerun()
-                    stroke_width = 2 if tool == "Pen" else 30
-                    stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
-                    try:
-                        from streamlit_drawable_canvas import st_canvas as _st_canvas
-                    except Exception:
-                        _st_canvas = None
-                    if _st_canvas is None:
-                        st.warning("Canvas unavailable. Add components folder or install streamlit-drawable-canvas.")
-                        canvas_result = None
-                    else:
-                        canvas_result = _st_canvas(
-                            stroke_width=stroke_width,
-                            stroke_color=stroke_color,
-                            background_color=CANVAS_BG_HEX,
-                            height=canvas_height,
-                            width=600,
-                            drawing_mode="freedraw",
-                            key=f"canvas_single_{st.session_state['canvas_key']}",
-                            display_toolbar=False,
-                            update_streamlit=True,
-                        )
-                        if canvas_result is not None and getattr(canvas_result, "image_data", None) is not None:
-                            if canvas_has_ink(canvas_result.image_data):
-                                st.session_state["last_canvas_image_data_single"] = canvas_result.image_data
+                canvas_value, canvas_result = _render_canvas("single", canvas_height, canvas_storage_key, qid)
 
                 submitted_writing = st.button(
                     "Submit Writing",
@@ -972,97 +977,7 @@ def render_student_page(helpers: dict):
                         if canvas_expanded
                         else f"panphy_canvas_h_{SUBJECT_SITE}_journey_v2"
                     )
-                    if _stylus_canvas_available():
-                        tool_row = st.columns([2.2, 1.4, 1, 1])
-                        with tool_row[0]:
-                            tool = st.radio(
-                                "Tool",
-                                ["Pen", "Eraser"],
-                                horizontal=True,
-                                label_visibility="collapsed",
-                                key="canvas_tool_journey",
-                            )
-                        with tool_row[1]:
-                            st.checkbox(
-                                "Stylus-only",
-                                help="Best on iPad. When enabled, finger/palm touches are ignored.",
-                                key="stylus_only_enabled",
-                            )
-                        undo_clicked = tool_row[2].button("Undo", use_container_width=True, key="canvas_undo_journey")
-                        clear_clicked = tool_row[3].button("Clear", use_container_width=True, key="canvas_clear_journey")
-                        cmd = None
-                        if undo_clicked:
-                            st.session_state["feedback"] = None
-                            st.session_state["canvas_cmd_nonce_journey"] = int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0) + 1
-                            cmd = "undo"
-                        if clear_clicked:
-                            st.session_state["feedback"] = None
-                            st.session_state["last_canvas_data_url_journey"] = None
-                            st.session_state["last_canvas_image_data_journey"] = None
-                            st.session_state["canvas_cmd_nonce_journey"] = int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0) + 1
-                            st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
-                            cmd = "clear"
-
-                        stroke_width = 2 if tool == "Pen" else 30
-                        stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
-                        canvas_value = stylus_canvas(
-                            stroke_width=stroke_width,
-                            stroke_color=stroke_color,
-                            background_color=CANVAS_BG_HEX,
-                            height=canvas_height,
-                            width=None,
-                            min_height=CANVAS_HEIGHT_DEFAULT,
-                            max_height=CANVAS_HEIGHT_EXPANDED,
-                            storage_key=canvas_storage_key,
-                            initial_data_url=st.session_state.get("last_canvas_data_url_journey"),
-                            pen_only=bool(st.session_state.get("stylus_only_enabled", True)),
-                            tool=("pen" if tool == "Pen" else "eraser"),
-                            command=cmd,
-                            command_nonce=int(st.session_state.get("canvas_cmd_nonce_journey", 0) or 0),
-                            key=f"stylus_canvas_journey_{qid or 'none'}_{step_i}_{st.session_state['canvas_key']}",
-                        )
-                        if isinstance(canvas_value, dict) and (not canvas_value.get("is_empty")) and canvas_value.get("data_url"):
-                            st.session_state["last_canvas_data_url_journey"] = canvas_value.get("data_url")
-                    else:
-                        tool_row = st.columns([2, 1])
-                        with tool_row[0]:
-                            tool = st.radio(
-                                "Tool",
-                                ["Pen", "Eraser"],
-                                horizontal=True,
-                                label_visibility="collapsed",
-                                key="canvas_tool_journey",
-                            )
-                        clear_clicked = tool_row[1].button("Clear", use_container_width=True, key="canvas_clear_journey")
-                        if clear_clicked:
-                            st.session_state["feedback"] = None
-                            st.session_state["last_canvas_image_data_journey"] = None
-                            st.session_state["canvas_key"] = int(st.session_state.get("canvas_key", 0) or 0) + 1
-                            st.rerun()
-                        stroke_width = 2 if tool == "Pen" else 30
-                        stroke_color = "#000000" if tool == "Pen" else CANVAS_BG_HEX
-                        try:
-                            from streamlit_drawable_canvas import st_canvas as _st_canvas
-                        except Exception:
-                            _st_canvas = None
-                        if _st_canvas is None:
-                            st.warning("Canvas unavailable. Add components folder or install streamlit-drawable-canvas.")
-                            canvas_result = None
-                        else:
-                            canvas_result = _st_canvas(
-                                stroke_width=stroke_width,
-                                stroke_color=stroke_color,
-                                background_color=CANVAS_BG_HEX,
-                                height=canvas_height,
-                                width=600,
-                                drawing_mode="freedraw",
-                                key=f"canvas_journey_{st.session_state['canvas_key']}",
-                                display_toolbar=False,
-                                update_streamlit=True,
-                            )
-                            if canvas_result is not None and getattr(canvas_result, "image_data", None) is not None:
-                                if canvas_has_ink(canvas_result.image_data):
-                                    st.session_state["last_canvas_image_data_journey"] = canvas_result.image_data
+                    canvas_value, canvas_result = _render_canvas("journey", canvas_height, canvas_storage_key, qid, step_i=step_i)
 
                     submitted_writing = st.button(
                         "Submit Writing",

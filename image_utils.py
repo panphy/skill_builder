@@ -9,6 +9,13 @@ LOGGER = logging.getLogger("panphy")
 # Image limits
 MAX_DIM_PX = 4000
 
+_PNG_MAGIC = b'\x89PNG\r\n\x1a\n'
+_JPEG_MAGIC = b'\xff\xd8\xff'
+
+
+def _has_valid_image_magic(data: bytes) -> bool:
+    return data[:8] == _PNG_MAGIC or data[:3] == _JPEG_MAGIC
+
 
 def _human_mb(num_bytes: int) -> str:
     return f"{(num_bytes / (1024 * 1024)):.1f}MB"
@@ -54,6 +61,9 @@ def validate_image_file(file_bytes: bytes, max_mb: float, _purpose: str) -> Tupl
     if not file_bytes:
         return False, "No image data received."
 
+    if not _has_valid_image_magic(file_bytes):
+        return False, "Invalid image file. Please upload a valid PNG/JPG."
+
     size_bytes = len(file_bytes)
     max_bytes = int(max_mb * 1024 * 1024)
 
@@ -86,6 +96,9 @@ def _compress_bytes_to_limit(
             "Large image received; attempting compression",
             extra={"ctx": {"component": "image", "size": _human_mb(size_bytes), "limit": f"{max_mb:.0f}MB"}},
         )
+
+    if not _has_valid_image_magic(file_bytes):
+        return False, b"", "", "Invalid image file. Please upload a valid PNG/JPG."
 
     try:
         img = Image.open(io.BytesIO(file_bytes))
@@ -127,7 +140,10 @@ def _compress_bytes_to_limit(
                     best_bytes = out
                     best_quality = q
                     img = img2
+                    img2 = None
                     break
+            if img2 is not None:
+                img2.close()
             if best_bytes is not None:
                 break
             scale *= 0.9
