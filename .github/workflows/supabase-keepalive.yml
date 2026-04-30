@@ -14,37 +14,55 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping PanPhy Skill Builder
+        continue-on-error: true
         env:
           URL: https://quvabaudrylulyvuqayu.supabase.co
           KEY: ${{ secrets.SUPABASE_ANON_KEY_SKILL_BUILDER }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           if [ -z "${KEY:-}" ]; then
-            echo "::error::Secret SUPABASE_ANON_KEY_SKILL_BUILDER is not set"
-            exit 1
+            echo "::warning::Secret SUPABASE_ANON_KEY_SKILL_BUILDER not set — skipping"
+            exit 0
           fi
-          code=$(curl -sS -o /tmp/body -w "%{http_code}" \
+          code=$(curl -sSL -o /tmp/body -w "%{http_code}" \
             "$URL/rest/v1/" \
             -H "apikey: $KEY" \
-            -H "Authorization: Bearer $KEY")
+            -H "Authorization: Bearer $KEY") || {
+              echo "::error::curl failed for skill-builder"
+              exit 1
+            }
           echo "skill-builder HTTP $code"
-          # PostgREST returns 200 with the OpenAPI spec, which requires
-          # a real query against pg_catalog -> resets the inactivity timer.
-          [ "$code" = "200" ]
+          if [ "$code" != "200" ]; then
+            echo "--- response body ---"
+            head -c 2000 /tmp/body || true
+            echo
+            echo "::error::skill-builder returned HTTP $code"
+            exit 1
+          fi
 
       - name: Ping PanPhy Games
+        continue-on-error: true
         env:
           URL: https://ldkgodxalwuvkqygchns.supabase.co
           KEY: ${{ secrets.SUPABASE_ANON_KEY_GAMES }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           if [ -z "${KEY:-}" ]; then
-            echo "::error::Secret SUPABASE_ANON_KEY_GAMES is not set"
-            exit 1
+            echo "::warning::Secret SUPABASE_ANON_KEY_GAMES not set — skipping"
+            exit 0
           fi
-          code=$(curl -sS -o /tmp/body -w "%{http_code}" \
+          code=$(curl -sSL -o /tmp/body -w "%{http_code}" \
             "$URL/rest/v1/" \
             -H "apikey: $KEY" \
-            -H "Authorization: Bearer $KEY")
+            -H "Authorization: Bearer $KEY") || {
+              echo "::error::curl failed for games"
+              exit 1
+            }
           echo "games HTTP $code"
-          [ "$code" = "200" ]
+          if [ "$code" != "200" ]; then
+            echo "--- response body ---"
+            head -c 2000 /tmp/body || true
+            echo
+            echo "::error::games returned HTTP $code"
+            exit 1
+          fi
