@@ -9,7 +9,7 @@ from ai_generation import AI_READY, MODEL_NAME
 from ai_progress import _run_ai_with_progress
 from attempts import delete_attempt_by_id, ensure_attempts_table, insert_attempt, load_attempts_df
 from canvas_utils import canvas_has_ink, data_url_to_image_data, preprocess_canvas_image
-from db import db_ready, get_db_driver_type, insert_question_bank_row
+from db import db_ready, get_db_driver_type, insert_question_bank_row, record_app_heartbeat
 from image_utils import _compress_bytes_to_limit, _encode_image_bytes, validate_image_file
 from markdown_rendering import normalize_markdown_math, render_md_box, render_report
 from rate_limiter import RATE_LIMIT_MAX, _check_rate_limit_db, _effective_student_id
@@ -239,6 +239,7 @@ def _build_ui_helpers() -> dict:
 
 def main() -> None:
     init_track_state()
+    record_app_heartbeat()
     nav = _render_sidebar()
     _render_header()
 

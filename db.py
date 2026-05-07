@@ -236,6 +236,16 @@ create unique index if not exists uq_question_bank_subject_source_assignment_lab
 """.strip()
 
 
+APP_HEARTBEAT_DDL = f"""
+create table if not exists public.app_heartbeat_v1 (
+  heartbeat_key text primary key,
+  subject_site text not null default '{SUBJECT_SITE}',
+  source text not null default 'streamlit_app',
+  updated_at timestamptz not null default now()
+);
+""".strip()
+
+
 @st.cache_resource
 def _ensure_question_bank_table_cached(_fp: str) -> None:
     eng = get_db_engine()
@@ -259,6 +269,44 @@ def ensure_question_bank_table():
         st.session_state["db_last_error"] = f"Question Bank Table Error: {type(e).__name__}: {e}"
         st.session_state["bank_table_ready"] = False
         LOGGER.error("Question bank table ensure failed", extra={"ctx": {"component": "db", "error": type(e).__name__}})
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _record_app_heartbeat_cached(_fp: str, subject_site: str) -> bool:
+    eng = get_db_engine()
+    if eng is None:
+        return False
+    subject_site = (subject_site or "").strip().lower() or SUBJECT_SITE
+    with eng.begin() as conn:
+        _exec_sql_many(conn, APP_HEARTBEAT_DDL)
+        conn.execute(
+            text("""
+                insert into public.app_heartbeat_v1 (heartbeat_key, subject_site, source, updated_at)
+                values (:heartbeat_key, :subject_site, 'streamlit_app', now())
+                on conflict (heartbeat_key) do update set
+                  subject_site = excluded.subject_site,
+                  source = excluded.source,
+                  updated_at = now()
+            """),
+            {"heartbeat_key": f"{subject_site}:streamlit_app", "subject_site": subject_site},
+        )
+    LOGGER.info("App heartbeat recorded", extra={"ctx": {"component": "db", "table": "app_heartbeat_v1"}})
+    return True
+
+
+def record_app_heartbeat() -> bool:
+    fp = (_safe_secret("DATABASE_URL", "") or "")[:40]
+    try:
+        ok = _record_app_heartbeat_cached(fp, SUBJECT_SITE)
+        st.session_state["app_heartbeat_ready"] = bool(ok)
+        return bool(ok)
+    except Exception as e:
+        st.session_state["app_heartbeat_ready"] = False
+        LOGGER.warning(
+            "App heartbeat failed",
+            extra={"ctx": {"component": "db", "error": type(e).__name__}},
+        )
+        return False
 
 
 @st.cache_data(ttl=30)
