@@ -225,9 +225,78 @@ create index if not exists idx_question_bank_active
 """.strip()
 
 
-QUESTION_BANK_ALTER_DDL = """
+QUESTION_BANK_ALTER_DDL = f"""
+alter table public.question_bank_v2
+  add column if not exists created_at timestamptz not null default now();
+alter table public.question_bank_v2
+  add column if not exists updated_at timestamptz not null default now();
+alter table public.question_bank_v2
+  add column if not exists source text not null default 'teacher';
+alter table public.question_bank_v2
+  add column if not exists created_by text;
+alter table public.question_bank_v2
+  add column if not exists assignment_name text;
+alter table public.question_bank_v2
+  add column if not exists question_label text;
+alter table public.question_bank_v2
+  add column if not exists max_marks int not null default 1;
+alter table public.question_bank_v2
+  add column if not exists topic text;
+alter table public.question_bank_v2
+  add column if not exists sub_topic text;
 alter table public.question_bank_v2
   add column if not exists sub_topic_raw text;
+alter table public.question_bank_v2
+  add column if not exists skill text;
+alter table public.question_bank_v2
+  add column if not exists difficulty text;
+alter table public.question_bank_v2
+  add column if not exists tags jsonb;
+alter table public.question_bank_v2
+  add column if not exists question_text text;
+alter table public.question_bank_v2
+  add column if not exists question_image_path text;
+alter table public.question_bank_v2
+  add column if not exists markscheme_text text;
+alter table public.question_bank_v2
+  add column if not exists markscheme_image_path text;
+alter table public.question_bank_v2
+  add column if not exists question_type text not null default 'single';
+alter table public.question_bank_v2
+  add column if not exists journey_json jsonb;
+alter table public.question_bank_v2
+  add column if not exists subject_site text not null default '{SUBJECT_SITE}';
+alter table public.question_bank_v2
+  add column if not exists track_ok text not null default 'both';
+alter table public.question_bank_v2
+  add column if not exists is_active boolean not null default true;
+
+update public.question_bank_v2
+  set source = coalesce(nullif(source, ''), 'teacher'),
+      assignment_name = coalesce(nullif(assignment_name, ''), 'Untitled Assignment'),
+      question_label = coalesce(nullif(question_label, ''), 'Untitled Question'),
+      max_marks = greatest(coalesce(max_marks, 1), 1),
+      question_type = coalesce(nullif(question_type, ''), 'single'),
+      subject_site = coalesce(nullif(subject_site, ''), '{SUBJECT_SITE}'),
+      track_ok = coalesce(nullif(track_ok, ''), 'both'),
+      is_active = coalesce(is_active, true);
+
+alter table public.question_bank_v2
+  alter column source set not null;
+alter table public.question_bank_v2
+  alter column assignment_name set not null;
+alter table public.question_bank_v2
+  alter column question_label set not null;
+alter table public.question_bank_v2
+  alter column max_marks set not null;
+alter table public.question_bank_v2
+  alter column question_type set not null;
+alter table public.question_bank_v2
+  alter column subject_site set not null;
+alter table public.question_bank_v2
+  alter column track_ok set not null;
+alter table public.question_bank_v2
+  alter column is_active set not null;
 
 drop index if exists public.uq_question_bank_v2_subject_source_assignment_label;
 

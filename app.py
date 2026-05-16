@@ -4,6 +4,15 @@ from logging.handlers import RotatingFileHandler
 
 import streamlit as st
 
+PANPHY_LOGO_URL = "https://panphy.github.io/assets/panphy.png"
+PANPHY_FAVICON_URL = "https://panphy.github.io/assets/favicon.png"
+
+st.set_page_config(
+    page_title="PanPhy Skill Builder",
+    page_icon=PANPHY_FAVICON_URL,
+    layout="wide",
+)
+
 from ai_feedback import get_gpt_feedback_from_bank
 from ai_generation import AI_READY, MODEL_NAME
 from ai_progress import _run_ai_with_progress
@@ -32,9 +41,6 @@ from track_state import (
 from ui_student import render_student_page
 from ui_teacher import render_teacher_page
 
-
-PANPHY_LOGO_URL = "https://panphy.github.io/assets/panphy.png"
-PANPHY_FAVICON_URL = "https://panphy.github.io/assets/favicon.png"
 
 CANVAS_BG_HEX = "#ffffff"
 TEXTAREA_HEIGHT_DEFAULT = 420
@@ -101,12 +107,6 @@ def setup_logging() -> logging.Logger:
     logger.info("Logging configured", extra={"ctx": {"component": "startup"}})
     return logger
 
-
-st.set_page_config(
-    page_title="PanPhy Skill Builder",
-    page_icon=PANPHY_FAVICON_URL,
-    layout="wide",
-)
 
 init_session_state()
 LOGGER = setup_logging()

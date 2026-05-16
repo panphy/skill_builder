@@ -81,8 +81,25 @@ def render_student_page(helpers: dict):
         st.session_state["student_difficulty_filter"] = "All"
         st.session_state["student_page_index"] = 0
         st.session_state["student_page_number"] = 1
+        _clear_selected_question_state()
+
+    def _clear_selected_question_state() -> None:
         st.session_state["selected_qid"] = None
         st.session_state["cached_q_row"] = None
+        st.session_state["cached_question_img"] = None
+        st.session_state["cached_q_path"] = None
+        st.session_state["cached_ms_path"] = None
+        st.session_state["feedback"] = None
+        st.session_state["last_canvas_image_data"] = None
+        st.session_state["last_canvas_image_data_single"] = None
+        st.session_state["last_canvas_data_url_single"] = None
+        st.session_state["last_canvas_image_data_journey"] = None
+        st.session_state["last_canvas_data_url_journey"] = None
+        st.session_state["journey_step_index"] = 0
+        st.session_state["journey_step_reports"] = []
+        st.session_state["journey_checkpoint_notes"] = {}
+        st.session_state["journey_active_id"] = None
+        st.session_state["journey_json_cache"] = None
 
     def _render_filter_chips(chips: list[str]) -> None:
         if not chips:
@@ -360,6 +377,7 @@ def render_student_page(helpers: dict):
                     st.session_state["student_filter_state"] = filter_state
                     st.session_state["student_page_index"] = 0
                     st.session_state["student_page_number"] = 1
+                    _clear_selected_question_state()
 
                 page_cols = st.columns([1.2, 1.4, 2])
                 with page_cols[0]:
@@ -428,6 +446,7 @@ def render_student_page(helpers: dict):
 
                 df_filtered = page_data.get("df", pd.DataFrame()).copy()
                 if df_filtered.empty:
+                    _clear_selected_question_state()
                     empty_choice = "No questions yet for this selection."
                     st.selectbox(
                         "Question",
@@ -529,6 +548,14 @@ def render_student_page(helpers: dict):
             q_key = f"QB:{qid}:{q_row.get('assignment_name','')}:{q_row.get('question_label','')}"
         except Exception:
             q_key = None
+
+    def _load_current_markscheme_img():
+        ms_path = (st.session_state.get("cached_ms_path") or q_row.get("markscheme_image_path") or "").strip()
+        if not ms_path:
+            return None
+        fp = (_safe_secret("SUPABASE_URL", "") or "")[:40]
+        ms_bytes = cached_download_from_storage(ms_path, fp)
+        return safe_bytes_to_pil(ms_bytes)
 
     # If journey, parse journey JSON once per selection
     journey_obj = None
@@ -662,12 +689,7 @@ def render_student_page(helpers: dict):
                             st.session_state["text_expanded_single"] = False
 
                             def task():
-                                ms_path = (st.session_state.get("cached_ms_path") or q_row.get("markscheme_image_path") or "").strip()
-                                ms_img = None
-                                if ms_path:
-                                    fp = (_safe_secret("SUPABASE_URL", "") or "")[:40]
-                                    ms_bytes = cached_download_from_storage(ms_path, fp)
-                                    ms_img = bytes_to_pil(ms_bytes) if ms_bytes else None
+                                ms_img = _load_current_markscheme_img()
                                 return get_gpt_feedback_from_bank(
                                     student_answer=answer_single,
                                     q_row=q_row,
@@ -763,12 +785,13 @@ def render_student_page(helpers: dict):
                         img_for_ai = Image.open(io.BytesIO(outb)).convert("RGB")
 
                     def task():
+                        ms_img = _load_current_markscheme_img()
                         return get_gpt_feedback_from_bank(
                             student_answer=img_for_ai,
                             q_row=q_row,
                             is_student_image=True,
                             question_img=question_img,
-                            markscheme_img=None,
+                            markscheme_img=ms_img,
                         )
 
                     st.session_state["feedback"] = _run_ai_with_progress(

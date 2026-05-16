@@ -61,6 +61,19 @@ def render_teacher_page(nav_label: str, helpers: dict):
     def _sorted_sub_topic_options(options):
         return sorted(options, key=lambda value: _clean_sub_topic_label(value).lower())
 
+    def _clear_journey_draft_widget_state() -> None:
+        prefixes = (
+            "jour_plan_md",
+            "jour_topic_display",
+            "jour_sub_topic_display",
+            "jour_skill",
+            "jour_difficulty",
+            "jour_step_",
+        )
+        for key in list(st.session_state.keys()):
+            if any(str(key).startswith(prefix) for prefix in prefixes):
+                del st.session_state[key]
+
     def _validate_classification_inputs(
         topic_value,
         sub_topic_value,
@@ -952,6 +965,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
 
                                     # Default label
                                     token = pysecrets.token_hex(3)
+                                    _clear_journey_draft_widget_state()
                                     default_label = f"JOURNEY-{slugify(topic_plain)[:24]}-{token}"
 
                                     # Track eligibility: if any chosen topic is separate_only, the whole journey is separate_only.
@@ -965,6 +979,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                     st.session_state["journey_draft"] = {
                                         "assignment_name": (j_assignment or "").strip() or "Topic Journey",
                                         "question_label": default_label,
+                                        "draft_id": token,
                                         "track_ok": draft_track_ok,
                                         "tags": [t.strip() for t in (j_tags or "").split(",") if t.strip()],
                                         "topic": topic_primary,
@@ -992,6 +1007,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                 st.caption("These details help diagnose failures (model output shape, JSON errors, timeouts).")
                     if st.session_state.get("journey_draft"):
                         d = st.session_state["journey_draft"]
+                        draft_id = str(d.get("draft_id") or "current")
                         journey = d.get("journey", {}) if isinstance(d, dict) else {}
                         steps = journey.get("steps", []) if isinstance(journey, dict) else []
 
@@ -1066,7 +1082,7 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                     key="jour_difficulty",
                                 )
 
-                            plan_md = st.text_area("Journey plan (Markdown)", value=journey.get("plan_markdown", ""), height=140, key="jour_plan_md")
+                            plan_md = st.text_area("Journey plan (Markdown)", value=journey.get("plan_markdown", ""), height=140, key=f"jour_plan_md_{draft_id}")
                             render_md_box("Preview: Journey plan", plan_md, empty_text="No plan.")
 
                             # Optional teacher-only spec alignment preview
@@ -1089,21 +1105,21 @@ def render_teacher_page(nav_label: str, helpers: dict):
                                     with st.expander(f"Step {i+1}: {stp.get('objective','')[:80]}", expanded=(i == 0)):
                                         obj = st.text_input("Objective", value=str(stp.get("objective", "") or ""), key=f"jour_step_obj_{i}")
                                         mm = st.number_input("Max marks", min_value=1, max_value=12, value=int(stp.get("max_marks", 1) or 1), step=1, key=f"jour_step_mm_{i}")
-                                        q_key = f"jour_step_q_{i}"
-                                        ms_key = f"jour_step_ms_{i}"
+                                        q_key = f"jour_step_q_{draft_id}_{i}"
+                                        ms_key = f"jour_step_ms_{draft_id}_{i}"
                                         if q_key not in st.session_state:
                                             st.session_state[q_key] = str(stp.get("question_text", "") or "")
                                         if ms_key not in st.session_state:
                                             st.session_state[ms_key] = str(stp.get("markscheme_text", "") or "")
                                         qtxt = st.session_state.get(q_key, "")
                                         mstxt = st.session_state.get(ms_key, "")
-                                        miscon = st.text_area("Common misconceptions (one per line)", value="\n".join([str(x) for x in (stp.get("misconceptions", []) or [])]), height=90, key=f"jour_step_mis_{i}")
+                                        miscon = st.text_area("Common misconceptions (one per line)", value="\n".join([str(x) for x in (stp.get("misconceptions", []) or [])]), height=90, key=f"jour_step_mis_{draft_id}_{i}")
 
                                         render_md_box("Preview: Question", qtxt, empty_text="No question text.")
                                         render_md_box("Preview: Mark scheme", mstxt, empty_text="No mark scheme.")
 
-                                        edit_q_key = f"jour_step_edit_q_{i}"
-                                        edit_ms_key = f"jour_step_edit_ms_{i}"
+                                        edit_q_key = f"jour_step_edit_q_{draft_id}_{i}"
+                                        edit_ms_key = f"jour_step_edit_ms_{draft_id}_{i}"
                                         if edit_q_key not in st.session_state:
                                             st.session_state[edit_q_key] = False
                                         if edit_ms_key not in st.session_state:

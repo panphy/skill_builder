@@ -137,9 +137,6 @@ def _coerce_utc(value, fallback: datetime) -> datetime:
 
 
 def _check_rate_limit_db(student_id: str) -> Tuple[bool, int, str]:
-    if st.session_state.get("is_teacher", False):
-        return True, RATE_LIMIT_MAX, ""
-
     eng = get_db_engine()
     if eng is None:
         return True, RATE_LIMIT_MAX, ""

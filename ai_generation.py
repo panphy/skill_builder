@@ -62,7 +62,6 @@ try:
     AI_READY = True
 except Exception as e:
     client = None
-    st.error("⚠️ OpenAI API Key missing or invalid in Streamlit Secrets!")
     AI_READY = False
     LOGGER.error("OpenAI client init failed", extra={"ctx": {"component": "openai", "error": type(e).__name__}})
 

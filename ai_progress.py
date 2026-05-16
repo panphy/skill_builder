@@ -1,8 +1,10 @@
+import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 import streamlit as st
+import streamlit.components.v1 as components
 try:
     from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
 except ImportError:
@@ -70,10 +72,10 @@ def _run_ai_with_progress(
     var overlay = doc.getElementById('ai-loading-overlay');
 
     var percent = {percent};
-    var subtitle = "{subtitle_text}";
-    var stepLabel = "{step_label}";
+    var subtitle = {json.dumps(subtitle_text or "")};
+    var stepLabel = {json.dumps(step_label)};
     var stepPercent = {step_percent};
-    var estimateLabel = "{estimate_label}";
+    var estimateLabel = {json.dumps(estimate_label)};
 
     if (overlay) {{
         var progressFill = overlay.querySelector('.ai-popup-progress-fill');
@@ -204,7 +206,7 @@ def _run_ai_with_progress(
 """
 
         with overlay.container():
-            st.iframe(popup_script, height=1, tab_index=-1)
+            components.html(popup_script, height=1)
 
     def _calc_percent(elapsed_s: float, done: bool = False) -> int:
         if done:
@@ -250,4 +252,4 @@ def _run_ai_with_progress(
 })();
 </script>
 """
-        st.iframe(cleanup_script, height=1, tab_index=-1)
+        components.html(cleanup_script, height=1)
